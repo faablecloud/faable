@@ -4,7 +4,7 @@
     "rootDir": "src",
     "outDir": "dist",
     "target": "ESNext",
-    "module": "ESNext",
+    "module": "CommonJS",
     "moduleResolution": "node",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
