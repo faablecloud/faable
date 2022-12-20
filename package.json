@@ -8,6 +8,9 @@
   "bugs": {
     "url": "https://github.com/faablecloud/faable/issues"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "homepage": "https://github.com/faablecloud/faable#readme",
   "bin": {
     "faable": "bin/faable"
