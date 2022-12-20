@@ -41,6 +41,6 @@ export const deploy: CommandModule<{}, Options> = {
 
     // TODO: get this data from Faable API
     //faablecloud#${ctx.faable_user}+deployment
-    await upload_tag({ app_name, user: "", key: "" });
+    await upload_tag({ app_name, user: "", password: "" });
   },
 };
