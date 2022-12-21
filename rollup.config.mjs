@@ -4,25 +4,28 @@ import commonjs from "@rollup/plugin-commonjs";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 import copy from "rollup-plugin-copy";
 import generatePackageJson from "rollup-plugin-generate-package-json";
+import autoExternal from "rollup-plugin-auto-external";
 
 export default {
   input: "src/index.ts",
   output: {
-    file: "pkg/dist/faable.js",
-    format: "cjs",
+    dir: "pkg/dist",
+    format: "esm",
     exports: "named",
-    preserveModules: false,
+    preserveModules: true,
     preserveModulesRoot: "src",
   },
   plugins: [
+    autoExternal(),
     json(),
     typescript(),
-    commonjs(),
-    nodeResolve(),
+    // commonjs(),
+    // nodeResolve(),
     copy({
       targets: [
         { src: "README.md", dest: "pkg" },
         { src: "bin/*", dest: "pkg/bin" },
+        { src: "templates/**/*", dest: "pkg/templates" },
       ],
     }),
     generatePackageJson({
@@ -32,8 +35,9 @@ export default {
         main: pkg.main,
         dependencies: pkg.dependencies,
         bin: {
-          faable: "bin/faable",
+          faable: "bin/faable.js",
         },
+        type: "module",
         license: "MIT",
         author: "Marc Pomar <marc@faable.com>",
         types: "./dist/index.d.ts",

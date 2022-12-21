@@ -1,9 +1,13 @@
-import * as fs from "fs-extra";
+import fs from "fs-extra";
 import Handlebars from "handlebars";
 import * as path from "path";
 import { log } from "../../log";
+import { fileURLToPath } from "url";
 
-const templates_dir = path.join(__dirname, "./templates");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const templates_dir = path.join(__dirname, "../../../templates");
 const dockerfile = fs.readFileSync(`${templates_dir}/Dockerfile`).toString();
 
 // Docker template file

@@ -1,6 +1,6 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { deploy } from "./commands/deploy";
+import { deploy } from "./commands/deploy/deploy";
 
 yargs(hideBin(process.argv))
   .scriptName("faable")
