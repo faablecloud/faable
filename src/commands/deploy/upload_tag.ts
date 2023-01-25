@@ -11,15 +11,13 @@ export const upload_tag = async (props: RegistryUploadConfig) => {
   const { user, password, hostname, image } = props.registry;
 
   // Registry login
-
-  await cmd("/bin/bash", [
-    "-c",
-    `echo "${password}" | docker login --username ${user} --password-stdin ${hostname}`,
-  ]);
+  const docker_login_cmd = `echo "${password}" | docker login --username ${user} --password-stdin ${hostname}`;
+  await cmd("/bin/bash", ["-c", docker_login_cmd]);
 
   // Tag image for production
-  await cmd("docker", ["tag", "app", image]);
+  const image_tag = `${hostname}/${image}`;
+  await cmd("docker", ["tag", "app", image_tag]);
 
   // Upload the image to faable registry
-  await cmd("docker", ["push", image]);
+  await cmd("docker", ["push", image_tag]);
 };
