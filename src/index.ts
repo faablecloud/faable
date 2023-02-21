@@ -1,12 +1,15 @@
-import yargs, { middleware } from "yargs";
+import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { faable_api } from "./api/faable_api";
+import { apps } from "./commands/apps";
+import { configure } from "./commands/configure";
 import { deploy } from "./commands/deploy";
 import { log } from "./log";
 
 const yg = yargs();
 yg.scriptName("faable")
   .command(deploy)
+  .command(apps)
+  .command(configure)
   .demandCommand(1)
   .fail(function (msg, err) {
     if (err) {
@@ -19,4 +22,4 @@ yg.scriptName("faable")
       log.info(msg);
     }
   })
-  .parse(hideBin(process.argv), { api: faable_api() });
+  .parse(hideBin(process.argv), {});

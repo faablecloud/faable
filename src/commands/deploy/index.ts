@@ -4,10 +4,10 @@ import { build_docker } from "./build_docker";
 import { upload_tag } from "./upload_tag";
 import fs from "fs-extra";
 import { check_environment } from "./check_environment";
-import { FaableApi } from "../../api/faable_api";
 import { analyze_package } from "./analyze_package";
+import { context } from "../../api/context";
 
-type Options = { api: FaableApi; app_name: string; workdir: string };
+type Options = { app_name: string; workdir: string };
 
 export const deploy: CommandModule<{}, Options> = {
   command: "deploy [app_name]",
@@ -30,15 +30,18 @@ export const deploy: CommandModule<{}, Options> = {
       })
       .showHelpOnFail(false) as any;
   },
+
   handler: async (args) => {
-    const { app_name, workdir, api } = args;
+    const { app_name, workdir } = args;
     if (!app_name) {
       throw new Error("Missing app_name");
     }
+
     // Check environment is ready
     await check_environment();
 
     // Get registry data from api.faable.com
+    const { api } = await context();
     const app = await api.getBySlug(app_name);
     log.info(`⚡️ Building app "${app.name}"`);
 
