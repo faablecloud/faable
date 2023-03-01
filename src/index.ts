@@ -13,7 +13,7 @@ yg.scriptName("faable")
   .demandCommand(1)
   .fail(function (msg, err) {
     if (err) {
-      console.log(`❌ ${err.message}`);
+      log.error(`❌ ${err.message}`);
       process.exit(1);
       return;
     }

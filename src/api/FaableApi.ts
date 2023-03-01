@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosInstance, AxiosResponse } from "axios";
-import { AuthStrategy } from "./types";
+import { prepare_client, FaableClientConfig } from "./client";
 export interface FaableApp {
   id: string;
   name: string;
@@ -20,7 +20,11 @@ const wrap_error = async <T>(prom: Promise<AxiosResponse<T>>): Promise<T> => {
     const e: AxiosError<{ message: string }> = error;
     if (e.isAxiosError) {
       const res = e.response;
-      throw new Error(`API Error: ${res.data.message}`);
+      if (res) {
+        throw new Error(`API Error ${res.status}: ${res?.data.message}`);
+      } else {
+        throw new Error(`API Error:${e.message}`);
+      }
     }
     throw error;
   }
@@ -35,37 +39,17 @@ const paginate = async <Q extends Promise<Page<T>>, T>(
   return items;
 };
 
-type FaableApiConfig<T = any> = {
-  authStrategy?: AuthStrategy<T>;
-  auth?: T;
-};
-export class FaableAppsApi {
+type FaableApiConfig<T> = {} & FaableClientConfig<T>;
+
+export class FaableApi<T = any> {
   client: AxiosInstance;
 
-  constructor(config: FaableApiConfig) {
-    const { authStrategy, auth } = config;
-    const strategy = authStrategy && authStrategy(auth);
-    this.client = axios.create({
-      baseURL: "https://api.faable.com",
-    });
-    this.client.interceptors.request.use(
-      async function (config) {
-        // Do something before request is sent
-        const headers = strategy ? await strategy.headers() : {};
-        config.headers.set(headers);
-        // console.log("all headers");
-        // console.log(headers);
-        return config;
-      },
-      function (error) {
-        // Do something with request error
-        return Promise.reject(error);
-      }
-    );
+  constructor(config: FaableApiConfig<T>) {
+    this.client = prepare_client(config);
   }
 
-  static create(config: FaableApiConfig = {}) {
-    return new FaableAppsApi(config);
+  static create<T>(config: FaableApiConfig<T> = {}) {
+    return new FaableApi(config);
   }
 
   async list() {

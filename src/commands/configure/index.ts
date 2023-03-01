@@ -1,11 +1,11 @@
 import { CommandModule } from "yargs";
 import prompts from "prompts";
-import { FaableAppsApi } from "../../api/faable_api";
+import { FaableApi } from "../../api/FaableApi";
 import fs from "fs-extra";
 import os from "os";
 import path from "path";
 type Options = {
-  api: FaableAppsApi;
+  api: FaableApi;
   app_name: string;
   workdir: string;
   remove: boolean;

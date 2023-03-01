@@ -1,6 +1,5 @@
 import axios from "axios";
-import { config } from "./config";
-import { AuthStrategy } from "./types";
+import { AuthStrategyBuilder } from "./types";
 
 interface ClientCredentials {
   clientId: string;
@@ -13,9 +12,9 @@ type TokenResponse = {
   token_type: string;
 };
 
-export const authenticateOAuthApp: AuthStrategy<Partial<ClientCredentials>> = (
-  creds = config
-) => {
+export const authenticateOAuthApp: AuthStrategyBuilder<
+  Partial<ClientCredentials>
+> = (creds) => {
   const { clientId, clientSecret } = creds;
   if (!clientId || !clientSecret) {
     throw new Error("Missing credentials. Run faable configure first.");

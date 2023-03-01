@@ -18,6 +18,8 @@
     "axios": "^1.2.3",
     "fs-extra": "^11.1.0",
     "handlebars": "^4.7.7",
+    "pino": "^8.11.0",
+    "pino-pretty": "^9.4.0",
     "promisify-child-process": "^4.1.1",
     "prompts": "^2.4.2",
     "tslib": "^2.4.1",

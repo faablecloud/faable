@@ -1,9 +1,9 @@
-import { FaableAppsApi } from "./faable_api";
-
+import { FaableApi } from "./FaableApi";
+import { authenticateOAuthApp } from "./authenticateOAuthApp";
 export const context = async () => {
-  const strategy = (await import("./authenticateOAuthApp"))
-    .authenticateOAuthApp;
+  const authStrategy = authenticateOAuthApp;
+  const { config } = await import("./userdir_config");
   return {
-    api: FaableAppsApi.create({ authStrategy: strategy }),
+    api: FaableApi.create({ authStrategy, auth: config }),
   };
 };

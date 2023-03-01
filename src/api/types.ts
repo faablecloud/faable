@@ -1,4 +1,4 @@
-export type AuthStrategyResponse = {
+export type AuthStrategy = {
   headers: () => Promise<Record<string, string>>;
 };
-export type AuthStrategy<T> = (...params: T[]) => AuthStrategyResponse;
+export type AuthStrategyBuilder<T> = (...params: T[]) => AuthStrategy;
