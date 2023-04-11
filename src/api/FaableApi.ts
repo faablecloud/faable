@@ -12,30 +12,46 @@ export interface FaableAppRegistry {
   password: string;
 }
 
-const wrap_error = async <T>(prom: Promise<AxiosResponse<T>>): Promise<T> => {
-  try {
-    const res = await prom;
-    return res.data as any;
-  } catch (error) {
-    const e: AxiosError<{ message: string }> = error;
-    if (e.isAxiosError) {
-      const res = e.response;
-      if (res) {
-        throw new Error(`API Error ${res.status}: ${res?.data.message}`);
-      } else {
-        throw new Error(`API Error:${e.message}`);
+function handleError(message?: string) {
+  return function (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor
+  ) {
+    const method = descriptor.value;
+    descriptor.value = async function (...args: any) {
+      try {
+        const res = await method.bind(this).apply(target, args);
+        return res.data;
+      } catch (error) {
+        const e: AxiosError<{ message: string }> = error;
+        if (e.isAxiosError) {
+          const res = e.response;
+          if (res) {
+            throw new Error(`API Error ${res.status}: ${res?.data.message}`);
+          } else {
+            throw new Error(`API Error:${e.message}`);
+          }
+        }
+        throw error;
       }
-    }
-    throw error;
-  }
-};
+    };
+  };
+}
 
 type Page<Q> = { results: Q[] };
 
-const paginate = async <Q extends Promise<Page<T>>, T>(
-  data: Q
+const paginate = async <T, Q extends Promise<Page<T>>>(
+  res: Q
 ): Promise<Awaited<Q>["results"]> => {
-  const items = (await data).results;
+  const items = (await res).results;
+  return items;
+};
+
+const data = async <T, Q extends Promise<AxiosResponse<T>>>(
+  res: Q
+): Promise<Awaited<Q>["data"]> => {
+  const items = (await res).data;
   return items;
 };
 
@@ -52,17 +68,18 @@ export class FaableApi<T = any> {
     return new FaableApi(config);
   }
 
+  @handleError()
   async list() {
-    return paginate(wrap_error(this.client.get<Page<FaableApp>>(`/app`)));
+    return paginate(data(this.client.get<Page<FaableApp>>(`/app`)));
   }
 
+  @handleError()
   async getBySlug(slug: string) {
-    return wrap_error(this.client.get<FaableApp>(`/app/slug/${slug}`));
+    return data(this.client.get<FaableApp>(`/app/slug/${slug}`));
   }
 
+  @handleError()
   async getRegistry(app_id: string) {
-    return wrap_error(
-      this.client.get<FaableAppRegistry>(`/app/${app_id}/registry`)
-    );
+    return data(this.client.get<FaableAppRegistry>(`/app/${app_id}/registry`));
   }
 }
