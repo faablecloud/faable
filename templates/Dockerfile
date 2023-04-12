@@ -12,4 +12,7 @@ ENV START_SCRIPT=start
 # Copy Usercode
 COPY . .
 
+# Entrypoint stript
+RUN echo '{{{escape entry_script}}}' >> entrypoint.sh
+
 CMD ["/bin/sh", "./entrypoint.sh"]  
