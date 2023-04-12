@@ -7,7 +7,7 @@ export const deploy: CommandModule<{}, DeployCommandArgs> = {
   describe: "Deploy a faable app",
   builder: (yargs) => {
     return yargs
-      .positional("app_name", {
+      .positional("app_slug", {
         type: "string",
         description: "App name to build for",
         default: (s) => {
