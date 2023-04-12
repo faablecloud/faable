@@ -53,7 +53,7 @@ export const bundle_docker = async (props: BuildConfig) => {
     "-c",
     `docker build -t ${tagname} ${workdir} -f -<<EOF\n${dockerfile}\nEOF`,
   ];
-  console.log(command.join(" "));
+
   await cmd("/bin/bash", command, { timeout, enableOutput: true });
 
   log.info(`⚙️  Image ready [tag:${tagname}]`);
