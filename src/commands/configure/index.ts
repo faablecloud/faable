@@ -37,13 +37,8 @@ export const configure: CommandModule<{}, Options> = {
     const response = await prompts([
       {
         type: "text",
-        name: "clientId",
-        message: "What is your Faable clientId?",
-      },
-      {
-        type: "text",
-        name: "clientSecret",
-        message: "What is your Faable clientSecret?",
+        name: "apikey",
+        message: "What is your Faable ApiKey?",
       },
     ]);
     await fs.ensureDir(faable_home);

@@ -1,18 +1,29 @@
 import { spawn } from "promisify-child-process";
 
 interface CmdParams {
-  enableOutput?: boolean;
+  /** Show output */
+  enableOutput: boolean;
+  /** Command timeout in milliseconds */
+  timeout: number;
+  /** Sets workdir */
+  cwd: string;
 }
 
 export const cmd = async (
   cmd: string,
   args?: string[],
-  params: CmdParams = { enableOutput: false }
+  params?: Partial<CmdParams>
 ) => {
-  const { enableOutput } = params;
+  // Defaults
+  const enableOutput = params?.enableOutput || false;
+  const timeout = params?.timeout;
+  const cwd = params?.cwd;
+
   const child = spawn(cmd, args, {
     encoding: "utf8",
     stdio: enableOutput ? "inherit" : "pipe",
+    timeout,
+    cwd,
   });
   const out_data: Buffer[] = [];
   child.stderr?.on("data", (data) => {

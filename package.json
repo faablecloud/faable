@@ -33,6 +33,7 @@
     "@types/fs-extra": "^9.0.13",
     "@types/node": "^18.11.17",
     "@types/yargs": "^17.0.17",
+    "ava": "^5.2.0",
     "rimraf": "^3.0.2",
     "rollup": "^3.7.5",
     "rollup-plugin-auto-external": "^2.0.0",
@@ -47,7 +48,8 @@
     "start": "yarn run cli",
     "cli": "ts-node --esm --experimental-specifier-resolution=node src/index.ts",
     "build": "rimraf pkg && rollup --config rollup.config.mjs",
-    "release": "yarn build && semantic-release"
+    "release": "yarn build && semantic-release",
+    "test": "ava"
   },
   "release": {
     "branches": "main",
@@ -65,5 +67,14 @@
   },
   "engines": {
     "node": ">=16"
+  },
+  "ava": {
+    "extensions": {
+      "ts": "module"
+    },
+    "nodeArguments": [
+      "--loader=ts-node/esm",
+      "--experimental-specifier-resolution=node"
+    ]
   }
 }

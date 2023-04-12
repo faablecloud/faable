@@ -21,16 +21,17 @@ function handleError(message?: string) {
     const method = descriptor.value;
     descriptor.value = async function (...args: any) {
       try {
-        const res = await method.bind(this).apply(target, args);
-        return res.data;
+        return await method.bind(this).apply(target, args);
       } catch (error) {
         const e: AxiosError<{ message: string }> = error;
         if (e.isAxiosError) {
           const res = e.response;
           if (res) {
-            throw new Error(`API Error ${res.status}: ${res?.data.message}`);
+            throw new Error(
+              `FaableApi ${e.config.url} ${res.status}: ${res?.data.message}`
+            );
           } else {
-            throw new Error(`API Error:${e.message}`);
+            throw new Error(`FaableApi ${e.message}`);
           }
         }
         throw error;

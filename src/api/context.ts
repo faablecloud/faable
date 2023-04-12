@@ -1,9 +1,10 @@
 import { FaableApi } from "./FaableApi";
-import { authenticateOAuthApp } from "./authenticateOAuthApp";
+import { apikey } from "./strategies/apikey";
+import { authenticateOAuthApp } from "./strategies/authenticateOAuthApp";
+
 export const context = async () => {
-  const authStrategy = authenticateOAuthApp;
   const { config } = await import("./userdir_config");
   return {
-    api: FaableApi.create({ authStrategy, auth: config }),
+    api: FaableApi.create({ authStrategy: apikey, auth: config }),
   };
 };

@@ -5,9 +5,12 @@ import { PackageJson } from "type-fest";
 
 interface AnalyzePackage {
   workdir: string;
+  build_script?: string;
 }
 
-export const analyze_package = async ({ workdir }: AnalyzePackage) => {
+export const analyze_package = async (params: AnalyzePackage) => {
+  const workdir = params.workdir;
+
   const package_file = path.join(path.resolve(workdir), "package.json");
   log.info(`Loading config from package.json...`);
   const pkg: PackageJson = await fs.readJSON(package_file);
@@ -18,15 +21,13 @@ export const analyze_package = async ({ workdir }: AnalyzePackage) => {
   }
 
   // Check if build is required to run
-  let hasBuild = false;
-  if (pkg?.scripts?.build) {
-    log.info(`Build step: ${pkg?.scripts?.build}`);
-    hasBuild = true;
-  } else {
+  const build_script = params.build_script || "build";
+  let build = pkg?.scripts[build_script];
+  if (!build) {
     log.info(`No build script found`);
   }
 
   return {
-    hasBuild,
+    build_script,
   };
 };
