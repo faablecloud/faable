@@ -10,7 +10,7 @@ interface ImageUploadArgs {
 
 export const upload_tag = async (args: ImageUploadArgs) => {
   const { api, app, tagname } = args;
-  log.info(`Uploading ${tagname}`);
+  log.info(`🔁 Uploading...`);
 
   const registry = await api.getRegistry(app.id);
 
@@ -26,4 +26,5 @@ export const upload_tag = async (args: ImageUploadArgs) => {
   // Upload the image to faable registry
   await cmd("docker", ["push", image_tag]);
   log.info(`✅ Upload completed.`);
+  log.info(`🌍 Deployed on ${app.url}`);
 };

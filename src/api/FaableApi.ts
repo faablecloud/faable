@@ -3,6 +3,7 @@ import { prepare_client, FaableClientConfig } from "./client";
 export interface FaableApp {
   id: string;
   name: string;
+  url: string;
 }
 
 export interface FaableAppRegistry {
