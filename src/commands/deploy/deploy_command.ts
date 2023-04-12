@@ -44,4 +44,6 @@ export const deploy_command = async (args: DeployCommandArgs) => {
 
   // Upload to Faable registry
   await upload_tag({ app, api, tagname });
+
+  log.info(`🌍 Deployed on https://${app.url}`);
 };

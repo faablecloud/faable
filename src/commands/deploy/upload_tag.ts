@@ -26,5 +26,4 @@ export const upload_tag = async (args: ImageUploadArgs) => {
   // Upload the image to faable registry
   await cmd("docker", ["push", image_tag]);
   log.info(`✅ Upload completed.`);
-  log.info(`🌍 Deployed on ${app.url}`);
 };
