@@ -1,15 +1,15 @@
 import { CommandModule } from "yargs";
-import fs from "fs-extra";
+
 import { deploy_command, DeployCommandArgs } from "./deploy_command";
 
 export const deploy: CommandModule<{}, DeployCommandArgs> = {
-  command: "deploy [app_name]",
+  command: "deploy [app_slug]",
   describe: "Deploy a faable app",
   builder: (yargs) => {
     return yargs
       .positional("app_slug", {
         type: "string",
-        description: "App name to build for",
+        description: "App slug",
       })
       .option("workdir", {
         alias: "w",
@@ -19,5 +19,5 @@ export const deploy: CommandModule<{}, DeployCommandArgs> = {
       .showHelpOnFail(false) as any;
   },
 
-  handler: async (args) => deploy_command(args),
+  handler: deploy_command,
 };

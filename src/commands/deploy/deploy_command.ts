@@ -19,6 +19,7 @@ const get_app = async (
   workdir: string
 ): Promise<FaableApp> => {
   let slug;
+  console.log("slug", app_slug);
   if (app_slug) {
     slug = app_slug;
   } else {
