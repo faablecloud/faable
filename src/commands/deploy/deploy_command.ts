@@ -5,25 +5,47 @@ import { check_environment } from "./check_environment";
 import { analyze_package } from "./analyze_package";
 import { context } from "../../api/context";
 import { build_project } from "./build_project";
-
+import fs from "fs-extra";
+import path from "path";
+import { FaableApi, FaableApp } from "../../api/FaableApi";
 export interface DeployCommandArgs {
-  app_slug: string;
+  app_slug?: string;
   workdir?: string;
 }
 
-export const deploy_command = async (args: DeployCommandArgs) => {
-  const app_slug = args.app_slug;
-  const workdir = args.workdir || process.cwd();
-  if (!app_slug) {
-    throw new Error("Missing app name");
+const get_app = async (
+  api: FaableApi,
+  app_slug: string,
+  workdir: string
+): Promise<FaableApp> => {
+  let slug;
+  if (app_slug) {
+    slug = app_slug;
+  } else {
+    const packageJSONFile = path.join(workdir, "package.json");
+    if (!fs.existsSync(packageJSONFile)) {
+      throw new Error("Not found package.json");
+    }
+    const { name } = fs.readJSONSync(packageJSONFile);
+    if (!name) {
+      throw new Error("Missing name in package.json");
+    }
+    slug = name;
   }
+
+  return api.getBySlug(slug);
+};
+
+export const deploy_command = async (args: DeployCommandArgs) => {
+  const workdir = args.workdir || process.cwd();
+
+  // Get registry data from api.faable.com
+  const { api } = await context();
+  const app = await get_app(api, args.app_slug, workdir);
 
   // Check if we can build docker images
   await check_environment();
 
-  // Get registry data from api.faable.com
-  const { api } = await context();
-  const app = await api.getBySlug(app_slug);
   log.info(`🚀 Preparing to build ${app.name} [${app.id}]`);
 
   // Analyze package.json to check if build is needed

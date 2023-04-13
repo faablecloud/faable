@@ -10,10 +10,6 @@ export const deploy: CommandModule<{}, DeployCommandArgs> = {
       .positional("app_slug", {
         type: "string",
         description: "App name to build for",
-        default: (s) => {
-          const { name } = fs.readJSONSync("./package.json");
-          return name;
-        },
       })
       .option("workdir", {
         alias: "w",
