@@ -66,7 +66,6 @@ export const deploy_command = async (args: DeployCommandArgs) => {
 
   // Upload to Faable registry
   const { image_tag } = await upload_tag({ app, api, tagname });
-  log.info(`✅ Image uploaded`);
 
   // Create a deployment for this image
   await api.createDeployment({ app_id: app.id, image: image_tag, type });
