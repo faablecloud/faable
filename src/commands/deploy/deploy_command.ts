@@ -49,7 +49,7 @@ export const deploy_command = async (args: DeployCommandArgs) => {
   log.info(`🚀 Preparing to build ${app.name} [${app.id}]`);
 
   // Analyze package.json to check if build is needed
-  const { build_script } = await analyze_package({ workdir });
+  const { build_script, type } = await analyze_package({ workdir });
   if (build_script) {
     await build_project({ app, build_script });
   }
@@ -65,7 +65,10 @@ export const deploy_command = async (args: DeployCommandArgs) => {
   });
 
   // Upload to Faable registry
-  await upload_tag({ app, api, tagname });
+  const { image_tag } = await upload_tag({ app, api, tagname });
+  log.info(`✅ Image uploaded`);
 
-  log.info(`🌍 Deployed on https://${app.url}`);
+  // Create a deployment for this image
+  await api.createDeployment({ app_id: app.id, image: image_tag, type });
+  log.info(`🌍 Deployment created -> https://${app.url}`);
 };

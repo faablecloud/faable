@@ -27,7 +27,16 @@ export const analyze_package = async (params: AnalyzePackage) => {
     log.info(`No build script found`);
   }
 
+  // Detect deployment type
+  let type: string = "node";
+  if (pkg.dependencies["next"]) {
+    type = "next";
+  }
+
+  log.info(`⚙️ Detected deployment type=${type}`);
+
   return {
     build_script,
+    type,
   };
 };

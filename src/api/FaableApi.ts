@@ -84,4 +84,13 @@ export class FaableApi<T = any> {
   async getRegistry(app_id: string) {
     return data(this.client.get<FaableAppRegistry>(`/app/${app_id}/registry`));
   }
+
+  @handleError()
+  async createDeployment(params: {
+    app_id: string;
+    type: string;
+    image: string;
+  }) {
+    return data(this.client.post<{ id: string }>(`/deployment`, params));
+  }
 }
