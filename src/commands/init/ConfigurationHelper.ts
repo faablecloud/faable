@@ -104,10 +104,10 @@ export class ConfigurationHelper {
                 cache: manager,
               },
             },
-            ...(manager == "npm" && [{ run: "npm ci" }]),
-            ...(manager == "yarn" && [
-              { run: "yarn install --frozen-lockfile" },
-            ]),
+            ...(manager == "npm" ? [{ run: "npm ci" }] : []),
+            ...(manager == "yarn"
+              ? [{ run: "yarn install --frozen-lockfile" }]
+              : []),
             {
               name: "Deploy to Faable",
               run: `faable deploy ${app_name}`,
