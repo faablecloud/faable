@@ -15,7 +15,7 @@ export const build_project = async (args: BuildProjectArgs) => {
   if (build_script) {
     const cwd = args.cwd || process.cwd();
     log.info(`⚡️ Running build [${build_script}]...`);
-    const timeout = 1000 * 60 * 10; // 10 minute timeout
+    const timeout = 1000 * 60 * 100; // 100 minute timeout
 
     await cmd("yarn", ["run", build_script], {
       timeout,
