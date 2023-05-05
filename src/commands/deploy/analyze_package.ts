@@ -5,7 +5,6 @@ import { PackageJson } from "type-fest";
 
 interface AnalyzePackage {
   workdir: string;
-  build_script?: string;
 }
 
 export const analyze_package = async (params: AnalyzePackage) => {
@@ -21,11 +20,14 @@ export const analyze_package = async (params: AnalyzePackage) => {
   }
 
   // Check if build is required to run
-  const build_script =
-    process.env.NPM_BUILD_SCRIPT || params.build_script || "build";
-  let build = pkg?.scripts[build_script];
-  if (!build) {
-    log.info(`No build script found`);
+  const build_script = process.env.FAABLE_NPM_BUILD_SCRIPT
+    ? process.env.FAABLE_NPM_BUILD_SCRIPT
+    : pkg?.scripts["build"]
+    ? "build"
+    : null;
+
+  if (!build_script) {
+    log.info(`No build script on package.json`);
   }
 
   // Detect deployment type

@@ -34,6 +34,7 @@ export default {
         name: pkg.name,
         main: pkg.main,
         dependencies: pkg.dependencies,
+        version: pkg.version,
         bin: {
           faable: "bin/faable.js",
         },

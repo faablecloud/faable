@@ -11,14 +11,18 @@ interface BuildProjectArgs {
 }
 
 export const build_project = async (args: BuildProjectArgs) => {
-  const cwd = args?.cwd || process.cwd();
-  const build_script = args?.build_script || "build";
-  const app = args.app;
-  log.info(`⚡️ Running build script [${build_script}]...`);
-  const timeout = 1000 * 60 * 10; // 10 minute timeout
-  await cmd("yarn", ["run", build_script], {
-    timeout,
-    cwd,
-    enableOutput: true,
-  });
+  const build_script = args.build_script;
+  if (build_script) {
+    const cwd = args.cwd || process.cwd();
+    log.info(`⚡️ Running build [${build_script}]...`);
+    const timeout = 1000 * 60 * 10; // 10 minute timeout
+
+    await cmd("yarn", ["run", build_script], {
+      timeout,
+      cwd,
+      enableOutput: true,
+    });
+  } else {
+    log.info(`⚡️ No build step`);
+  }
 };

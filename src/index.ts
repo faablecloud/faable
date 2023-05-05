@@ -5,9 +5,13 @@ import { configure } from "./commands/configure";
 import { deploy } from "./commands/deploy";
 import { log } from "./log";
 import { init } from "./commands/init";
+import { version } from "./config";
 
 const yg = yargs();
 yg.scriptName("faable")
+  .middleware(function (argv) {
+    console.log(`Faable CLI ${version}`);
+  }, true)
   .command(deploy)
   .command(apps)
   .command(configure)

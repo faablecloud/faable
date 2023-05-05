@@ -19,12 +19,12 @@ export class ConfigurationHelper {
     return path.join(this.workflows_dir, "deploy.yml");
   }
 
-  async demandConfig() {
+  async demandConfig(force: boolean = false) {
     const creds = await this.store.loadCredentials();
     if (creds.apikey) {
       return;
     }
-    const apikey = await prompts([
+    const { apikey } = await prompts([
       {
         type: "text",
         name: "apikey",

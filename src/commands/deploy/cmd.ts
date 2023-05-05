@@ -1,4 +1,4 @@
-import { spawn } from "promisify-child-process";
+import { spawn, exec } from "promisify-child-process";
 
 interface CmdParams {
   /** Show output */

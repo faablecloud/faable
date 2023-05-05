@@ -1,7 +1,7 @@
 import { CommandModule } from "yargs";
 import { FaableApi } from "../../api/FaableApi";
 import { ConfigStore } from "../../lib/ConfigStore";
-import { ConfigurationHelper } from "../init/ConfigurationHelper";
+import prompts from "prompts";
 
 type Options = {
   api: FaableApi;
@@ -27,10 +27,18 @@ export const configure: CommandModule<{}, Options> = {
     const { app_name, workdir, api, remove } = args;
 
     const store = new ConfigStore();
-    const helper = new ConfigurationHelper();
+
     if (remove) {
       await store.deleteCredentials();
     }
-    await helper.demandConfig();
+
+    const { apikey } = await prompts([
+      {
+        type: "text",
+        name: "apikey",
+        message: "What is your Faable ApiKey?",
+      },
+    ]);
+    await store.saveApiKey({ apikey });
   },
 };

@@ -50,9 +50,7 @@ export const deploy_command = async (args: DeployCommandArgs) => {
 
   // Analyze package.json to check if build is needed
   const { build_script, type } = await analyze_package({ workdir });
-  if (build_script) {
-    await build_project({ app, build_script });
-  }
+  await build_project({ app, build_script });
 
   // Bundle project inside a docker image
   const { tagname } = await bundle_docker({
