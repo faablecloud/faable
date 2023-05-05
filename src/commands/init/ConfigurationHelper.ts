@@ -44,6 +44,16 @@ export class ConfigurationHelper {
     }
   }
 
+  async checkPackageManager() {
+    if (fs.existsSync(path.join(process.cwd(), "package-lock.json"))) {
+      return "npm";
+    }
+    if (fs.existsSync(path.join(process.cwd(), "yarn.lock"))) {
+      return "yarn";
+    }
+    throw new Error("No package-lock.json or yarn.lock file found");
+  }
+
   async initializeGithubAction(force: boolean = false) {
     await this.demandConfig();
 
@@ -70,6 +80,7 @@ export class ConfigurationHelper {
       { onCancel }
     );
 
+    const manager = await this.checkPackageManager();
     const action = {
       name: "Deploy to Faable",
       on: {
@@ -93,7 +104,10 @@ export class ConfigurationHelper {
                 cache: "yarn",
               },
             },
-            { run: "npm ci" },
+            ...(manager == "npm" && [{ run: "npm ci" }]),
+            ...(manager == "yarn" && [
+              { run: "yarn install --frozen-lockfile" },
+            ]),
             {
               name: "Deploy to Faable",
               run: `faable deploy ${app_name}`,
