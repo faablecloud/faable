@@ -21,7 +21,8 @@ export const analyze_package = async (params: AnalyzePackage) => {
   }
 
   // Check if build is required to run
-  const build_script = params.build_script || "build";
+  const build_script =
+    process.env.NPM_BUILD_SCRIPT || params.build_script || "build";
   let build = pkg?.scripts[build_script];
   if (!build) {
     log.info(`No build script found`);
