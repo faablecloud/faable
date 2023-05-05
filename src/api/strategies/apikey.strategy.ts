@@ -1,11 +1,13 @@
 import axios from "axios";
-import { AuthStrategyBuilder } from "../types";
+import { AuthStrategyBuilder } from "./types";
 
 interface ApikeyConfig {
   apikey: string;
 }
 
-export const apikey: AuthStrategyBuilder<Partial<ApikeyConfig>> = (config) => {
+export const apikey_strategy: AuthStrategyBuilder<Partial<ApikeyConfig>> = (
+  config
+) => {
   const { apikey } = config;
   if (!apikey) {
     throw new Error("Missing apikey.");

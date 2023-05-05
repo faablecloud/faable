@@ -1,5 +1,5 @@
 import axios from "axios";
-import { AuthStrategyBuilder } from "../types";
+import { AuthStrategyBuilder } from "./types";
 
 interface ClientCredentials {
   clientId: string;

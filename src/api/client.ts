@@ -1,5 +1,5 @@
 import axios from "axios";
-import { AuthStrategy, AuthStrategyBuilder } from "./types";
+import { AuthStrategy, AuthStrategyBuilder } from "./strategies/types";
 
 export type FaableClientConfig<T = any> = {
   authStrategy?: AuthStrategyBuilder<T>;
