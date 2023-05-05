@@ -101,7 +101,7 @@ export class ConfigurationHelper {
               uses: "actions/setup-node@v3",
               with: {
                 "node-version": "16",
-                cache: "yarn",
+                cache: manager,
               },
             },
             ...(manager == "npm" && [{ run: "npm ci" }]),
