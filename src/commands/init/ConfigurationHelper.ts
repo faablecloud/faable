@@ -100,7 +100,7 @@ export class ConfigurationHelper {
             {
               uses: "actions/setup-node@v3",
               with: {
-                "node-version": "16",
+                "node-version": "18",
                 cache: manager,
               },
             },
