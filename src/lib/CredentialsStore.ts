@@ -8,7 +8,7 @@ export interface FaableConfig {
   apikey: string;
 }
 
-export class ConfigStore {
+export class CredentialsStore {
   faable_home: string;
   constructor(private log: Logger = baselog) {
     this.faable_home = path.join(os.homedir(), ".faable");

@@ -1,10 +1,10 @@
-import { ConfigStore } from "../lib/ConfigStore";
+import { CredentialsStore } from "../lib/CredentialsStore";
 import { FaableApi } from "./FaableApi";
 import { apikey_strategy } from "./strategies/apikey.strategy";
 import { authenticateOAuthApp } from "./strategies/authenticateOAuthApp";
 
 export const context = async () => {
-  const store = new ConfigStore();
+  const store = new CredentialsStore();
   const apikey =
     process.env.FAABLE_APIKEY || (await store.loadCredentials())?.apikey;
 

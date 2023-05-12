@@ -1,0 +1,11 @@
+{
+  "name": "node-express",
+  "scripts": {
+    "start_demo": "node dist/app.js",
+    "build_demo": "tsc"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "typescript": "^5.0.4"
+  }
+}

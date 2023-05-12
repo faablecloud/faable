@@ -1,15 +1,16 @@
-import { log } from "../../log";
-import { cmd } from "./cmd";
+import { log } from "../../../log";
+import { cmd } from "../../../lib/cmd";
 import fs from "fs-extra";
 import Handlebars from "handlebars";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { FaableApp } from "../../api/FaableApi";
+import { FaableApp } from "../../../api/FaableApi";
+import { Configuration } from "../../../lib/Configuration";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const templates_dir = path.join(__dirname, "../../../templates");
+const templates_dir = path.join(__dirname, "templates");
 const dockerfile = fs.readFileSync(`${templates_dir}/Dockerfile`).toString();
 const entrypoint = fs
   .readFileSync(`${templates_dir}/entrypoint.sh`)
@@ -32,7 +33,6 @@ interface BuildConfig {
   workdir: string;
   template_context: {
     from: string;
-    start_script: string;
   };
 }
 
@@ -41,24 +41,18 @@ export const bundle_docker = async (props: BuildConfig) => {
 
   const entrypoint_custom = entrypoint_template(template_context);
   const dockerfile = docker_template({
-    ...template_context,
+    from: template_context.from,
     entry_script: entrypoint_custom,
+    start_command: Configuration.instance().startCommand,
   });
 
   log.info(`📦 Packaging inside a docker image`);
-  const tagname = app.id;
 
+  // Build options
   const timeout = 10 * 60 * 1000; // 10 minute timeout
-  const command = [
-    "-c",
-    `docker build -t ${tagname} ${workdir} -f -<<EOF\n${dockerfile}\nEOF`,
-  ];
 
-  await cmd("/bin/bash", command, { timeout, enableOutput: true });
-
-  log.info(`⚙️  Image ready [tag:${tagname}]`);
-
-  return {
-    tagname,
-  };
+  await cmd(
+    `docker build -t ${app.id} ${workdir} -f -<<EOF\n${dockerfile}\nEOF`,
+    { timeout, enableOutput: true }
+  );
 };

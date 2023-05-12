@@ -1,6 +1,6 @@
-import { spawn, exec } from "promisify-child-process";
+import { spawn } from "promisify-child-process";
 
-interface CmdParams {
+interface CmdConfig {
   /** Show output */
   enableOutput: boolean;
   /** Command timeout in milliseconds */
@@ -9,17 +9,13 @@ interface CmdParams {
   cwd: string;
 }
 
-export const cmd = async (
-  cmd: string,
-  args?: string[],
-  params?: Partial<CmdParams>
-) => {
+export const cmd = async (cmd: string, config?: Partial<CmdConfig>) => {
   // Defaults
-  const enableOutput = params?.enableOutput || false;
-  const timeout = params?.timeout;
-  const cwd = params?.cwd;
+  const enableOutput = config?.enableOutput || false;
+  const timeout = config?.timeout;
+  const cwd = config?.cwd;
 
-  const child = spawn(cmd, args, {
+  const child = spawn("/bin/bash", ["-c", cmd], {
     encoding: "utf8",
     stdio: enableOutput ? "inherit" : "pipe",
     timeout,
@@ -37,7 +33,7 @@ export const cmd = async (
     return result;
   } catch (error) {
     const output = out_data.map((b) => b.toString()).join("\n");
-    console.log(output);
-    throw new Error(`Error running command`);
+    // console.log(output);
+    throw new Error(`Command error: ${cmd}`);
   }
 };

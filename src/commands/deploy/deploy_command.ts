@@ -1,71 +1,59 @@
 import { log } from "../../log";
-import { bundle_docker } from "./bundle_docker";
 import { upload_tag } from "./upload_tag";
 import { check_environment } from "./check_environment";
-import { analyze_package } from "./analyze_package";
 import { context } from "../../api/context";
-import { build_project } from "./build_project";
-import fs from "fs-extra";
-import path from "path";
-import { FaableApi, FaableApp } from "../../api/FaableApi";
+import { build_node } from "./node-pipeline";
+import { runtime_detection } from "./runtime-detect/runtime_detection";
+import { cmd } from "../../lib/cmd";
+
 export interface DeployCommandArgs {
   app_slug?: string;
   workdir?: string;
 }
 
-const get_app = async (
-  api: FaableApi,
-  app_slug: string,
-  workdir: string
-): Promise<FaableApp> => {
-  let slug;
-  if (app_slug) {
-    slug = app_slug;
-  } else {
-    const packageJSONFile = path.join(workdir, "package.json");
-    if (!fs.existsSync(packageJSONFile)) {
-      throw new Error("Not found package.json");
-    }
-    const { name } = fs.readJSONSync(packageJSONFile);
-    if (!name) {
-      throw new Error("Missing name in package.json");
-    }
-    slug = name;
-  }
-
-  return api.getBySlug(slug);
-};
-
 export const deploy_command = async (args: DeployCommandArgs) => {
   const workdir = args.workdir || process.cwd();
 
-  // Get registry data from api.faable.com
   const { api } = await context();
-  const app = await get_app(api, args.app_slug, workdir);
+
+  // Resolve runtime
+  const { app_name, runtime, runtime_version } = await runtime_detection(
+    workdir
+  );
+
+  const name = args.app_slug || app_name;
+  if (!name) {
+    throw new Error("Missing <app_name>");
+  }
+
+  // Get app from Faable API
+  const app = await api.getBySlug(name);
 
   // Check if we can build docker images
   await check_environment();
 
-  log.info(`🚀 Preparing to build ${app.name} [${app.id}]`);
+  log.info(
+    `🚀 Deploying [${app.name}] runtime=${runtime}-${runtime_version} app_id=${app.id}`
+  );
 
-  // Analyze package.json to check if build is needed
-  const { build_script, type } = await analyze_package({ workdir });
-  await build_project({ app, build_script });
+  let type;
 
-  // Bundle project inside a docker image
-  const { tagname } = await bundle_docker({
-    app,
-    workdir,
-    template_context: {
-      from: "node:18.12.0-slim",
-      start_script: "start",
-    },
-  });
+  if (runtime == "node") {
+    const node_result = await build_node(app, workdir);
+    type = node_result.type;
+  } else if (runtime == "docker") {
+    type = "node";
+    await cmd(`docker build -t ${app.id} .`, {
+      enableOutput: true,
+    });
+  } else {
+    throw new Error(`No build pipeline for runtime=${runtime}`);
+  }
 
   // Upload to Faable registry
-  const { image_tag } = await upload_tag({ app, api, tagname });
+  const { upload_tagname } = await upload_tag({ app, api });
 
   // Create a deployment for this image
-  await api.createDeployment({ app_id: app.id, image: image_tag, type });
+  await api.createDeployment({ app_id: app.id, image: upload_tagname, type });
   log.info(`🌍 Deployment created -> https://${app.url}`);
 };

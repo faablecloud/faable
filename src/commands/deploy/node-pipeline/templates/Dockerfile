@@ -7,7 +7,7 @@ WORKDIR /faable/app
 # Environment variables for runtime
 ENV PORT=80
 ENV NODE_ENV=production
-ENV START_SCRIPT=start
+ENV START_COMMAND="{{start_command}}"
 
 # Copy Usercode
 COPY . .

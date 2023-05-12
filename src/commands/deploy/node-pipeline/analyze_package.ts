@@ -1,6 +1,6 @@
 import fs from "fs-extra";
 import path from "path";
-import { log } from "../../log";
+import { log } from "../../../log";
 import { PackageJson } from "type-fest";
 
 interface AnalyzePackage {
@@ -13,11 +13,6 @@ export const analyze_package = async (params: AnalyzePackage) => {
   const package_file = path.join(path.resolve(workdir), "package.json");
   log.info(`Loading config from package.json...`);
   const pkg: PackageJson = await fs.readJSON(package_file);
-
-  // Package must have a start script
-  if (!pkg?.scripts?.start) {
-    throw new Error("Missing start script");
-  }
 
   // Check if build is required to run
   const build_script = process.env.FAABLE_NPM_BUILD_SCRIPT
@@ -36,7 +31,7 @@ export const analyze_package = async (params: AnalyzePackage) => {
     type = "next";
   }
 
-  log.info(`⚙️ Detected deployment type=${type}`);
+  log.info(`⚡️ Detected deployment type=${type}`);
 
   return {
     build_script,

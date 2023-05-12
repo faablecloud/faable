@@ -1,6 +1,7 @@
-import { FaableApp } from "../../api/FaableApi";
-import { log } from "../../log";
-import { cmd } from "./cmd";
+import { FaableApp } from "../../../api/FaableApi";
+import { log } from "../../../log";
+import { cmd } from "../../../lib/cmd";
+import { Configuration } from "../../../lib/Configuration";
 
 interface BuildProjectArgs {
   /**App we are building */
@@ -12,12 +13,16 @@ interface BuildProjectArgs {
 
 export const build_project = async (args: BuildProjectArgs) => {
   const build_script = args.build_script;
-  if (build_script) {
+  const build_command = build_script
+    ? `yarn run ${build_script}`
+    : Configuration.instance().buildCommand;
+
+  if (build_command) {
     const cwd = args.cwd || process.cwd();
-    log.info(`⚡️ Running build [${build_script}]...`);
+    log.info(`⚙️ Building project [${build_command}]...`);
     const timeout = 1000 * 60 * 100; // 100 minute timeout
 
-    await cmd("yarn", ["run", build_script], {
+    await cmd(build_command, {
       timeout,
       cwd,
       enableOutput: true,

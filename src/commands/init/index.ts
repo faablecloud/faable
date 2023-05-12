@@ -1,6 +1,6 @@
 import { CommandModule } from "yargs";
 import prompts from "prompts";
-import { ConfigStore } from "../../lib/ConfigStore";
+import { CredentialsStore } from "../../lib/CredentialsStore";
 import { log } from "../../log";
 import { ConfigurationHelper } from "./ConfigurationHelper";
 

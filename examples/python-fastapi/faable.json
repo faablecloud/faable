@@ -1,0 +1,3 @@
+{
+  "startCommand": "uvicorn main:app"
+}

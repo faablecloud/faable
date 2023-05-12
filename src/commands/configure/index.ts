@@ -1,6 +1,6 @@
 import { CommandModule } from "yargs";
 import { FaableApi } from "../../api/FaableApi";
-import { ConfigStore } from "../../lib/ConfigStore";
+import { CredentialsStore } from "../../lib/CredentialsStore";
 import prompts from "prompts";
 
 type Options = {
@@ -26,7 +26,7 @@ export const configure: CommandModule<{}, Options> = {
   handler: async (args) => {
     const { app_name, workdir, api, remove } = args;
 
-    const store = new ConfigStore();
+    const store = new CredentialsStore();
 
     if (remove) {
       await store.deleteCredentials();

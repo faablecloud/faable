@@ -2,13 +2,13 @@ import path from "path";
 import fs from "fs-extra";
 import { log } from "../../log";
 import prompts from "prompts";
-import { ConfigStore } from "../../lib/ConfigStore";
+import { CredentialsStore } from "../../lib/CredentialsStore";
 import yaml from "yaml";
 
 export class ConfigurationHelper {
-  store: ConfigStore;
+  store: CredentialsStore;
   constructor() {
-    this.store = new ConfigStore();
+    this.store = new CredentialsStore();
   }
 
   get workflows_dir() {

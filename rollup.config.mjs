@@ -25,7 +25,10 @@ export default {
       targets: [
         { src: "README.md", dest: "pkg" },
         { src: "bin/*", dest: "pkg/bin" },
-        { src: "templates/**/*", dest: "pkg/templates" },
+        {
+          src: "src/commands/deploy/node-pipeline/templates/**/*",
+          dest: "pkg/dist/commands/deploy/node-pipeline/templates",
+        },
       ],
     }),
     generatePackageJson({
