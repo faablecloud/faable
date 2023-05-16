@@ -40,10 +40,12 @@ export const bundle_docker = async (props: BuildConfig) => {
   const { app, workdir, template_context } = props;
 
   const entrypoint_custom = entrypoint_template(template_context);
+  const start_command = Configuration.instance().startCommand;
+  log.info(`⚙️ Start command: ${start_command}`);
   const dockerfile = docker_template({
     from: template_context.from,
     entry_script: entrypoint_custom,
-    start_command: Configuration.instance().startCommand,
+    start_command,
   });
 
   log.info(`📦 Packaging inside a docker image`);

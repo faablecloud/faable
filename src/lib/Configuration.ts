@@ -8,7 +8,7 @@ interface ProjectConfig {
 
 export class Configuration {
   private static _instance: Configuration;
-  private config?: ProjectConfig;
+  private config: ProjectConfig = {};
 
   private constructor() {
     // Try to read default config file
@@ -27,18 +27,18 @@ export class Configuration {
     }
   }
 
-  static instance() {
-    if (Configuration._instance) {
-      return Configuration._instance;
+  public static instance() {
+    if (!Configuration._instance) {
+      Configuration._instance = new Configuration();
     }
-    return new Configuration();
+    return Configuration._instance;
   }
 
   get startCommand() {
-    return this.config?.startCommand || "npm run start";
+    return this.config.startCommand || "npm run start";
   }
 
   get buildCommand() {
-    return this.config?.buildCommand;
+    return this.config.buildCommand;
   }
 }
