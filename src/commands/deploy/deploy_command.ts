@@ -9,6 +9,7 @@ import { cmd } from "../../lib/cmd";
 export interface DeployCommandArgs {
   app_slug?: string;
   workdir?: string;
+  project_type?: string;
 }
 
 export const deploy_command = async (args: DeployCommandArgs) => {
