@@ -17,7 +17,7 @@ export const upload_tag = async (args: ImageUploadArgs) => {
   const { user, password, hostname, image } = registry;
 
   await cmd(
-    `echo "${password}" | docker login --username ${user} --password-stdin ${hostname}`
+    `echo "${password}" | docker login --username "${user}" --password-stdin ${hostname}`
   );
 
   // Tag image for production
