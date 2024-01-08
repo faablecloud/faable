@@ -16,7 +16,7 @@ export const build_node = async (app: FaableApp, workdir: string) => {
     app,
     workdir,
     template_context: {
-      from: "node:18.19.0-slim",
+      from: "node:18.19.0",
     },
   });
 
