@@ -18,9 +18,7 @@ export const deploy_command = async (args: DeployCommandArgs) => {
   const { api } = await context();
 
   // Resolve runtime
-  const { app_name, runtime, runtime_version } = await runtime_detection(
-    workdir
-  );
+  const { app_name, runtime } = await runtime_detection(workdir);
 
   const name = args.app_slug || app_name;
   if (!name) {
@@ -34,21 +32,24 @@ export const deploy_command = async (args: DeployCommandArgs) => {
   await check_environment();
 
   log.info(
-    `🚀 Deploying [${app.name}] runtime=${runtime}-${runtime_version} app_id=${app.id}`
+    `🚀 Deploying ${app.name} (${app.id}) runtime=${runtime.name}-${runtime.version} `
   );
 
   let type;
 
-  if (runtime == "node") {
-    const node_result = await build_node(app, workdir);
+  if (runtime.name == "node") {
+    const node_result = await build_node(app, {
+      workdir,
+      runtime,
+    });
     type = node_result.type;
-  } else if (runtime == "docker") {
+  } else if (runtime.name == "docker") {
     type = "node";
     await cmd(`docker build -t ${app.id} .`, {
       enableOutput: true,
     });
   } else {
-    throw new Error(`No build pipeline for runtime=${runtime}`);
+    throw new Error(`No build pipeline for runtime=${runtime.name}`);
   }
 
   // Upload to Faable registry

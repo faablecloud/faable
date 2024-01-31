@@ -37,6 +37,6 @@ export class CredentialsStore {
 
     // Return credentials
     const config = await fs.readJSON(this.credentials_path);
-    return config;
+    return config || {};
   }
 }

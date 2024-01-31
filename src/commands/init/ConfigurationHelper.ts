@@ -21,7 +21,7 @@ export class ConfigurationHelper {
 
   async demandConfig(force: boolean = false) {
     const creds = await this.store.loadCredentials();
-    if (creds.apikey) {
+    if (creds?.apikey) {
       return;
     }
     const { apikey } = await prompts([

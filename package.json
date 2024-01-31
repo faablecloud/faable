@@ -9,6 +9,9 @@
   "bugs": {
     "url": "https://github.com/faablecloud/faable/issues"
   },
+  "bin": {
+    "faable": "bin/faable.js"
+  },
   "publishConfig": {
     "access": "public"
   },
