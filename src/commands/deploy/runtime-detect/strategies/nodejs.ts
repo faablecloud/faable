@@ -23,9 +23,8 @@ export const strategy_nodejs: StrategyFn = async (workdir: string) => {
   let runtime_version = "18.19.0";
   if (engines?.node) {
     try {
-      const out = await cmd(
-        `npm view node@${engines.node} version | tail -n 1 | cut -d "'" -f2`
-      );
+      const check_cmd = `npm view node@"${engines.node}" version | tail -n 1 | cut -d "'" -f2`;
+      const out = await cmd(check_cmd);
       runtime_version = out.stdout.toString();
       log.info(
         `Using node@${runtime_version} from engines in package.json (${engines.node})`
