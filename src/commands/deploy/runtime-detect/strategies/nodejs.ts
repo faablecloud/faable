@@ -2,6 +2,7 @@ import { StrategyFn } from "../RuntimeStrategy";
 import fs from "fs-extra";
 import path from "path";
 import { cmd } from "../../../../lib/cmd";
+import { log } from "../../../../log";
 
 /**
  * Strategy to detect app name from package.json
@@ -21,10 +22,17 @@ export const strategy_nodejs: StrategyFn = async (workdir: string) => {
   // Use engines.node if found
   let runtime_version = "18.19.0";
   if (engines?.node) {
-    const out = await cmd(
-      `npm view node@20.8 version | tail -n 1 | cut -d "'" -f2`
-    );
-    runtime_version = out.stdout.toString();
+    try {
+      const out = await cmd(
+        `npm view node@${engines.node} version | tail -n 1 | cut -d "'" -f2`
+      );
+      runtime_version = out.stdout.toString();
+      log.info(
+        `Using node@${runtime_version} from engines in package.json (${engines.node})`
+      );
+    } catch (e) {
+      throw new Error(`Node version is not valid (${engines.node})`);
+    }
   }
 
   return {
