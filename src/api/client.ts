@@ -13,7 +13,7 @@ export function prepare_client<T>({
   const strategy: AuthStrategy | undefined = authStrategy && authStrategy(auth);
   const client = axios.create({
     baseURL: "https://api.faable.com",
-    timeout: 5000,
+    timeout: 10000,
   });
 
   client.interceptors.request.use(
