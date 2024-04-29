@@ -11,7 +11,7 @@ export const runtime_detection = async (
   const has = R.curry(has_any_of_files);
   const strategy = R.cond<[string], StrategyFn>([
     [has(["package.json"]), R.always(strategy_nodejs)],
-    [has(["requirements.txt"]), R.always(strategy_python)],
+    // [has(["requirements.txt"]), R.always(strategy_python)],
     [has(["Dockerfile"]), R.always(strategy_docker)],
   ])(workdir);
 
