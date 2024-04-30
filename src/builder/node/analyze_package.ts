@@ -1,6 +1,6 @@
 import fs from "fs-extra";
 import path from "path";
-import { log } from "../../../log";
+import { log } from "../../log";
 import { PackageJson } from "type-fest";
 
 interface AnalyzePackage {

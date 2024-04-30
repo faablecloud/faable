@@ -88,8 +88,8 @@ export class FaableApi<T = any> {
   @handleError()
   async createDeployment(params: {
     app_id: string;
-    type: string;
     image: string;
+    type?: string;
   }) {
     return data(this.client.post<{ id: string }>(`/deployment`, params));
   }

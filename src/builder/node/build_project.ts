@@ -1,7 +1,7 @@
-import { FaableApp } from "../../../api/FaableApi";
-import { log } from "../../../log";
-import { cmd } from "../../../lib/cmd";
-import { Configuration } from "../../../lib/Configuration";
+import { FaableApp } from "../../api/FaableApi";
+import { log } from "../../log";
+import { cmd } from "../../lib/cmd";
+import { Configuration } from "../../lib/Configuration";
 
 interface BuildProjectArgs {
   /**App we are building */

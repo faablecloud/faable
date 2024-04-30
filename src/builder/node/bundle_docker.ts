@@ -1,11 +1,11 @@
-import { log } from "../../../log";
-import { cmd } from "../../../lib/cmd";
+import { log } from "../../log";
+import { cmd } from "../../lib/cmd";
 import fs from "fs-extra";
 import Handlebars from "handlebars";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { FaableApp } from "../../../api/FaableApi";
-import { Configuration } from "../../../lib/Configuration";
+import { FaableApp } from "../../api/FaableApi";
+import { Configuration } from "../../lib/Configuration";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

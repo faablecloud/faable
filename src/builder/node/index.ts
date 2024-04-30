@@ -1,17 +1,11 @@
-import { FaableApp } from "../../../api/FaableApi";
 import { bundle_docker } from "./bundle_docker";
 import { analyze_package } from "./analyze_package";
 import { build_project } from "./build_project";
-import { Runtime } from "../runtime-detect/RuntimeStrategy";
+import { Builder } from "../Builder";
 
-interface BuildNodeOptions {
-  workdir: string;
-  runtime: Runtime;
-}
-
-export const build_node = async (app: FaableApp, options: BuildNodeOptions) => {
+export const builder: Builder = async (ctx) => {
+  const { app, workdir, runtime } = ctx;
   // log.info(`🚀 Build Toolchain ${app.name} [${app.id}]`);
-  const { workdir, runtime } = options;
 
   if (!runtime.version) {
     throw new Error("Runtime version not specified for node");
@@ -31,3 +25,5 @@ export const build_node = async (app: FaableApp, options: BuildNodeOptions) => {
 
   return { type };
 };
+
+export default builder;
