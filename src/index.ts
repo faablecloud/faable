@@ -1,6 +1,6 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { apps } from "./commands/apps";
+import { apps } from "./commands/apps/index";
 import { configure } from "./commands/configure";
 import { deploy } from "./commands/deploy";
 import { log } from "./log";

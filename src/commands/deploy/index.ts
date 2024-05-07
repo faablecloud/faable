@@ -16,6 +16,11 @@ export const deploy: CommandModule<{}, DeployCommandArgs> = {
         type: "string",
         description: "Working directory",
       })
+      .option("onlybuild", {
+        type: "boolean",
+        default: false,
+        description: "Just build",
+      })
       .showHelpOnFail(false) as any;
   },
 

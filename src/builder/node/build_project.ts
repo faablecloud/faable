@@ -1,33 +1,37 @@
-import { FaableApp } from "../../api/FaableApi";
-import { log } from "../../log";
 import { cmd } from "../../lib/cmd";
-import { Configuration } from "../../lib/Configuration";
+import { BuilderContext } from "builder/Builder";
+import { NodeBuidContext } from "./NodeBuildContext";
 
-interface BuildProjectArgs {
-  /**App we are building */
-  app: FaableApp;
-  /**build script*/
-  build_script?: string;
-  cwd?: string;
-}
+export const build_project = async (
+  ctx: BuilderContext,
+  nodeCtx: NodeBuidContext
+) => {
+  const { log, config, workdir } = ctx;
 
-export const build_project = async (args: BuildProjectArgs) => {
-  const build_script = args.build_script;
-  const build_command = build_script
-    ? `yarn run ${build_script}`
-    : Configuration.instance().buildCommand;
+  // Check if exists any type of builc command
+  let build_command = config.getConfigProperty(
+    "buildCommand",
+    process.env.FAABLE_NPM_BUILD_COMMAND
+  );
+
+  const build_script_name = config.getConfigProperty("buildScript", "build");
+  const build_script = nodeCtx.pkg.scripts[build_script_name];
+
+  // No build command but build script
+  if (!build_command && build_script) {
+    build_command = `npm run ${build_script_name}`;
+  }
 
   if (build_command) {
-    const cwd = args.cwd || process.cwd();
-    log.info(`⚙️ Building project [${build_command}]...`);
+    log.info(`✅ Build command detected. Running "${build_command}"`);
     const timeout = 1000 * 60 * 100; // 100 minute timeout
 
     await cmd(build_command, {
       timeout,
-      cwd,
+      cwd: workdir,
       enableOutput: true,
     });
   } else {
-    log.info(`⚡️ No build step`);
+    log.info(`No build script in package.json`);
   }
 };

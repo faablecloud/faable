@@ -1,0 +1,16 @@
+{
+  "name": "test",
+  "version": "0.0.0-dev",
+  "license": "MIT",
+  "devDependencies": {
+    "@ava/typescript": "^4.1.0",
+    "ava": "^6.1.3",
+    "typescript": "^4.5.5"
+  },
+  "scripts": {
+    "test": "ava src/build.test.ts"
+  },
+  "dependencies": {
+    "promisify-child-process": "^4.1.2"
+  }
+}

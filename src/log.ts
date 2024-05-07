@@ -1,11 +1,11 @@
 import pino from "pino";
-import "pino-pretty";
+import pretty from "pino-pretty";
 
-export const log = pino({
-  transport: {
-    target: "pino-pretty",
-    options: {
-      colorize: true,
-    },
-  },
-});
+export const log = pino(
+  pretty({
+    colorize: true,
+    messageFormat: "{timestamp}{if runtime}⚙️:{runtime} - {end}{msg}",
+    ignore: "runtime",
+    singleLine: true,
+  })
+);

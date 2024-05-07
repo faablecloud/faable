@@ -1,13 +1,11 @@
-import { cmd } from "../../lib/cmd";
 import { Builder } from "../Builder";
+import path from "path";
+import fs from "fs-extra";
 
 export const builder: Builder = async (ctx) => {
-  const { app } = ctx;
-  await cmd(`docker build -t ${app.id} .`, {
-    enableOutput: true,
-  });
-
-  return { type: "docker" };
+  const { app, workdir } = ctx;
+  const f = path.join(path.resolve(workdir), "Dockerfile");
+  return { dockerfile: (await fs.readFile(f)).toString() };
 };
 
 export default builder;

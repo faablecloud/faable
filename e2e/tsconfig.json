@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
-    "baseUrl": "./src",
-    "target": "ESNext",
-    "module": "ESNext",
+    "target": "es2020",
+    "outDir": "dist",
+    "baseUrl": "src",
+    "module": "commonjs",
     "moduleResolution": "node",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": false,
     "skipLibCheck": true,
     "experimentalDecorators": true
-  },
-  "include": ["./src/**/*.ts"]
+  }
 }

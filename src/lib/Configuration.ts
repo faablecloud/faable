@@ -34,11 +34,7 @@ export class Configuration {
     return Configuration._instance;
   }
 
-  get startCommand() {
-    return this.config.startCommand || "npm run start";
-  }
-
-  get buildCommand() {
-    return this.config.buildCommand;
+  getConfigProperty<T>(name: string, defaultValue?: T) {
+    return this.config[name] || defaultValue;
   }
 }

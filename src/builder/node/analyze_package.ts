@@ -1,40 +1,33 @@
 import fs from "fs-extra";
 import path from "path";
-import { log } from "../../log";
 import { PackageJson } from "type-fest";
+import { BuilderContext } from "builder/Builder";
+import { NodeBuidContext, NodeBuildType } from "./NodeBuildContext";
 
-interface AnalyzePackage {
-  workdir: string;
-}
+export const analyze_package = async (
+  ctx: BuilderContext
+): Promise<NodeBuidContext> => {
+  const { log, workdir } = ctx;
 
-export const analyze_package = async (params: AnalyzePackage) => {
-  const workdir = params.workdir;
+  const node_modules_dir = path.join(path.resolve(workdir), "node_modules");
+
+  const installedModules = await fs.pathExists(node_modules_dir);
+  if (!installedModules) {
+    throw new Error("node_modules not found, please install packages first");
+  }
 
   const package_file = path.join(path.resolve(workdir), "package.json");
-  log.info(`Loading config from package.json...`);
   const pkg: PackageJson = await fs.readJSON(package_file);
 
-  // Check if build is required to run
-  const build_script = process.env.FAABLE_NPM_BUILD_SCRIPT
-    ? process.env.FAABLE_NPM_BUILD_SCRIPT
-    : pkg?.scripts["build"]
-    ? "build"
-    : null;
-
-  if (!build_script) {
-    log.info(`No build script on package.json`);
-  }
-
   // Detect deployment type
-  let type: string = "node";
+  let type: NodeBuildType = "node";
   if (pkg.dependencies["next"]) {
     type = "next";
+    log.info(`✅ Next.js ⚡️ project detected`);
   }
 
-  log.info(`⚡️ Detected deployment type=${type}`);
-
   return {
-    build_script,
+    pkg,
     type,
   };
 };

@@ -20,9 +20,6 @@ export const strategy_python: StrategyFn = async (workdir: string) => {
   }
 
   return {
-    runtime: {
-      name: "python",
-      version: runtime_version,
-    },
+    runtime: "python",
   };
 };

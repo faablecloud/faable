@@ -5,6 +5,7 @@ import { nodeResolve } from "@rollup/plugin-node-resolve";
 import copy from "rollup-plugin-copy";
 import generatePackageJson from "rollup-plugin-generate-package-json";
 import autoExternal from "rollup-plugin-auto-external";
+import dynamicImportVars from "@rollup/plugin-dynamic-import-vars";
 
 export default {
   input: "src/index.ts",
@@ -18,16 +19,28 @@ export default {
   plugins: [
     autoExternal(),
     json(),
+
     typescript(),
-    // commonjs(),
-    // nodeResolve(),
+    // dynamicImportVars(),
+    // commonjs({
+    //   dynamicRequireTargets: "src/builder/*.ts",
+    // }),
+
     copy({
       targets: [
         { src: "README.md", dest: "pkg" },
         { src: "bin/*", dest: "pkg/bin" },
         {
-          src: "src/commands/deploy/node-pipeline/templates/**/*",
-          dest: "pkg/dist/commands/deploy/node-pipeline/templates",
+          src: "src/builder/node/templates/*",
+          dest: "pkg/dist/builder/node/templates",
+        },
+        {
+          src: "src/builder/docker/templates/*",
+          dest: "pkg/dist/builder/docker/templates",
+        },
+        {
+          src: "src/builder/python/templates/*",
+          dest: "pkg/dist/builder/python/templates",
         },
       ],
     }),

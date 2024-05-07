@@ -1,29 +1,31 @@
-import { bundle_docker } from "./bundle_docker";
+import { prepare_dockerfile } from "./prepare_dockerfile";
 import { analyze_package } from "./analyze_package";
 import { build_project } from "./build_project";
 import { Builder } from "../Builder";
+import { engine_version } from "./engine_version";
 
 export const builder: Builder = async (ctx) => {
-  const { app, workdir, runtime } = ctx;
   // log.info(`🚀 Build Toolchain ${app.name} [${app.id}]`);
 
-  if (!runtime.version) {
-    throw new Error("Runtime version not specified for node");
-  }
+  const { version } = await engine_version(ctx);
+
   // Analyze package.json to check if build is needed
-  const { build_script, type } = await analyze_package({ workdir });
-  await build_project({ app, build_script });
+  const nodeCtx = await analyze_package(ctx);
+  await build_project(ctx, nodeCtx);
 
   // Bundle project inside a docker image
-  await bundle_docker({
-    app,
-    workdir,
+  const { dockerfile } = await prepare_dockerfile(ctx, {
     template_context: {
-      from: `node:${runtime.version}`,
+      from: `node:${version}`,
     },
   });
 
-  return { type };
+  return {
+    dockerfile,
+    params: {
+      type: nodeCtx.type,
+    },
+  };
 };
 
 export default builder;
