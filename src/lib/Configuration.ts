@@ -10,13 +10,13 @@ export class Configuration {
   private static _instance: Configuration;
   private config: ProjectConfig = {};
 
-  private constructor() {
+  private constructor(public workdir: string) {
     // Try to read default config file
     this.setConfigFile("faable.json", { ignoreWarnings: true });
   }
 
   setConfigFile(file: string, options: { ignoreWarnings: boolean }) {
-    const config_file = path.join(process.cwd(), file);
+    const config_file = path.join(this.workdir, file);
     if (fs.existsSync(config_file)) {
       this.config = fs.readJSONSync(config_file);
       log.info(`Loaded configuration from: ${file}`);
@@ -27,9 +27,9 @@ export class Configuration {
     }
   }
 
-  public static instance() {
+  public static instance(workdir: string) {
     if (!Configuration._instance) {
-      Configuration._instance = new Configuration();
+      Configuration._instance = new Configuration(workdir);
     }
     return Configuration._instance;
   }

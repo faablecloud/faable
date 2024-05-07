@@ -45,7 +45,7 @@ export const deploy_command = async (args: DeployCommandArgs) => {
     app,
     workdir,
     log: log.child({ runtime }),
-    config: Configuration.instance(),
+    config: Configuration.instance(workdir),
   };
 
   // Do build

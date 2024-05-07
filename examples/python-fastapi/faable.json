@@ -1,3 +1,3 @@
 {
-  "startCommand": "uvicorn main:app"
+  "startCommand": "uvicorn main:app --host 0.0.0.0 --port 80"
 }
