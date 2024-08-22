@@ -33,7 +33,7 @@ body:
 - type: input
   id: bug-browser
   attributes:
-    label: Browser / OS
+    label: "Browser / OS"
     description: "How often do you or others encounter this bug?"
     placeholder: "Chrome 128.0.6613.85 / macOS Sonoma 14.5"
   validations:
