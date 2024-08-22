@@ -1,9 +1,9 @@
 name: Bug report
 about: Create a report to help us improve
-title: '[Bug] xxxxxx'
-labels: ['bug']
+title: "[Bug] xxxxxx"
+labels: ["bug"]
 assignees:
- - boyander
+  - boyander
 body:
   - type: textarea
     id: bug-description
@@ -30,15 +30,15 @@ body:
       placeholder: A clear and concise description of what you expected to happen.
     validations:
       required: true
-- type: input
-  id: bug-browser
-  attributes:
-    label: "Browser / OS"
-    description: "How often do you or others encounter this bug?"
-    placeholder: "Chrome 128.0.6613.85 / macOS Sonoma 14.5"
-  validations:
-    required: true
-- type: markdown
-  id: bug-screenshots
-  attributes:
-    label: If applicable, add screenshots to help explain your problem.
+  - type: input
+    id: bug-browser
+    attributes:
+      label: "Browser / OS"
+      description: "How often do you or others encounter this bug?"
+      placeholder: "Chrome 128.0.6613.85 / macOS Sonoma 14.5"
+    validations:
+      required: true
+  - type: markdown
+    id: bug-screenshots
+    attributes:
+      label: If applicable, add screenshots to help explain your problem.
