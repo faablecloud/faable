@@ -10,14 +10,14 @@ body:
       value: |
         Thanks for taking the time to fill out this bug report!
   - type: textarea
-    id: bug-description
+    id: description
     attributes:
       label: Describe the bug
       placeholder: Tell us what you see! A clear and concise description of what the bug is.
     validations:
       required: true
   - type: textarea
-    id: bug-steps
+    id: steps
     attributes:
       label: Steps to reproduce the behavior
       placeholder: |
@@ -28,22 +28,30 @@ body:
     validations:
       required: true
   - type: textarea
-    id: bug-expected
+    id: expected
     attributes:
       label: Also tell us, what did you expect to happen?
       placeholder: A clear and concise description of what you expected to happen.
     validations:
       required: true
   - type: input
-    id: bug-browser
+    id: browser
     attributes:
       label: "Browser / OS"
       description: "How often do you or others encounter this bug?"
       placeholder: "Chrome 128.0.6613.85 / macOS Sonoma 14.5"
     validations:
       required: true
+  - type: input
+    id: url
+    attributes:
+      label: "Source URL"
+      description: "URL related to Bug"
+      placeholder: "https://faable.com/xxxx"
+    validations:
+      required: true
   - type: textarea
-    id: bug-screenshots
+    id: screenshots
     attributes:
       label: If applicable, add screenshots to help explain your problem.
   - type: textarea
