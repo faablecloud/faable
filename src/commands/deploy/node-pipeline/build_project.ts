@@ -14,7 +14,7 @@ interface BuildProjectArgs {
 export const build_project = async (args: BuildProjectArgs) => {
   const build_script = args.build_script;
   const build_command = build_script
-    ? `yarn run ${build_script}`
+    ? `npm run ${build_script}`
     : Configuration.instance().buildCommand;
 
   if (build_command) {
