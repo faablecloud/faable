@@ -11,7 +11,7 @@ export const analyze_package = async (params: AnalyzePackage) => {
   const workdir = params.workdir;
 
   const package_file = path.join(path.resolve(workdir), "package.json");
-  log.info(`Loading config from package.json...`);
+  log.info(`Loading config from package.json`);
   const pkg: PackageJson = await fs.readJSON(package_file);
 
   // Check if build is required to run
