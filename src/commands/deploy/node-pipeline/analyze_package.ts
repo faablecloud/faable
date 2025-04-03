@@ -2,7 +2,7 @@ import fs from "fs-extra";
 import path from "path";
 import { log } from "../../../log";
 import { PackageJson } from "type-fest";
-
+import * as R from "ramda";
 interface AnalyzePackage {
   workdir: string;
 }
@@ -25,9 +25,12 @@ export const analyze_package = async (params: AnalyzePackage) => {
     log.info(`No build script on package.json`);
   }
 
-  // Detect deployment type
   let type: string = "node";
-  if (pkg.dependencies["next"]) {
+
+  // Detect nextjs deployment type
+  const next_dep = R.lensPath(["dependencies", "next"]);
+  const next_devdep = R.lensPath(["devDependencies", "next"]);
+  if (R.view(next_dep, pkg) || R.view(next_devdep, pkg)) {
     type = "next";
   }
 
