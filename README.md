@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://faable.com">
-    <img src="https://www.faable.com/logo/Emblem.png" height="96">
+    <img src="https://www.faable.com/assets/logo/Emblem.png" height="96">
     <h3 align="center">Faable</h3>
   </a>
 </p>
