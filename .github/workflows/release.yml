@@ -1,8 +1,10 @@
 name: Release
 
 permissions:
+  contents: write # necesario para push de commits y tags
+  pull-requests: write
+  issues: write
   id-token: write
-  contents: read
 on:
   push:
     branches:
