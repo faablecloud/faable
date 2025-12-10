@@ -18,39 +18,38 @@
   "homepage": "https://github.com/faablecloud/faable#readme",
   "dependencies": {
     "axios": "^1.2.3",
-    "express": "^4.18.2",
     "fs-extra": "^11.1.0",
     "handlebars": "^4.7.7",
-    "pino": "^8.11.0",
-    "pino-pretty": "^9.4.0",
+    "pino": "^10.1.0",
+    "pino-pretty": "^13.1.3",
     "promisify-child-process": "^4.1.1",
     "prompts": "^2.4.2",
-    "ramda": "^0.29.0",
+    "ramda": "^0.32.0",
     "tslib": "^2.4.1",
     "yaml": "^2.2.2",
-    "yargs": "^17.6.2"
+    "yargs": "^18.0.0"
   },
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^23.0.2",
-    "@rollup/plugin-json": "^5.0.1",
-    "@rollup/plugin-node-resolve": "^15.0.1",
-    "@rollup/plugin-typescript": "^9.0.2",
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
     "@types/bluebird": "^3.5.38",
-    "@types/fs-extra": "^9.0.13",
-    "@types/node": "^18.11.17",
-    "@types/ramda": "^0.29.1",
-    "@types/yargs": "^17.0.17",
-    "ava": "^5.2.0",
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^24.10.2",
+    "@types/ramda": "^0.31.1",
+    "@types/yargs": "^17.0.35",
+    "ava": "^6.4.1",
     "husky": "^9.1.7",
-    "rimraf": "^3.0.2",
-    "rollup": "^3.7.5",
+    "rimraf": "^6.1.2",
+    "rollup": "^4.53.3",
     "rollup-plugin-auto-external": "^2.0.0",
     "rollup-plugin-copy": "^3.4.0",
     "rollup-plugin-generate-package-json": "^3.2.0",
-    "semantic-release": "^19.0.5",
+    "semantic-release": "^25.0.2",
     "ts-node": "^10.9.1",
-    "type-fest": "^3.5.3",
-    "typescript": "^4.5.5"
+    "type-fest": "^5.3.1",
+    "typescript": "^5.9.3"
   },
   "scripts": {
     "start": "npm run cli",
@@ -74,7 +73,7 @@
     ]
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.8"
   },
   "ava": {
     "extensions": {
