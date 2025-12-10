@@ -1,5 +1,6 @@
 {
   "branches": "main",
+  "repositoryUrl": "https://x-access-token:${GITHUB_TOKEN}@github.com/faablecloud/faable.git",
   "plugins": [
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
