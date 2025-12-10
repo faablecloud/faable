@@ -41,6 +41,7 @@
     "@types/ramda": "^0.29.1",
     "@types/yargs": "^17.0.17",
     "ava": "^5.2.0",
+    "husky": "^9.1.7",
     "rimraf": "^3.0.2",
     "rollup": "^3.7.5",
     "rollup-plugin-auto-external": "^2.0.0",

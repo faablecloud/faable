@@ -45,10 +45,12 @@ export const bundle_docker = async (props: BuildConfig) => {
 
   // NOTE: use slim to build projects
   const linux_distro = "slim";
+  const from = [template_context.from, linux_distro].filter((e) => e).join("-");
+  log.info(`Using docker image ${from}`);
 
   // run template
   const dockerfile = docker_template({
-    from: [template_context.from, linux_distro].filter((e) => e).join("-"),
+    from,
     entry_script: entrypoint_custom,
     start_command,
   });
