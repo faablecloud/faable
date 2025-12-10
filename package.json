@@ -56,7 +56,7 @@
     "start": "npm run cli",
     "cli": "ts-node --esm --experimental-specifier-resolution=node src/index.ts",
     "build": "rimraf pkg && rollup --config rollup.config.mjs",
-    "release": "npm build && semantic-release",
+    "release": "npm run build && semantic-release",
     "test": "ava"
   },
   "release": {
