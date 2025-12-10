@@ -18,6 +18,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-node@v3
         with:
-          node-version: "16"
-      - run: yarn install
-      - run: yarn build
+          node-version: "18"
+      - run: npm i
+      - run: npm run build
