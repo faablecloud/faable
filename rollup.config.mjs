@@ -48,9 +48,7 @@ export default {
         bugs: {
           url: "https://github.com/faablecloud/faable/issues",
         },
-        publishConfig: {
-          access: "public",
-        },
+        publishConfig: pkg.publishConfig,
         repository: pkg.repository,
         homepage: "https://github.com/faablecloud/faable#readme",
       }),
