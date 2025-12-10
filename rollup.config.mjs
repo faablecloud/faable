@@ -51,6 +51,7 @@ export default {
         publishConfig: {
           access: "public",
         },
+        repository: pkg.repository,
         homepage: "https://github.com/faablecloud/faable#readme",
       }),
     }),
