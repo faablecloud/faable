@@ -17,16 +17,16 @@
   },
   "homepage": "https://github.com/faablecloud/faable#readme",
   "dependencies": {
-    "axios": "^1.2.3",
-    "fs-extra": "^11.1.0",
-    "handlebars": "^4.7.7",
+    "axios": "^1.13.2",
+    "fs-extra": "^11.3.2",
+    "handlebars": "^4.7.8",
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.3",
-    "promisify-child-process": "^4.1.1",
+    "promisify-child-process": "^4.1.2",
     "prompts": "^2.4.2",
     "ramda": "^0.32.0",
-    "tslib": "^2.4.1",
-    "yaml": "^2.2.2",
+    "tslib": "^2.8.1",
+    "yaml": "^2.8.2",
     "yargs": "^18.0.0"
   },
   "devDependencies": {
@@ -47,7 +47,7 @@
     "rollup-plugin-copy": "^3.4.0",
     "rollup-plugin-generate-package-json": "^3.2.0",
     "semantic-release": "^25.0.2",
-    "ts-node": "^10.9.1",
+    "ts-node": "^10.9.2",
     "type-fest": "^5.3.1",
     "typescript": "^5.9.3"
   },
