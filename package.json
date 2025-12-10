@@ -53,10 +53,10 @@
     "typescript": "^4.5.5"
   },
   "scripts": {
-    "start": "yarn run cli",
+    "start": "npm run cli",
     "cli": "ts-node --esm --experimental-specifier-resolution=node src/index.ts",
     "build": "rimraf pkg && rollup --config rollup.config.mjs",
-    "release": "yarn build && semantic-release",
+    "release": "npm build && semantic-release",
     "test": "ava"
   },
   "release": {
@@ -74,7 +74,7 @@
     ]
   },
   "engines": {
-    "node": ">=16"
+    "node": ">=18"
   },
   "ava": {
     "extensions": {
