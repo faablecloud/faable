@@ -42,8 +42,13 @@ export const bundle_docker = async (props: BuildConfig) => {
   const entrypoint_custom = entrypoint_template(template_context);
   const start_command = Configuration.instance().startCommand;
   log.info(`⚙️ Start command: ${start_command}`);
+
+  // NOTE: use slim to build projects
+  const linux_distro = "slim";
+
+  // run template
   const dockerfile = docker_template({
-    from: template_context.from,
+    from: [template_context.from, linux_distro].filter((e) => e).join("-"),
     entry_script: entrypoint_custom,
     start_command,
   });
