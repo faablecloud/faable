@@ -57,20 +57,6 @@
     "build": "rimraf pkg && rollup --config rollup.config.mjs",
     "test": "ava"
   },
-  "release": {
-    "branches": "main",
-    "plugins": [
-      "@semantic-release/commit-analyzer",
-      "@semantic-release/release-notes-generator",
-      [
-        "@semantic-release/npm",
-        {
-          "pkgRoot": "pkg"
-        }
-      ],
-      "@semantic-release/github"
-    ]
-  },
   "engines": {
     "node": ">=22.8"
   },
