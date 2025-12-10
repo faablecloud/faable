@@ -17,6 +17,7 @@
     "faable": "bin/faable.js"
   },
   "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
   "homepage": "https://github.com/faablecloud/faable#readme",
