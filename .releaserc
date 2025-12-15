@@ -1,5 +1,20 @@
 {
-  "branches": "main",
+  "branches": [
+    {
+      "name": "main",
+      "channel": "latest"
+    },
+    {
+      "name": "next",
+      "channel": "next",
+      "prerelease": true
+    },
+    {
+      "name": "beta",
+      "channel": "beta",
+      "prerelease": true
+    }
+  ],
   "repositoryUrl": "https://x-access-token:${GITHUB_TOKEN}@github.com/faablecloud/faable.git",
   "plugins": [
     "@semantic-release/commit-analyzer",
