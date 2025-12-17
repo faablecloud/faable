@@ -21,7 +21,7 @@ export const build_project = async (args: BuildProjectArgs) => {
   if (build_command) {
     const cwd = args.cwd || process.cwd();
     log.info(`⚙️ Building project [${build_command}]...`);
-    const timeout = 1000 * 60 * 100; // 100 minute timeout
+    const timeout = 1000 * 60 * 30; // 30 minute timeout
 
     await cmd(build_command, {
       timeout,

@@ -36,7 +36,7 @@ export const cmd = async (cmd: string, config?: Partial<CmdConfig>) => {
     return result;
   } catch (error) {
     const output = out_data.map((b) => b.toString()).join("\n");
-    log.error(output);
+    log.error(error?.message);
     throw new Error(`Command error: ${cmd}`);
   }
 };
