@@ -4,6 +4,12 @@ import path from "path";
 import { cmd } from "../../../../lib/cmd";
 import { log } from "../../../../log";
 
+const getCurrentNodeVersion = async () => {
+  const out = await cmd(`node --version`);
+  const [_, version] = out.stdout.toString().trim().split("v");
+  return version;
+};
+
 /**
  * Strategy to detect app name from package.json
  * @param api
@@ -20,7 +26,7 @@ export const strategy_nodejs: StrategyFn = async (workdir: string) => {
   }
 
   // Use engines.node if found
-  let runtime_version = "18.19.0";
+  let runtime_version = await getCurrentNodeVersion();
   if (engines?.node) {
     try {
       const check_cmd = `npm view node@"${engines.node}" version | tail -n 1 | cut -d "'" -f2`;
@@ -30,8 +36,12 @@ export const strategy_nodejs: StrategyFn = async (workdir: string) => {
         `Using node@${runtime_version} from engines in package.json (${engines.node})`
       );
     } catch (e) {
-      throw new Error(`Node version is not valid (${engines.node})`);
+      log.info(
+        `Node version defined in engines in package.json is not valid (${engines.node}), using current version ${runtime_version}`
+      );
     }
+  } else {
+    log.info(`Node version ${runtime_version}`);
   }
 
   return {
