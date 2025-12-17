@@ -21,7 +21,7 @@ export const cmd = async (cmd: string, config?: Partial<CmdConfig>) => {
     stdio: enableOutput ? "inherit" : "pipe",
     timeout,
     cwd,
-    env: config.env,
+    env: config?.env || {},
   });
   const out_data: Buffer[] = [];
   child.stderr?.on("data", (data) => {
