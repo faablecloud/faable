@@ -32,8 +32,11 @@ export const deploy_command = async (args: DeployCommandArgs) => {
   await check_environment();
 
   log.info(
-    `🚀 Deploying ${app.name} (${app.id}) runtime=${runtime.name}-${runtime.version} `
+    `🚀 Deploying ${app.name} (${app.id}) runtime=${runtime.name}-${runtime.version}`
   );
+
+  // get environment variables
+  const env_vars = await api.getAppSecrets(app.id);
 
   let type;
 
@@ -41,6 +44,7 @@ export const deploy_command = async (args: DeployCommandArgs) => {
     const node_result = await build_node(app, {
       workdir,
       runtime,
+      env_vars,
     });
     type = node_result.type;
   } else if (runtime.name == "docker") {

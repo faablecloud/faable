@@ -13,6 +13,13 @@ export interface FaableAppRegistry {
   password: string;
 }
 
+export interface Secret {
+  id: string;
+  related: string;
+  name: string;
+  value: string;
+}
+
 function handleError(message?: string) {
   return function (
     target: any,
@@ -43,7 +50,7 @@ function handleError(message?: string) {
 
 type Page<Q> = { results: Q[] };
 
-const paginate = async <T, Q extends Promise<Page<T>>>(
+const firstPage = async <T, Q extends Promise<Page<T>>>(
   res: Q
 ): Promise<Awaited<Q>["results"]> => {
   const items = (await res).results;
@@ -72,7 +79,7 @@ export class FaableApi<T = any> {
 
   @handleError()
   async list() {
-    return paginate(data(this.client.get<Page<FaableApp>>(`/app`)));
+    return firstPage(data(this.client.get<Page<FaableApp>>(`/app`)));
   }
 
   @handleError()
@@ -92,5 +99,9 @@ export class FaableApi<T = any> {
     image: string;
   }) {
     return data(this.client.post<{ id: string }>(`/deployment`, params));
+  }
+  @handleError()
+  async getAppSecrets(app_id: string) {
+    return firstPage(data(this.client.get<Page<Secret>>(`/secret/${app_id}`)));
   }
 }

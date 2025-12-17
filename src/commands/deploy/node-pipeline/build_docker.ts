@@ -36,7 +36,7 @@ interface BuildConfig {
   };
 }
 
-export const bundle_docker = async (props: BuildConfig) => {
+export const build_docker = async (props: BuildConfig) => {
   const { app, workdir, template_context } = props;
 
   const entrypoint_custom = entrypoint_template(template_context);

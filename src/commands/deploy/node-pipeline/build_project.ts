@@ -1,4 +1,4 @@
-import { FaableApp } from "../../../api/FaableApi";
+import { FaableApp, Secret } from "../../../api/FaableApi";
 import { log } from "../../../log";
 import { cmd } from "../../../lib/cmd";
 import { Configuration } from "../../../lib/Configuration";
@@ -9,6 +9,7 @@ interface BuildProjectArgs {
   /**build script*/
   build_script?: string;
   cwd?: string;
+  env?: Record<string, string>;
 }
 
 export const build_project = async (args: BuildProjectArgs) => {
