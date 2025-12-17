@@ -14,7 +14,7 @@ interface BuildNodeOptions {
 
 export const build_node = async (app: FaableApp, options: BuildNodeOptions) => {
   // log.info(`🚀 Build Toolchain ${app.name} [${app.id}]`);
-  const { workdir, runtime, env_vars } = options;
+  const { workdir, runtime, env_vars = [] } = options;
 
   if (!runtime.version) {
     throw new Error("Runtime version not specified for node");

@@ -1,4 +1,5 @@
 import { spawn } from "promisify-child-process";
+import { log } from "../log";
 
 interface CmdConfig {
   /** Show output */
@@ -35,7 +36,7 @@ export const cmd = async (cmd: string, config?: Partial<CmdConfig>) => {
     return result;
   } catch (error) {
     const output = out_data.map((b) => b.toString()).join("\n");
-    // console.log(output);
+    log.error(output);
     throw new Error(`Command error: ${cmd}`);
   }
 };
