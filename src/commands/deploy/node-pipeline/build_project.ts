@@ -27,7 +27,7 @@ export const build_project = async (args: BuildProjectArgs) => {
       timeout,
       cwd,
       enableOutput: true,
-      env: args.env || {},
+      ...(args?.env ? { env: args?.env } : {}),
     });
   } else {
     log.info(`⚡️ No build step`);
