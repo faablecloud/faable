@@ -61,7 +61,7 @@ export const build_docker = async (props: BuildConfig) => {
   const timeout = 10 * 60 * 1000; // 10 minute timeout
 
   await cmd(
-    `docker build -t ${app.id} ${workdir} -f -<<EOF\n${dockerfile}\nEOF`,
-    { timeout, enableOutput: true }
+    `docker build --platform linux/amd64 -t ${app.id} ${workdir} -f -<<EOF\n${dockerfile}\nEOF`,
+    { timeout, enableOutput: true },
   );
 };
