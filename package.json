@@ -1,6 +1,6 @@
 {
   "name": "@faable/faable",
-  "version": "0.0.0-dev",
+  "version": "1.0.0-dev",
   "main": "dist/index.js",
   "license": "MIT",
   "author": "Marc Pomar <marc@faable.com>",
