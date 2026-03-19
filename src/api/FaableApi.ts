@@ -1,5 +1,5 @@
-import  { AxiosError, AxiosInstance, AxiosResponse } from "axios";
-import { base_client } from "./base_client";
+import { AxiosError, AxiosInstance, AxiosResponse } from "axios";
+import { create_base_client } from "./base_client";
 import { AuthStrategy, AuthStrategyBuilder } from "./strategies/types";
 export interface FaableApp {
   id: string;
@@ -77,8 +77,8 @@ export class FaableApi<T = any> {
 
   constructor(config: FaableApiConfig<T>) {
     const {authStrategy,auth} = config
-    this.client = base_client;
-      const strategy: AuthStrategy | undefined = authStrategy && authStrategy(auth);
+    this.client = create_base_client()
+    const strategy: AuthStrategy | undefined = authStrategy && authStrategy(auth);
   
     this.client.interceptors.request.use(
     async function (config) {

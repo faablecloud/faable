@@ -1,10 +1,10 @@
-import { base_client } from "../base_client";
+import { create_base_client } from "../base_client";
 import { AuthStrategyBuilder } from "./types";
 
 
 const exchangeGithubOidcToken = async(gh_token:string)=>{
-
-  const res = await base_client.post("/auth/github-oidc",{
+  const client = create_base_client()
+  const res = await client.post("/auth/github-oidc",{
     token:gh_token
   })
   const {token} =res.data

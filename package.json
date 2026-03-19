@@ -57,14 +57,16 @@
     "rollup-plugin-copy": "^3.4.0",
     "rollup-plugin-generate-package-json": "^3.2.0",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "type-fest": "^5.3.1",
     "typescript": "^5.9.3"
   },
   "scripts": {
     "start": "npm run cli",
-    "cli": "ts-node --esm --experimental-specifier-resolution=node src/index.ts",
+    "cli": "tsx src/index.ts",
+    "gh-action-cli": "GITHUB_ACTIONS=true FAABLE_ID_TOKEN=fake-token tsx src/index.ts",
     "build": "rimraf pkg && rollup --config rollup.config.mjs",
-    "test": "ava",
+    "test": "tsx node_modules/ava/entrypoints/cli.mjs",
     "lint": "npx eslint .",
     "lint:fix": "npx eslint . --fix"
   },
@@ -74,10 +76,6 @@
   "ava": {
     "extensions": {
       "ts": "module"
-    },
-    "nodeArguments": [
-      "--loader=ts-node/esm",
-      "--experimental-specifier-resolution=node"
-    ]
+    }
   }
 }

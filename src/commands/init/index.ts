@@ -1,5 +1,5 @@
 import { CommandModule } from "yargs";
-import {  writeGithubAction } from "./writeGithubAction";
+import { writeGithubAction } from "./writeGithubAction";
 
 export const init: CommandModule<any, { overwrite: boolean }> = {
   command: ["initialize", "$0"],

@@ -19,8 +19,8 @@ export const context = async () => {
   // Github actions environment
   if (process.env.GITHUB_ACTIONS === 'true') {
     try {
-      const idToken = await getIDToken("https://faable.com");
-       api = FaableApi.create({ authStrategy: oidc_strategy, auth: { idToken } })
+      const idToken = process.env.FAABLE_ID_TOKEN || await getIDToken("https://faable.com");
+      api = FaableApi.create({ authStrategy: oidc_strategy, auth: { idToken } })
     } catch (_) {
       console.error("Error fetching token, configure 'permissions: id-token: write'");
     }
