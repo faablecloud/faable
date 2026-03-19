@@ -36,7 +36,6 @@ export const link: CommandModule<object, Options> = {
     log.info("Checking local git repository...");
     const gitUrl = await getGitRemoteUrl(workdir);
 
-    log.info("Fetching your Faable apps...");
     const apps = await api.list();
 
     if (apps.length === 0) {
