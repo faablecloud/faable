@@ -137,6 +137,32 @@ export class FaableApi<T = any> {
 
   @handleError()
   async updateApp(app_id: string, params: Partial<FaableApp> & { github_repo?: string }) {
-    return data(this.client.patch<FaableApp>(`/app/${app_id}`, params));
+    return data(this.client.post<FaableApp>(`/app/${app_id}`, params));
+  }
+
+  @handleError()
+  async getDeviceCode() {
+    return data(this.client.post<{
+      device_code: string;
+      user_code: string;
+      verification_uri: string;
+      expires_in: number;
+      interval: number;
+    }>(`/auth/device/code`));
+  }
+
+  @handleError()
+  async getDeviceToken(device_code: string) {
+    return data(this.client.post<{
+      access_token: string;
+      token_type: string;
+      expires_in: number;
+      refresh_token?: string;
+    }>(`/auth/device/token`, { device_code }));
+  }
+
+  @handleError()
+  async getMe() {
+    return data(this.client.get<{ email: string; id: string }>(`/auth/me`));
   }
 }

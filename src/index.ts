@@ -1,7 +1,10 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { apps } from "./commands/apps";
-import { configure } from "./commands/configure";
+import { login } from "./commands/login";
+import { logout } from "./commands/logout";
+import { whoami } from "./commands/whoami";
+import { auth } from "./commands/auth";
 import { deploy } from "./commands/deploy";
 import { log } from "./log";
 import { link } from "./commands/link";
@@ -30,7 +33,10 @@ yg.scriptName("faable")
   }, true)
   .command(deploy)
   .command(apps)
-  .command(configure)
+  .command(login)
+  .command(logout)
+  .command(whoami)
+  .command(auth)
   .command(init)
   .command(link)
   .demandCommand(1)
