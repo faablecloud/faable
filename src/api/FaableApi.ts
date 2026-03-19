@@ -1,5 +1,6 @@
-import axios, { AxiosError, AxiosInstance, AxiosResponse } from "axios";
-import { prepare_client, FaableClientConfig } from "./client";
+import  { AxiosError, AxiosInstance, AxiosResponse } from "axios";
+import { base_client } from "./base_client";
+import { AuthStrategy, AuthStrategyBuilder } from "./strategies/types";
 export interface FaableApp {
   id: string;
   name: string;
@@ -20,7 +21,7 @@ export interface Secret {
   value: string;
 }
 
-function handleError(message?: string) {
+function handleError() {
   return function (
     target: any,
     propertyKey: string,
@@ -37,9 +38,9 @@ function handleError(message?: string) {
           if (res) {
             throw new Error(
               `FaableApi ${e.config.url} ${res.status}: ${res?.data.message}`
-            );
+            ,{cause:error});
           } else {
-            throw new Error(`FaableApi ${e.message}`);
+            throw new Error(`FaableApi ${e.message}`,{cause:error});
           }
         }
         throw error;
@@ -64,13 +65,35 @@ const data = async <T, Q extends Promise<AxiosResponse<T>>>(
   return items;
 };
 
+export type FaableClientConfig<T = any> = {
+  authStrategy?: AuthStrategyBuilder<T>;
+  auth?: T;
+};
+
 type FaableApiConfig<T> = {} & FaableClientConfig<T>;
 
 export class FaableApi<T = any> {
   client: AxiosInstance;
 
   constructor(config: FaableApiConfig<T>) {
-    this.client = prepare_client(config);
+    const {authStrategy,auth} = config
+    this.client = base_client;
+      const strategy: AuthStrategy | undefined = authStrategy && authStrategy(auth);
+  
+    this.client.interceptors.request.use(
+    async function (config) {
+      // Do something before request is sent
+      const headers = strategy ? await strategy.headers() : {};
+      config.headers.set(headers);
+      // console.log("all headers");
+      // console.log(headers);
+      return config;
+    },
+    function (error) {
+      // Do something with request error
+      return Promise.reject(error);
+    }
+  );
   }
 
   static create<T>(config: FaableApiConfig<T> = {}) {
