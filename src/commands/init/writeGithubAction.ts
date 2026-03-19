@@ -5,22 +5,18 @@ import prompts from "prompts";
 import { CredentialsStore } from "../../lib/CredentialsStore";
 import yaml from "yaml";
 
-export class ConfigurationHelper {
-  store: CredentialsStore;
-  constructor() {
-    this.store = new CredentialsStore();
-  }
 
-  get workflows_dir() {
+const store: CredentialsStore = new CredentialsStore();
+  const get_workflows_dir = ()=> {
     return path.join(process.cwd(), ".github", "workflows");
   }
 
-  get default_action() {
-    return path.join(this.workflows_dir, "deploy.yml");
+  const get_default_action=()=> {
+    return path.join(get_workflows_dir(), "deploy.yml");
   }
 
-  async demandConfig(force: boolean = false) {
-    const creds = await this.store.loadCredentials();
+  const  demandConfig = async(force: boolean = false) =>{
+    const creds = await store.loadCredentials();
     if (creds?.apikey) {
       return;
     }
@@ -31,10 +27,10 @@ export class ConfigurationHelper {
         message: "What is your Faable ApiKey?",
       },
     ]);
-    await this.store.saveApiKey({ apikey });
+    await store.saveApiKey({ apikey });
   }
 
-  async tentativeName() {
+  const tentativeName = async() => {
     try {
       const pkg = path.join(process.cwd(), "package.json");
       const { name } = await fs.readJSON(pkg);
@@ -44,7 +40,7 @@ export class ConfigurationHelper {
     }
   }
 
-  async checkPackageManager() {
+  const  checkPackageManager = async()=> {
     if (fs.existsSync(path.join(process.cwd(), "package-lock.json"))) {
       return "npm";
     }
@@ -54,11 +50,19 @@ export class ConfigurationHelper {
     throw new Error("No package-lock.json or yarn.lock file found");
   }
 
-  async initializeGithubAction(force: boolean = false) {
-    await this.demandConfig();
 
+type WriteGithubActionParams = {
+  overwrite?: boolean
+}
+
+export const  writeGithubAction = async(params:WriteGithubActionParams = {}) => {
+
+  const {overwrite} = params
+    await demandConfig();
+
+    const gh_action_file = get_default_action();
     // Already configured
-    if (!force && fs.pathExistsSync(this.default_action)) {
+    if (!overwrite && fs.pathExistsSync(gh_action_file)) {
       log.info(`Github action is already configured.`);
       return;
     }
@@ -73,14 +77,14 @@ export class ConfigurationHelper {
         {
           type: "text",
           name: "app_name",
-          initial: await this.tentativeName(),
+          initial: await tentativeName(),
           message: "Which app are you deploying",
         },
       ],
       { onCancel }
     );
 
-    const manager = await this.checkPackageManager();
+    const manager = await checkPackageManager();
     const action = {
       name: "Deploy to Faable",
       on: {
@@ -88,20 +92,19 @@ export class ConfigurationHelper {
           branches: ["main"],
         },
       },
-      env: {
-        FAABLE_APIKEY: "${{ secrets.FAABLE_APIKEY }}",
+      permissions:{
+        "id-token": "write",
+        "contents": "read"
       },
       jobs: {
         deploy: {
           "runs-on": "ubuntu-latest",
           steps: [
             { uses: "actions/checkout@v2" },
-            { name: "Prepare CLI", run: "npm i -g @faable/faable" },
             {
-              uses: "actions/setup-node@v3",
+              uses: "actions/setup-node@v4",
               with: {
-                "node-version": "18",
-                cache: manager,
+                "node-version": "lts/*",
               },
             },
             ...(manager == "npm" ? [{ run: "npm ci" }] : []),
@@ -110,15 +113,14 @@ export class ConfigurationHelper {
               : []),
             {
               name: "Deploy to Faable",
-              run: `faable deploy ${app_name}`,
+              run: `npx @faable/faable deploy ${app_name}`,
             },
           ],
         },
       },
     };
 
-    await fs.writeFile(this.default_action, yaml.stringify(action));
-    log.info(`Written ${this.default_action}`);
-    log.info(`Remember to create FAABLE_APIKEY on Github repo secrets`);
+    
+    await fs.writeFile(gh_action_file, yaml.stringify(action));
+    log.info(`Written ${gh_action_file}`);
   }
-}

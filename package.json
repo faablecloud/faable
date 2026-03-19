@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/faablecloud/faable#readme",
   "dependencies": {
+    "@actions/core": "^3.0.0",
     "axios": "^1.13.2",
     "fs-extra": "^11.3.2",
     "handlebars": "^4.7.8",
@@ -35,6 +36,7 @@
     "yargs": "^18.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -44,7 +46,10 @@
     "@types/node": "^24.10.2",
     "@types/ramda": "^0.31.1",
     "@types/yargs": "^17.0.35",
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
     "ava": "^6.4.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.4.0",
     "husky": "^9.1.7",
     "rimraf": "^6.1.2",
     "rollup": "^4.53.3",
@@ -59,7 +64,9 @@
     "start": "npm run cli",
     "cli": "ts-node --esm --experimental-specifier-resolution=node src/index.ts",
     "build": "rimraf pkg && rollup --config rollup.config.mjs",
-    "test": "ava"
+    "test": "ava",
+    "lint": "npx eslint .",
+    "lint:fix": "npx eslint . --fix"
   },
   "engines": {
     "node": ">=22.8"
