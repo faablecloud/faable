@@ -15,18 +15,26 @@ export interface DeployCommandArgs {
 export const deploy_command = async (args: DeployCommandArgs) => {
   const workdir = args.workdir || process.cwd();
 
-  const { api } = await context();
+  const { api, appId } = await context();
 
   // Resolve runtime
   const { app_name, runtime } = await runtime_detection(workdir);
 
-  const name = args.app_slug || app_name;
-  if (!name) {
-    throw new Error("Missing <app_name>");
+  let app;
+  if (args.app_slug) {
+    app = await api.getBySlug(args.app_slug);
+  } else {
+    const oidc_app_id = appId;
+    if (oidc_app_id) {
+      app = await api.getApp(oidc_app_id);
+    } else if (app_name) {
+      app = await api.getBySlug(app_name);
+    }
   }
 
-  // Get app from Faable API
-  const app = await api.getBySlug(name);
+  if (!app) {
+    throw new Error("Missing <app_name>");
+  }
 
   // Check if we can build docker images
   await check_environment();

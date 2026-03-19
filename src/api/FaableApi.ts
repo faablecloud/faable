@@ -74,12 +74,14 @@ type FaableApiConfig<T> = {} & FaableClientConfig<T>;
 
 export class FaableApi<T = any> {
   client: AxiosInstance;
+  strategy?: AuthStrategy;
 
   constructor(config: FaableApiConfig<T>) {
     const {authStrategy,auth} = config
     this.client = create_base_client()
-    const strategy: AuthStrategy | undefined = authStrategy && authStrategy(auth);
+    this.strategy = authStrategy && authStrategy(auth);
   
+    const strategy = this.strategy;
     this.client.interceptors.request.use(
     async function (config) {
       // Do something before request is sent
@@ -111,6 +113,11 @@ export class FaableApi<T = any> {
   }
 
   @handleError()
+  async getApp(app_id: string) {
+    return data(this.client.get<FaableApp>(`/app/${app_id}`));
+  }
+
+  @handleError()
   async getRegistry(app_id: string) {
     return data(this.client.get<FaableAppRegistry>(`/app/${app_id}/registry`));
   }
@@ -126,5 +133,10 @@ export class FaableApi<T = any> {
   @handleError()
   async getAppSecrets(app_id: string) {
     return firstPage(data(this.client.get<Page<Secret>>(`/secret/${app_id}`)));
+  }
+
+  @handleError()
+  async updateApp(app_id: string, params: Partial<FaableApp> & { github_repo?: string }) {
+    return data(this.client.patch<FaableApp>(`/app/${app_id}`, params));
   }
 }

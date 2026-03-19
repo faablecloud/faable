@@ -27,7 +27,10 @@ export const context = async () => {
   }
 
 
+  const appId = await api?.strategy?.app_id?.();
+
   return {
     api,
+    appId
   };
 };

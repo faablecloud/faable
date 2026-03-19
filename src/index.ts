@@ -4,14 +4,15 @@ import { apps } from "./commands/apps";
 import { configure } from "./commands/configure";
 import { deploy } from "./commands/deploy";
 import { log } from "./log";
+import { link } from "./commands/link";
 import { init } from "./commands/init";
 import { version } from "./config";
 import { Configuration } from "./lib/Configuration";
 
 const yg = yargs();
 yg.scriptName("faable")
-  .middleware(function (argv) {
-    console.log(`Faable CLI ${version}`);
+  .middleware(function (_argv) {
+    log.info(`Faable CLI ${version}`);
   }, true)
   .option("c", {
     alias: "config",
@@ -31,6 +32,7 @@ yg.scriptName("faable")
   .command(apps)
   .command(configure)
   .command(init)
+  .command(link)
   .demandCommand(1)
   .help()
   .fail(function (msg, err) {
