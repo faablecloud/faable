@@ -28,6 +28,13 @@
         "useOidc": true
       }
     ],
-    "@semantic-release/github"
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          "pkg/*.tgz"
+        ]
+      }
+    ]
   ]
 }

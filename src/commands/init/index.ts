@@ -2,7 +2,7 @@ import { CommandModule } from "yargs";
 import { writeGithubAction } from "./writeGithubAction";
 
 export const init: CommandModule<any, { overwrite: boolean }> = {
-  command: ["initialize", "$0"],
+  command: ["init", "initialize"],
   describe: "Initialize Faable",
   builder: (yargs) => {
     return yargs
