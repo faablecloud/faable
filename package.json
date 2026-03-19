@@ -68,7 +68,8 @@
     "build": "rimraf pkg && rollup --config rollup.config.mjs",
     "test": "tsx node_modules/ava/entrypoints/cli.mjs",
     "lint": "npx eslint .",
-    "lint:fix": "npx eslint . --fix"
+    "lint:fix": "npx eslint . --fix",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=22.8"
