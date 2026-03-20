@@ -23,7 +23,6 @@
       "@semantic-release/npm",
       {
         "npmPublish": true,
-        "pkgRoot": "pkg",
         "otp": false,
         "useOidc": true
       }

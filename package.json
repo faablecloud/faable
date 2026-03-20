@@ -21,6 +21,10 @@
     "access": "public"
   },
   "homepage": "https://github.com/faablecloud/faable#readme",
+  "files": [
+    "dist",
+    "bin"
+  ],
   "dependencies": {
     "@actions/core": "^3.0.0",
     "axios": "^1.13.2",
@@ -48,7 +52,7 @@
     "@types/ramda": "^0.31.1",
     "@types/yargs": "^17.0.35",
     "@typescript-eslint/eslint-plugin": "^8.57.1",
-    "ava": "^6.4.1",
+    "ava": "^7.0.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.4.0",
     "husky": "^9.1.7",
@@ -67,19 +71,14 @@
     "start": "npm run cli",
     "cli": "tsx src/index.ts",
     "gh-action-cli": "GITHUB_ACTIONS=true FAABLE_ID_TOKEN=fake-token tsx src/index.ts",
-    "build": "rimraf pkg && rollup --config rollup.config.mjs",
-    "test": "tsx node_modules/ava/entrypoints/cli.mjs",
+    "build": "rimraf dist && rollup --config rollup.config.mjs",
+    "test": "ava",
     "lint": "npx eslint .",
     "lint:fix": "npx eslint . --fix",
     "prepare": "husky",
-    "release": "node scripts/release.js"
+    "release": "semantic-release"
   },
   "engines": {
     "node": ">=22.8"
-  },
-  "ava": {
-    "extensions": {
-      "ts": "module"
-    }
   }
 }
