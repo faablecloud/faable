@@ -24,9 +24,6 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm audit signatures
-      - name: Workaround for semantic-release npm plugin and npm 10 workspace bug
-        run: rm package-lock.json
-
-      - run: npx semantic-release
+      - run: npm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
