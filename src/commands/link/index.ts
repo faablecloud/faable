@@ -31,6 +31,23 @@ export const link: CommandModule<object, Options> = {
   },
   handler: async (args) => {
     const workdir = args.workdir || process.cwd();
+
+    const config = Configuration.instance();
+    if (config.app_slug) {
+      log.info(`This repository is already linked to app: ${config.app_slug}`);
+      const { relink } = await prompts({
+        type: "toggle",
+        name: "relink",
+        message: "Do you want to link it to a different app?",
+        initial: false,
+        active: "yes",
+        inactive: "no",
+      });
+      if (!relink) {
+        return;
+      }
+    }
+
     const { api } = await context();
 
     log.info("Checking local git repository...");
