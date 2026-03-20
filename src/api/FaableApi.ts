@@ -21,33 +21,6 @@ export interface Secret {
   value: string;
 }
 
-function handleError() {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor
-  ) {
-    const method = descriptor.value;
-    descriptor.value = async function (...args: any) {
-      try {
-        return await method.bind(this).apply(target, args);
-      } catch (error) {
-        const e: AxiosError<{ message: string }> = error;
-        if (e.isAxiosError) {
-          const res = e.response;
-          if (res) {
-            throw new Error(
-              `FaableApi ${e.config.url} ${res.status}: ${res?.data.message}`
-            ,{cause:error});
-          } else {
-            throw new Error(`FaableApi ${e.message}`,{cause:error});
-          }
-        }
-        throw error;
-      }
-    };
-  };
-}
 
 type Page<Q> = { results: Q[] };
 
@@ -77,52 +50,68 @@ export class FaableApi<T = any> {
   strategy?: AuthStrategy;
 
   constructor(config: FaableApiConfig<T>) {
-    const {authStrategy,auth} = config
-    this.client = create_base_client()
+    const { authStrategy, auth } = config;
+    this.client = create_base_client();
     this.strategy = authStrategy && authStrategy(auth);
-  
+
     const strategy = this.strategy;
     this.client.interceptors.request.use(
-    async function (config) {
-      // Do something before request is sent
-      const headers = strategy ? await strategy.headers() : {};
-      config.headers.set(headers);
-      // console.log("all headers");
-      // console.log(headers);
-      return config;
-    },
-    function (error) {
-      // Do something with request error
-      return Promise.reject(error);
-    }
-  );
+      async function (config) {
+        // Do something before request is sent
+        const headers = strategy ? await strategy.headers() : {};
+        config.headers.set(headers);
+        // console.log("all headers");
+        // console.log(headers);
+        return config;
+      },
+      function (error) {
+        // Do something with request error
+        return Promise.reject(error);
+      }
+    );
+
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        const e: AxiosError<{ message: string }> = error;
+        if (e.isAxiosError) {
+          const res = e.response;
+          const url = e.config?.url || "";
+          if (res) {
+            const serverMessage =
+              res.data?.message || res.statusText || "Unknown Error";
+            throw new Error(`FaableApi ${url} ${res.status}: ${serverMessage}`, {
+              cause: error,
+            });
+          } else {
+            throw new Error(`FaableApi ${url} ${e.message}`, { cause: error });
+          }
+        }
+        throw error;
+      }
+    );
   }
 
   static create<T>(config: FaableApiConfig<T> = {}) {
     return new FaableApi(config);
   }
 
-  @handleError()
   async list() {
     return firstPage(data(this.client.get<Page<FaableApp>>(`/app`)));
   }
 
-  @handleError()
   async getBySlug(slug: string) {
     return data(this.client.get<FaableApp>(`/app/slug/${slug}`));
   }
 
-  @handleError()
   async getApp(app_id: string) {
     return data(this.client.get<FaableApp>(`/app/${app_id}`));
   }
 
-  @handleError()
   async getRegistry(app_id: string) {
     return data(this.client.get<FaableAppRegistry>(`/app/${app_id}/registry`));
   }
 
-  @handleError()
   async createDeployment(params: {
     app_id: string;
     type: string;
@@ -130,38 +119,41 @@ export class FaableApi<T = any> {
   }) {
     return data(this.client.post<{ id: string }>(`/deployment`, params));
   }
-  @handleError()
+
   async getAppSecrets(app_id: string) {
     return firstPage(data(this.client.get<Page<Secret>>(`/secret/${app_id}`)));
   }
 
-  @handleError()
-  async updateApp(app_id: string, params: Partial<FaableApp> & { github_repo?: string }) {
+  async updateApp(
+    app_id: string,
+    params: Partial<FaableApp> & { github_repo?: string }
+  ) {
     return data(this.client.post<FaableApp>(`/app/${app_id}`, params));
   }
 
-  @handleError()
   async getDeviceCode() {
-    return data(this.client.post<{
-      device_code: string;
-      user_code: string;
-      verification_uri: string;
-      expires_in: number;
-      interval: number;
-    }>(`/auth/device/code`));
+    return data(
+      this.client.post<{
+        device_code: string;
+        user_code: string;
+        verification_uri: string;
+        expires_in: number;
+        interval: number;
+      }>(`/auth/device/code`)
+    );
   }
 
-  @handleError()
   async getDeviceToken(device_code: string) {
-    return data(this.client.post<{
-      access_token: string;
-      token_type: string;
-      expires_in: number;
-      refresh_token?: string;
-    }>(`/auth/device/token`, { device_code }));
+    return data(
+      this.client.post<{
+        access_token: string;
+        token_type: string;
+        expires_in: number;
+        refresh_token?: string;
+      }>(`/auth/device/token`, { device_code })
+    );
   }
 
-  @handleError()
   async getMe() {
     return data(this.client.get<{ email: string; id: string }>(`/auth/me`));
   }

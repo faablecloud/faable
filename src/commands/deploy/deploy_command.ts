@@ -5,6 +5,7 @@ import { context } from "../../api/context";
 import { build_node } from "./node-pipeline";
 import { runtime_detection } from "./runtime-detect/runtime_detection";
 import { cmd } from "../../lib/cmd";
+import { FaableApp } from "../../api/FaableApi";
 
 export interface DeployCommandArgs {
   app_slug?: string;
@@ -20,7 +21,7 @@ export const deploy_command = async (args: DeployCommandArgs) => {
   // Resolve runtime
   const { app_name, runtime } = await runtime_detection(workdir);
 
-  let app;
+  let app: FaableApp | undefined;
   if (args.app_slug) {
     app = await api.getBySlug(args.app_slug);
   } else {
