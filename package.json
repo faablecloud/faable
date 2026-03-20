@@ -72,7 +72,7 @@
     "lint": "npx eslint .",
     "lint:fix": "npx eslint . --fix",
     "prepare": "husky",
-    "release": "rm -f package-lock.json && env -u npm_config_local_prefix semantic-release"
+    "release": "rm -f package-lock.json && node scripts/release.js"
   },
   "engines": {
     "node": ">=22.8"
