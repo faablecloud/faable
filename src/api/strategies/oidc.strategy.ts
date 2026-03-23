@@ -17,6 +17,7 @@ const exchangeGithubOidcToken = async(gh_token:string)=>{
     resource:"https://faable.com",
     audience:"https://faable.com",
     scope:"openid email profile",
+    client_id:"a6f1381a-2591-4f18-aaa4-b8922ac91fce"
   })
   return res.data
 }
