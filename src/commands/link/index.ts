@@ -64,7 +64,7 @@ export const link: CommandModule<object, Options> = {
     const apps = await api.list();
 
     if (apps.length === 0) {
-      log.error("No apps found in your account. Create one first at https://faable.cloud");
+      log.error("No apps found in your account. Create one first at https://faable.com");
       return;
     }
 

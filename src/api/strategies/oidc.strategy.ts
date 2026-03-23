@@ -1,16 +1,24 @@
-import { create_base_client } from "../base_client";
 import { AuthStrategyBuilder } from "./types";
+import axios from 'axios'
+
+type TokenExchange = {access_token:string, token_type:string, expires_in:number}
 
 
-type TokenExchange = {token:string, app_id:string}
-
+const auth = axios.create({
+  baseURL:"https://faable.auth.staging.faable.link",
+  
+})
 const exchangeGithubOidcToken = async(gh_token:string)=>{
-  const client = create_base_client()
-  const res = await client.post<TokenExchange>("/auth/github-oidc",{
-    token:gh_token
+
+  const res = await auth.post<TokenExchange>("/oauth/token",{
+    grant_type:"urn:ietf:params:oauth:grant-type:token-exchange",
+    subject_token_type:"urn:ietf:params:oauth:token-type:jwt",
+    subject_token:gh_token,
+    resource:"https://faable.com",
+    audience:"https://faable.com",
+    scope:"openid email profile",
   })
-  const {token, app_id} =res.data
-  return {token, app_id}
+  return res.data
 }
 
 export const oidc_strategy: AuthStrategyBuilder<{idToken:string}> = (
@@ -30,7 +38,7 @@ export const oidc_strategy: AuthStrategyBuilder<{idToken:string}> = (
         token_ex = ex
       }
       return {
-        Authorization: `Bearer ${token_ex.token}`,
+        Authorization: `Bearer ${token_ex.access_token}`,
       };
     },
     app_id: async () => {
@@ -38,7 +46,7 @@ export const oidc_strategy: AuthStrategyBuilder<{idToken:string}> = (
         const ex = await exchangeGithubOidcToken(idToken)
         token_ex = ex
       }
-      return token_ex.app_id;
+      return token_ex.access_token;
     }
   };
 };
