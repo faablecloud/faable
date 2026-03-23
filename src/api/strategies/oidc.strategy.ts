@@ -2,15 +2,15 @@ import { create_base_client } from "../base_client";
 import { AuthStrategyBuilder } from "./types";
 
 
-type TokenExchange = {token:string, app_id:string}
+type TokenExchange = {access_token:string, app_id:string}
 
 const exchangeGithubOidcToken = async(gh_token:string)=>{
   const client = create_base_client()
   const res = await client.post<TokenExchange>("/auth/github-oidc",{
     token:gh_token
   })
-  const {token, app_id} = res.data
-  return {token, app_id}
+  const {access_token, app_id} = res.data
+  return {access_token, app_id}
 }
 
 export const oidc_strategy: AuthStrategyBuilder<{idToken:string}> = (
@@ -30,7 +30,7 @@ export const oidc_strategy: AuthStrategyBuilder<{idToken:string}> = (
         token_ex = ex
       }
       return {
-        Authorization: `Bearer ${token_ex.token}`,
+        Authorization: `Bearer ${token_ex.access_token}`,
       };
     },
     app_id: async () => {
