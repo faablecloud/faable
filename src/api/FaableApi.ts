@@ -5,6 +5,7 @@ export interface FaableApp {
   id: string;
   name: string;
   url: string;
+  repository:string
 }
 
 export interface FaableAppRegistry {

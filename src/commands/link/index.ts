@@ -98,7 +98,7 @@ export const link: CommandModule<object, Options> = {
 
     // Update the app in the API
     if (gitUrl) {
-      await api.updateApp(selectedApp.id, { github_repo: gitUrl });
+      await api.updateApp(selectedApp.id, { repository: gitUrl });
       log.info(`Updated app with github_repo: ${gitUrl}`);
     } else {
       log.warn("No git remote URL detected. Skipping API update for github_repo.");
