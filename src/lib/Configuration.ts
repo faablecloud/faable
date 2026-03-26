@@ -5,6 +5,7 @@ interface ProjectConfig {
   startCommand?: string;
   buildCommand?: string;
   app_slug?: string;
+  app_id?:string
 }
 
 export class Configuration {
@@ -53,6 +54,9 @@ export class Configuration {
   }
 
   get app_slug() {
+    return this.config.app_slug;
+  }
+  get app_id() {
     return this.config.app_slug;
   }
 }

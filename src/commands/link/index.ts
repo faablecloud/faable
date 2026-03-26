@@ -5,7 +5,7 @@ import { log } from "../../log";
 import { cmd } from "../../lib/cmd";
 import { Configuration } from "../../lib/Configuration";
 
-type Options = { workdir: string };
+type Options = { workdir: string, app_id?:string};
 
 const getGitRemoteUrl = async (workdir: string): Promise<string | undefined> => {
   try {
@@ -26,10 +26,14 @@ const getGitRemoteUrl = async (workdir: string): Promise<string | undefined> => 
 };
 
 export const link: CommandModule<object, Options> = {
-  command: "link",
+  command: "link [app_id]",
   describe: "Link the local repository with a Faable app",
   builder: (yargs) => {
     return yargs
+      .positional("app_id", {
+        type: "string",
+        description: "app_id to link this repository",
+      })
       .option("workdir", {
         alias: "w",
         type: "string",
@@ -40,9 +44,10 @@ export const link: CommandModule<object, Options> = {
   handler: async (args) => {
     const workdir = args.workdir || process.cwd();
 
+    const {app_id } = args
     const config = Configuration.instance();
-    if (config.app_slug) {
-      log.info(`This repository is already linked to app: ${config.app_slug}`);
+    if (config.app_id) {
+      log.info(`This repository is already linked to app: "${config.app_slug}" (${config.app_id})`);
       const { relink } = await prompts({
         type: "toggle",
         name: "relink",
@@ -61,40 +66,46 @@ export const link: CommandModule<object, Options> = {
     log.info("Checking local git repository...");
     const gitUrl = await getGitRemoteUrl(workdir);
 
-    const apps = await api.list();
 
-    if (apps.length === 0) {
-      log.error("No apps found in your account. Create one first at https://faable.com");
-      return;
+    let selectedApp;
+    if(!app_id){
+      const apps = await api.list();
+
+      if (apps.length === 0) {
+        log.error("No apps found in your account. Create one first at https://faable.com");
+        return;
+      }
+
+      selectedApp = await prompts({
+        type: "select",
+        name: "selectedApp",
+        message: "Select the Faable app to link with this repository:",
+        choices: apps.map((app) => ({
+          title: `${app.name} (${app.url})`,
+          value: app,
+        })),
+      });
+    }else{
+      selectedApp = await api.getApp(app_id)
     }
-
-    const { selectedApp } = await prompts({
-      type: "select",
-      name: "selectedApp",
-      message: "Select the Faable app to link with this repository:",
-      choices: apps.map((app) => ({
-        title: `${app.name} (${app.url})`,
-        value: app,
-      })),
-    });
 
     if (!selectedApp) {
       log.info("Link cancelled.");
       return;
     }
 
-    log.info(`Linking to ${selectedApp.name}...`);
+    log.info(`Linking to "${selectedApp.name}" (${selectedApp.id})...`);
 
     // Update the app in the API
     if (gitUrl) {
       await api.updateApp(selectedApp.id, { github_repo: gitUrl });
-      log.info(`Updated app ${selectedApp.name} with github_repo: ${gitUrl}`);
+      log.info(`Updated app with github_repo: ${gitUrl}`);
     } else {
       log.warn("No git remote URL detected. Skipping API update for github_repo.");
     }
 
     // Save locally for CLI convenience
-    Configuration.instance().saveConfig({ app_slug: selectedApp.name });
+    Configuration.instance().saveConfig({ app_slug: selectedApp.name, app_id:selectedApp.id });
     log.info(`Successfully linked local repository to ${selectedApp.name}.`);
   },
 };
