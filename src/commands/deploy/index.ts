@@ -40,18 +40,14 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     // Resolve runtime
     const { runtime } = await runtime_detection(workdir)
 
-    let app: FaableApp | undefined
-    if (args.app_id) {
-      app = await api.getApp(args.app_id)
-    } else {
-      if (ctx.appId) {
-        app = await api.getApp(ctx.appId)
-      }
-    }
+    const app_id = args.app_id || ctx.appId
 
-    if (!app) {
-      throw new Error('Missing <app_id>')
+    if (!app_id) {
+      throw new Error(
+        'Missing <app_id>, run inside github action or pass <app_id> after deploy command'
+      )
     }
+    const app = await api.getApp(app_id)
 
     // Check if we can build docker images
     await check_environment()
