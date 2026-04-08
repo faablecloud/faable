@@ -1,55 +1,51 @@
-import yargs from "yargs";
-import { hideBin } from "yargs/helpers";
-import { apps } from "./commands/apps";
-import { login } from "./commands/login";
-import { logout } from "./commands/logout";
-import { whoami } from "./commands/whoami";
-import { auth } from "./commands/auth";
-import { deploy } from "./commands/deploy";
-import { log } from "./log";
-import { link } from "./commands/link";
-import { init } from "./commands/init";
-import { version } from "./config";
-import { Configuration } from "./lib/Configuration";
+import yargs from 'yargs'
+import { hideBin } from 'yargs/helpers'
+import { deploy } from './commands/deploy'
+import { init } from './commands/init'
+import { link } from './commands/link'
+import { login } from './commands/login'
+import { logout } from './commands/logout'
+import { whoami } from './commands/whoami'
+import { version } from './config'
+import { Configuration } from './lib/Configuration'
+import { log } from './log'
 
-const yg = yargs();
-yg.scriptName("faable")
+const yg = yargs()
+yg.scriptName('faable')
   .middleware(function (_argv) {
-    log.info(`Faable CLI ${version}`);
+    log.info(`Faable CLI ${version}`)
   }, true)
-  .option("c", {
-    alias: "config",
-    description: "Path to the local `faable.json` file",
-    string: true,
+  .option('c', {
+    alias: 'config',
+    description: 'Path to the local `faable.json` file',
+    string: true
   })
   .middleware(function (argv) {
     if (argv.config) {
       Configuration.instance().setConfigFile(argv.config as any, {
-        ignoreWarnings: false,
-      });
+        ignoreWarnings: false
+      })
     } else {
-      Configuration.instance();
+      Configuration.instance()
     }
   }, true)
   .command(deploy)
-  .command(apps)
   .command(login)
   .command(logout)
   .command(whoami)
-  .command(auth)
   .command(init)
   .command(link)
   .demandCommand(1)
   .help()
   .fail(function (msg, err) {
     if (err) {
-      log.error(`❌ ${err.message}`);
-      process.exit(1);
-      return;
+      log.error(`❌ ${err.message}`)
+      process.exit(1)
+      return
     }
     if (msg) {
-      yg.showHelp();
-      log.info(msg);
+      yg.showHelp()
+      log.info(msg)
     }
   })
-  .parse(hideBin(process.argv), {});
+  .parse(hideBin(process.argv), {})

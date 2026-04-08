@@ -132,28 +132,7 @@ export class FaableApi<T = any> {
     return data(this.client.post<FaableApp>(`/app/${app_id}`, params));
   }
 
-  async getDeviceCode() {
-    return data(
-      this.client.post<{
-        device_code: string;
-        user_code: string;
-        verification_uri: string;
-        expires_in: number;
-        interval: number;
-      }>(`/auth/device/code`)
-    );
-  }
 
-  async getDeviceToken(device_code: string) {
-    return data(
-      this.client.post<{
-        access_token: string;
-        token_type: string;
-        expires_in: number;
-        refresh_token?: string;
-      }>(`/auth/device/token`, { device_code })
-    );
-  }
 
   async getMe() {
     return data(this.client.get<{ email: string; id: string }>(`/auth/me`));

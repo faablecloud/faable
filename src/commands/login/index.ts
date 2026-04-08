@@ -1,5 +1,6 @@
 import { CommandModule } from "yargs";
 import { FaableApi } from "../../api/FaableApi";
+import { getDeviceCode, getDeviceToken } from "../../api/auth";
 import { CredentialsStore } from "../../lib/CredentialsStore";
 import prompts from "prompts";
 import open from "open";
@@ -56,7 +57,7 @@ export const login: CommandModule = {
     // Interactive Device Flow
     log.info("Starting browser-based authentication...");
     try {
-      const { device_code, user_code, verification_uri, interval, expires_in } = await api.getDeviceCode();
+      const { device_code, user_code, verification_uri, interval, expires_in } = await getDeviceCode();
 
       log.info(`\nVerification code: ${user_code}\n`);
       log.info(`If your browser doesn't open automatically, please visit:\n${verification_uri}\n`);
@@ -73,7 +74,7 @@ export const login: CommandModule = {
       
       while (Date.now() - start < timeout) {
         try {
-          const { access_token } = await api.getDeviceToken(device_code);
+          const { access_token } = await getDeviceToken(device_code);
           if (access_token) {
             log.info("Token received!");
             const tempApi = FaableApi.create({ auth: { token: access_token }, authStrategy: () => ({ headers: async () => ({ Authorization: `Bearer ${access_token}` }) }) });
@@ -84,11 +85,13 @@ export const login: CommandModule = {
           }
         } catch (e: any) {
           // Typically returns 400 with "authorization_pending"
-          if (e.cause?.response?.data?.error === "authorization_pending") {
+          const errData = e.response?.data || e.cause?.response?.data;
+          const errHeaders = e.response?.headers || e.cause?.response?.headers;
+          if (errData?.error === "authorization_pending") {
               // Wait and continue
-          } else if (e.cause?.response?.data?.error === "slow_down") {
+          } else if (errData?.error === "slow_down") {
               // Should increase interval but for now we just wait
-          } else if (e.cause?.response?.headers?.["content-type"]?.includes("application/json")) {
+          } else if (errHeaders?.["content-type"]?.includes("application/json")) {
               // Other error
           }
         }
