@@ -35,7 +35,7 @@ export const strategy_nodejs: StrategyFn = async (workdir: string) => {
       log.info(
         `Using node@${runtime_version} from engines in package.json (${engines.node})`
       );
-    } catch (e) {
+    } catch {
       log.info(
         `Node version defined in engines in package.json is not valid (${engines.node}), using current version ${runtime_version}`
       );

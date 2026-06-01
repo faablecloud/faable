@@ -43,6 +43,6 @@ export const cmd = async (cmd: string, config?: Partial<CmdConfig>) => {
     if (output) {
       log.error(output);
     }
-    throw new Error(`Command error: ${cmd}`);
+    throw new Error(`Command error: ${cmd}`, { cause: error });
   }
 };

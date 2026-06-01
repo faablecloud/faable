@@ -2,9 +2,36 @@ import { CommandModule } from "yargs";
 import { FaableApi } from "../../api/FaableApi";
 import { getDeviceCode, getDeviceToken } from "../../api/auth";
 import { CredentialsStore } from "../../lib/CredentialsStore";
-import prompts from "prompts";
+import { bearer_strategy } from "../../api/strategies/bearer.strategy";
 import open from "open";
+import ora from "ora";
 import { log } from "../../log";
+
+const wait = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const renderUserCodeBlock = (code: string): string => {
+  const padded = `   ${code}   `;
+  const border = "─".repeat(padded.length);
+  return [
+    "",
+    `  ┌${border}┐`,
+    `  │${padded}│`,
+    `  └${border}┘`,
+    "",
+  ].join("\n");
+};
+
+type OAuthError = {
+  error?: string;
+  error_description?: string;
+};
+
+const extractOAuthError = (e: any): OAuthError => {
+  const data = e?.response?.data || e?.cause?.response?.data || {};
+  if (typeof data === "object") return data as OAuthError;
+  return {};
+};
 
 export const login: CommandModule = {
   command: "login",
@@ -24,7 +51,6 @@ export const login: CommandModule = {
   handler: async (args) => {
     const { apikey, token } = args as any;
     const store = new CredentialsStore();
-    const api = FaableApi.create(); // Base client for device flow
 
     if (apikey) {
       log.info("Logging in with API Key...");
@@ -33,7 +59,7 @@ export const login: CommandModule = {
         const me = await tempApi.getMe();
         await store.saveCredentials({ apikey, email: me.email });
         log.info(`✅ Successfully logged in as ${me.email}`);
-      } catch (e) {
+      } catch {
         log.error("❌ Invalid API Key");
         process.exit(1);
       }
@@ -47,61 +73,119 @@ export const login: CommandModule = {
           const me = await tempApi.getMe();
           await store.saveCredentials({ token, email: me.email });
           log.info(`✅ Successfully logged in as ${me.email}`);
-        } catch (e) {
+        } catch {
           log.error("❌ Invalid OIDC token");
           process.exit(1);
         }
         return;
     }
 
-    // Interactive Device Flow
+    // Interactive Device Authorization Grant (RFC 8628)
     log.info("Starting browser-based authentication...");
+
+    let device_code: string;
+    let user_code: string;
+    let verification_uri: string;
+    let verification_uri_complete: string;
+    let interval: number;
+    let expires_in: number;
+
     try {
-      const { device_code, user_code, verification_uri, interval, expires_in } = await getDeviceCode();
+      const dc = await getDeviceCode();
+      device_code = dc.device_code;
+      user_code = dc.user_code;
+      verification_uri = dc.verification_uri;
+      verification_uri_complete = dc.verification_uri_complete;
+      interval = dc.interval;
+      expires_in = dc.expires_in;
+    } catch (e: any) {
+      log.error(`❌ Failed to start authentication: ${e.message}`);
+      process.exit(1);
+    }
 
-      log.info(`\nVerification code: ${user_code}\n`);
-      log.info(`If your browser doesn't open automatically, please visit:\n${verification_uri}\n`);
+    process.stdout.write(renderUserCodeBlock(user_code));
+    log.info(`If your browser doesn't open automatically, visit: ${verification_uri}`);
 
-      try {
-        await open(verification_uri);
-      } catch (e) {
-        log.warn("Could not open browser automatically.");
-      }
+    try {
+      await open(verification_uri_complete);
+    } catch {
+      log.warn("Could not open browser automatically.");
+    }
 
-      // Polling
-      const start = Date.now();
-      const timeout = expires_in * 1000;
-      
-      while (Date.now() - start < timeout) {
+    const spinner = ora({
+      text: "Waiting for confirmation in browser…",
+      spinner: "dots",
+    }).start();
+
+    let cancelled = false;
+    const onSigint = () => {
+      cancelled = true;
+      spinner.stop();
+      process.stderr.write("\nLogin cancelled.\n");
+      process.exit(130);
+    };
+    process.once("SIGINT", onSigint);
+
+    const start = Date.now();
+    const timeoutMs = expires_in * 1000;
+    let currentInterval = interval;
+
+    try {
+      while (!cancelled && Date.now() - start < timeoutMs) {
+        await wait(currentInterval * 1000);
+        if (cancelled) return;
+
         try {
           const { access_token } = await getDeviceToken(device_code);
           if (access_token) {
-            log.info("Token received!");
-            const tempApi = FaableApi.create({ auth: { token: access_token }, authStrategy: () => ({ headers: async () => ({ Authorization: `Bearer ${access_token}` }) }) });
+            spinner.stop();
+            const tempApi = FaableApi.create({
+              auth: { token: access_token },
+              authStrategy: bearer_strategy,
+            });
             const me = await tempApi.getMe();
             await store.saveCredentials({ token: access_token, email: me.email });
             log.info(`✅ Successfully logged in as ${me.email}`);
             return;
           }
         } catch (e: any) {
-          // Typically returns 400 with "authorization_pending"
-          const errData = e.response?.data || e.cause?.response?.data;
-          const errHeaders = e.response?.headers || e.cause?.response?.headers;
-          if (errData?.error === "authorization_pending") {
-              // Wait and continue
-          } else if (errData?.error === "slow_down") {
-              // Should increase interval but for now we just wait
-          } else if (errHeaders?.["content-type"]?.includes("application/json")) {
-              // Other error
+          const { error, error_description } = extractOAuthError(e);
+
+          if (error === "authorization_pending") {
+            continue;
           }
+
+          if (error === "slow_down") {
+            currentInterval += 5;
+            spinner.text = `Waiting for confirmation in browser… (slowing polling to ${currentInterval}s)`;
+            continue;
+          }
+
+          if (error === "access_denied") {
+            spinner.stop();
+            log.error("❌ Authorization denied. Run `faable login` again to retry.");
+            process.exit(1);
+          }
+
+          if (error === "expired_token") {
+            spinner.stop();
+            log.error("❌ Code expired. Run `faable login` again to start over.");
+            process.exit(1);
+          }
+
+          // Unknown OAuth error or non-OAuth failure
+          spinner.stop();
+          const detail = error_description || error || e?.message || "unknown error";
+          log.error(`❌ Authentication failed: ${detail}`);
+          process.exit(1);
         }
-        await new Promise(resolve => setTimeout(resolve, interval * 1000));
       }
-      log.error("❌ Authentication timed out");
+
+      spinner.stop();
+      log.error("❌ Code expired. Run `faable login` again to start over.");
       process.exit(1);
-    } catch (e: any) {
-      log.error(`❌ Failed to start authentication: ${e.message}`);
-      process.exit(1);
+    } finally {
+      process.removeListener("SIGINT", onSigint);
     }
   },
 };

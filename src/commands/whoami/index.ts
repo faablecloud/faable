@@ -1,5 +1,4 @@
 import { CommandModule } from "yargs";
-import { FaableApi } from "../../api/FaableApi";
 import { log } from "../../log";
 
 import { context } from "../../api/context";
@@ -16,7 +15,7 @@ export const whoami: CommandModule = {
     try {
       const me = await api.getMe();
       log.info(`Logged in as: ${me.email}`);
-    } catch (e) {
+    } catch {
       log.error("❌ Not logged in or session expired");
       process.exit(1);
     }

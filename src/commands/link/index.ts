@@ -19,7 +19,7 @@ const getGitRemoteUrl = async (workdir: string): Promise<string | undefined> => 
       return match[1];
     }
     return url;
-  } catch (error) {
+  } catch {
     log.warn("Could not detect git remote origin URL.");
     return undefined;
   }

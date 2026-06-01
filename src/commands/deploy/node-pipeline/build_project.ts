@@ -1,4 +1,4 @@
-import { FaableApp, Secret } from "../../../api/FaableApi";
+import { FaableApp } from "../../../api/FaableApi";
 import { log } from "../../../log";
 import { cmd } from "../../../lib/cmd";
 import { Configuration } from "../../../lib/Configuration";

@@ -1,5 +1,4 @@
 import { CommandModule } from 'yargs'
-import { FaableApp } from '../../api/FaableApi'
 import { context } from '../../api/context'
 import { cmd } from '../../lib/cmd'
 import { log } from '../../log'
@@ -81,7 +80,14 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     const { upload_tagname } = await upload_tag({ app, api })
 
     // Create a deployment for this image
-    await api.createDeployment({ app_id: app.id, image: upload_tagname, type })
-    log.info(`🌍 Deployment created -> https://${app.url}`)
+    const deployment = await api.createDeployment({
+      app_id: app.id,
+      image: upload_tagname,
+      type
+    })
+
+    const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
+    log.info(`🌍 Deployment created (${deployment.id}) -> https://${app.url}`)
+    log.info(`📊 View it in the dashboard -> ${dashboard_url}`)
   }
 }

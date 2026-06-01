@@ -6,7 +6,7 @@ import globals from "globals";
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: ["dist/**", "node_modules/**", "**/.next/**"],
   },
   js.configs.recommended, // Configuración básica de ESLint
   {
@@ -41,6 +41,13 @@ export default [
   {
     files: ["**/*.ts", "**/*.tsx"],
     rules: {},
+  },
+  {
+    files: ["examples/**/*.{js,ts}"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+      "no-console": "off",
+    },
   },
   prettierConfig,
 ];

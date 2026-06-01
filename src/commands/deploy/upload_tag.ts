@@ -1,4 +1,4 @@
-import { FaableApi, FaableApp, FaableAppRegistry } from "../../api/FaableApi";
+import { FaableApi, FaableApp } from "../../api/FaableApi";
 import { log } from "../../log";
 import { cmd } from "../../lib/cmd";
 
