@@ -7,6 +7,10 @@ export interface FaableApp {
   url: string;
   team: string;
   repository:string
+  status?: {
+    phase: string;
+    deployment: string | null;
+  };
 }
 
 export interface FaableAppRegistry {

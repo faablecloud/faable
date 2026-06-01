@@ -89,5 +89,36 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
     log.info(`🌍 Deployment created (${deployment.id}) -> https://${app.url}`)
     log.info(`📊 View it in the dashboard -> ${dashboard_url}`)
+
+    // Wait (up to 5 minutes) for the deployment to be promoted (live)
+    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+    const timeoutMs = 5 * 60 * 1000
+    const intervalMs = 5000
+    const start = Date.now()
+
+    log.info(`⏳ Waiting for deployment to be promoted...`)
+
+    let promoted = false
+    while (Date.now() - start < timeoutMs) {
+      await wait(intervalMs)
+      try {
+        const current = await api.getApp(app.id)
+        if (current.status?.deployment === deployment.id) {
+          promoted = true
+          break
+        }
+      } catch (error) {
+        // Ignore transient errors while polling and keep waiting
+        log.debug(`Polling app status failed, retrying...`)
+      }
+    }
+
+    if (promoted) {
+      log.info(`✅ Deployment promoted and live -> https://${app.url}`)
+    } else {
+      log.warn(
+        `⌛ Timed out after 5min waiting for promotion. The deployment is still rolling out, check the dashboard -> ${dashboard_url}`
+      )
+    }
   }
 }
