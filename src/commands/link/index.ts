@@ -96,15 +96,51 @@ export const link: CommandModule<object, Options> = {
 
     log.info(`Linking to "${selectedApp.name}" (${selectedApp.id})...`);
 
-    // Update the app in the API
-    if (gitUrl) {
-      await api.updateApp(selectedApp.id, { repository: gitUrl });
-      log.info(`Updated app with github_repo: ${gitUrl}`);
-    } else {
-      log.warn("No git remote URL detected. Skipping API update for github_repo.");
+    if (!gitUrl) {
+      log.error(
+        "No git remote URL detected. Add a GitHub 'origin' remote and try again."
+      );
+      return;
     }
 
-    // Save locally for CLI convenience
+    // The API verifies that the user has a connected GitHub identity AND
+    // access to the repository before persisting the link.
+    try {
+      await api.linkRepository(selectedApp.id, { repository: gitUrl });
+    } catch (err) {
+      const code = (err as any)?.code as string | undefined;
+      switch (code) {
+        case "github_identity_missing":
+          log.error(
+            "You have not connected a GitHub account to Faable. Connect GitHub in the dashboard, then re-run `faable link`."
+          );
+          break;
+        case "github_token_invalid":
+          log.error(
+            "Your GitHub authorization has expired. Reconnect GitHub in the dashboard, then re-run `faable link`."
+          );
+          break;
+        case "github_installation_missing":
+          log.error(
+            "The Faable GitHub App is not installed on your repositories. Install it from the Faable dashboard, then re-run `faable link`."
+          );
+          break;
+        case "github_repository_not_found":
+          log.error(
+            `Faable can't access "${gitUrl}". Check the repository name and that the Faable GitHub App is installed on it.`
+          );
+          break;
+        default:
+          log.error(
+            `Could not link repository: ${(err as Error)?.message ?? err}`
+          );
+      }
+      return;
+    }
+
+    log.info(`Linked repository ${gitUrl} to ${selectedApp.name}.`);
+
+    // Save locally for CLI convenience (only after the API confirms the link)
     Configuration.instance().saveConfig({ app_slug: selectedApp.name, app_id:selectedApp.id });
     log.info(`Successfully linked local repository to ${selectedApp.name}.`);
   },

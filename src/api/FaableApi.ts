@@ -13,6 +13,22 @@ export interface FaableApp {
   };
 }
 
+export interface GithubRepo {
+  id: number;
+  full_name: string;
+  private: boolean;
+  default_branch: string;
+  installation_id: number;
+}
+
+export interface GithubInstallation {
+  installation_id: number;
+  account_login: string;
+  account_type: string;
+  account_avatar_url?: string;
+  app_slug: string;
+}
+
 export interface FaableAppRegistry {
   hostname: string;
   image: string;
@@ -79,16 +95,24 @@ export class FaableApi<T = any> {
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
-        const e: AxiosError<{ message: string }> = error;
+        const e: AxiosError<{ message: string; code?: string; action?: string }> =
+          error;
         if (e.isAxiosError) {
           const res = e.response;
           const url = e.config?.url || "";
           if (res) {
             const serverMessage =
               res.data?.message || res.statusText || "Unknown Error";
-            throw new Error(`FaableApi ${url} ${res.status}: ${serverMessage}`, {
-              cause: error,
-            });
+            const wrapped = new Error(
+              `FaableApi ${url} ${res.status}: ${serverMessage}`,
+              { cause: error }
+            );
+            // Surface the structured error contract (e.g. the repository-link
+            // flow returns { code, action }) so callers can branch on it.
+            (wrapped as any).status = res.status;
+            if (res.data?.code) (wrapped as any).code = res.data.code;
+            if (res.data?.action) (wrapped as any).action = res.data.action;
+            throw wrapped;
           } else {
             throw new Error(`FaableApi ${url} ${e.message}`, { cause: error });
           }
@@ -137,7 +161,36 @@ export class FaableApi<T = any> {
     return data(this.client.post<FaableApp>(`/app/${app_id}`, params));
   }
 
+  async linkRepository(
+    app_id: string,
+    params: { repository: string; github_branch?: string }
+  ) {
+    return data(
+      this.client.post<FaableApp>(`/app/${app_id}/link-repository`, params)
+    );
+  }
 
+  // Organizations/accounts where the Faable GitHub App is installed.
+  async listGithubInstallations() {
+    return data(
+      this.client.get<{ installations: GithubInstallation[] }>(
+        `/github/installations`
+      )
+    ).then((res) => res.installations);
+  }
+
+  // Top repositories for a single installation (org), optionally filtered.
+  async listGithubRepos(
+    installation_id: number,
+    params: { q?: string; limit?: number } = {}
+  ) {
+    return data(
+      this.client.get<{ repositories: GithubRepo[] }>(
+        `/github/installations/${installation_id}/repositories`,
+        { params }
+      )
+    ).then((res) => res.repositories);
+  }
 
   async getMe() {
     return data(this.client.get<{ email: string; id: string }>(`/auth/me`));
