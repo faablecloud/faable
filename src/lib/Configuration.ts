@@ -49,6 +49,11 @@ export class Configuration {
     return this.config.startCommand || "npm run start";
   }
 
+  /** Start command explicitly set in faable.json, or undefined when relying on the default. */
+  get configuredStartCommand() {
+    return this.config.startCommand;
+  }
+
   get buildCommand() {
     return this.config.buildCommand;
   }

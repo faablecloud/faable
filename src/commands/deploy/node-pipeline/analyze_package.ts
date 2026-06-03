@@ -2,7 +2,7 @@ import fs from "fs-extra";
 import path from "path";
 import { log } from "../../../log";
 import { PackageJson } from "type-fest";
-import * as R from "ramda";
+import { detect_framework } from "./frameworks";
 interface AnalyzePackage {
   workdir: string;
 }
@@ -17,7 +17,7 @@ export const analyze_package = async (params: AnalyzePackage) => {
   // Check if build is required to run
   const build_script = process.env.FAABLE_NPM_BUILD_SCRIPT
     ? process.env.FAABLE_NPM_BUILD_SCRIPT
-    : pkg?.scripts["build"]
+    : pkg?.scripts?.["build"]
     ? "build"
     : null;
 
@@ -25,19 +25,19 @@ export const analyze_package = async (params: AnalyzePackage) => {
     log.info(`No build script on package.json`);
   }
 
-  let type: string = "node";
-
-  // Detect nextjs deployment type
-  const next_dep = R.lensPath(["dependencies", "next"]);
-  const next_devdep = R.lensPath(["devDependencies", "next"]);
-  if (R.view(next_dep, pkg) || R.view(next_devdep, pkg)) {
-    type = "next";
-  }
+  const has_start = Boolean(pkg?.scripts?.["start"]);
+  const { type, start_command, inject_serve } = detect_framework({
+    pkg,
+    workdir,
+    has_start,
+  });
 
   log.info(`⚡️ Detected deployment type=${type}`);
 
   return {
     build_script,
     type,
+    start_command,
+    inject_serve,
   };
 };

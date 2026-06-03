@@ -31,6 +31,8 @@ const entrypoint_template = Handlebars.compile(entrypoint);
 interface BuildConfig {
   app: FaableApp;
   workdir: string;
+  /** Framework-detected start command, used when faable.json doesn't set one. */
+  start_command?: string | null;
   template_context: {
     from: string;
   };
@@ -40,7 +42,12 @@ export const build_docker = async (props: BuildConfig) => {
   const { app, workdir, template_context } = props;
 
   const entrypoint_custom = entrypoint_template(template_context);
-  const start_command = Configuration.instance().startCommand;
+  // Precedence: explicit faable.json startCommand > framework-detected command
+  // (e.g. serving a static SPA) > default `npm run start`.
+  const start_command =
+    Configuration.instance().configuredStartCommand ??
+    props.start_command ??
+    "npm run start";
   log.info(`⚙️ Start command: ${start_command}`);
 
   // NOTE: use slim to build projects
