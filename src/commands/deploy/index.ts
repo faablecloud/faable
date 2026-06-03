@@ -3,6 +3,7 @@ import { context } from '../../api/context'
 import { cmd } from '../../lib/cmd'
 import { log } from '../../log'
 import { check_environment } from './check_environment'
+import { git_context } from './git_context'
 import { build_node } from './node-pipeline'
 import { runtime_detection } from './runtime-detect/runtime_detection'
 import { upload_tag } from './upload_tag'
@@ -79,11 +80,16 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     // Upload to Faable registry
     const { upload_tagname } = await upload_tag({ app, api })
 
+    // Capture the commit/ref/actor so the deployment records which commit it
+    // came from and who pushed it (env in CI, git fallback locally).
+    const git = await git_context({ workdir })
+
     // Create a deployment for this image
     const deployment = await api.createDeployment({
       app_id: app.id,
       image: upload_tagname,
-      type
+      type,
+      ...git
     })
 
     const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
@@ -107,7 +113,7 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
           promoted = true
           break
         }
-      } catch (error) {
+      } catch (_error) {
         // Ignore transient errors while polling and keep waiting
         log.debug(`Polling app status failed, retrying...`)
       }

@@ -4,6 +4,13 @@ import prompts from "prompts";
 import { log } from "../../log";
 import { cmd } from "../../lib/cmd";
 import { Configuration } from "../../lib/Configuration";
+import {
+  DEPLOY_DOCS_URL,
+  DEPLOY_WORKFLOW_PATH,
+  DEPLOY_WORKFLOW_YAML,
+  workflowExists,
+  writeWorkflow,
+} from "./workflow_template";
 
 type Options = { workdir: string, app_id?:string};
 
@@ -143,5 +150,43 @@ export const link: CommandModule<object, Options> = {
     // Save locally for CLI convenience (only after the API confirms the link)
     Configuration.instance().saveConfig({ app_slug: selectedApp.name, app_id:selectedApp.id });
     log.info(`Successfully linked local repository to ${selectedApp.name}.`);
+
+    // Onboarding: deploys happen via a GitHub Actions workflow on push. Offer
+    // to scaffold it, and always explain the next steps so the user isn't left
+    // wondering why nothing deploys.
+    await setupDeployWorkflow(workdir);
   },
+};
+
+const setupDeployWorkflow = async (workdir: string) => {
+  if (workflowExists(workdir)) {
+    log.info(
+      `Deploy workflow already present at ${DEPLOY_WORKFLOW_PATH}. Commit & push to "main" to deploy.`
+    );
+    return;
+  }
+
+  const { create } = await prompts({
+    type: "toggle",
+    name: "create",
+    message: `Create the GitHub Actions deploy workflow (${DEPLOY_WORKFLOW_PATH})?`,
+    initial: true,
+    active: "yes",
+    inactive: "no",
+  });
+
+  if (create) {
+    const filePath = await writeWorkflow(workdir);
+    log.info(`Created ${filePath}`);
+    log.info("Next steps:");
+    log.info("  1. Commit the workflow file");
+    log.info('  2. Push to "main" — that triggers your first deploy');
+    log.info(`Docs: ${DEPLOY_DOCS_URL}`);
+  } else {
+    log.info(
+      `Skipped. To enable automated deploys, add ${DEPLOY_WORKFLOW_PATH} with:`
+    );
+    log.info(`\n${DEPLOY_WORKFLOW_YAML}`);
+    log.info(`Then commit & push to "main". Docs: ${DEPLOY_DOCS_URL}`);
+  }
 };

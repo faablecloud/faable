@@ -146,6 +146,9 @@ export class FaableApi<T = any> {
     app_id: string;
     type: string;
     image: string;
+    github_commit?: string;
+    github_ref?: string;
+    github_actor?: string;
   }) {
     return data(this.client.post<{ id: string }>(`/deployment`, params));
   }
