@@ -24,6 +24,10 @@ export default {
           src: "src/commands/deploy/node-pipeline/templates/**/*",
           dest: "dist/commands/deploy/node-pipeline/templates",
         },
+        {
+          src: "src/commands/deploy/python-pipeline/templates/**/*",
+          dest: "dist/commands/deploy/python-pipeline/templates",
+        },
       ],
     })
   ],

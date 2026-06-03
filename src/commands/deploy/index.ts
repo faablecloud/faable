@@ -5,6 +5,7 @@ import { log } from '../../log'
 import { check_environment } from './check_environment'
 import { git_context } from './git_context'
 import { build_node } from './node-pipeline'
+import { build_python } from './python-pipeline'
 import { runtime_detection } from './runtime-detect/runtime_detection'
 import { upload_tag } from './upload_tag'
 
@@ -68,6 +69,13 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
         env_vars
       })
       type = node_result.type
+    } else if (runtime.name == 'python') {
+      const python_result = await build_python(app, {
+        workdir,
+        runtime,
+        env_vars
+      })
+      type = python_result.type
     } else if (runtime.name == 'docker') {
       type = 'node'
       await cmd(`docker build -t ${app.id} .`, {
