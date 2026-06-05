@@ -12,7 +12,7 @@ import {
   writeWorkflow,
 } from "./workflow_template";
 
-type Options = { workdir: string, app_id?:string};
+type Options = { workdir: string };
 
 const getGitRemoteUrl = async (workdir: string): Promise<string | undefined> => {
   try {
@@ -33,14 +33,10 @@ const getGitRemoteUrl = async (workdir: string): Promise<string | undefined> => 
 };
 
 export const link: CommandModule<object, Options> = {
-  command: "link [app_id]",
+  command: "link",
   describe: "Link the local repository with a Faable app",
   builder: (yargs) => {
     return yargs
-      .positional("app_id", {
-        type: "string",
-        description: "app_id to link this repository",
-      })
       .option("workdir", {
         alias: "w",
         type: "string",
@@ -51,7 +47,17 @@ export const link: CommandModule<object, Options> = {
   handler: async (args) => {
     const workdir = args.workdir || process.cwd();
 
-    const {app_id } = args
+    // `faable link <app_id>` is deprecated. Linking is now fully interactive and
+    // the repository is auto-detected from the current folder — users never need
+    // to look up an app_id. Warn if an extra positional was passed and ignore it.
+    const stray = (args._ ?? []).slice(1);
+    if (stray.length > 0) {
+      log.warn(
+        'Passing an app_id to "faable link" is deprecated and ignored. ' +
+          'Just run "faable link" and select the app from the list.'
+      );
+    }
+
     const config = Configuration.instance();
     if (config.app_id) {
       log.info(`This repository is already linked to app: "${config.app_slug}" (${config.app_id})`);
@@ -73,28 +79,21 @@ export const link: CommandModule<object, Options> = {
     log.info("Checking local git repository...");
     const gitUrl = await getGitRemoteUrl(workdir);
 
-
-    let selectedApp;
-    if(!app_id){
-      const apps = await api.list();
-
-      if (apps.length === 0) {
-        log.error("No apps found in your account. Create one first at https://faable.com");
-        return;
-      }
-
-      selectedApp = await prompts({
-        type: "select",
-        name: "selectedApp",
-        message: "Select the Faable app to link with this repository:",
-        choices: apps.map((app) => ({
-          title: `${app.name} (${app.url})`,
-          value: app,
-        })),
-      });
-    }else{
-      selectedApp = await api.getApp(app_id)
+    const apps = await api.list();
+    if (apps.length === 0) {
+      log.error("No apps found in your account. Create one first at https://faable.com");
+      return;
     }
+
+    const { selectedApp } = await prompts({
+      type: "select",
+      name: "selectedApp",
+      message: "Select the Faable app to link with this repository:",
+      choices: apps.map((app) => ({
+        title: `${app.name} (${app.url})`,
+        value: app,
+      })),
+    });
 
     if (!selectedApp) {
       log.info("Link cancelled.");

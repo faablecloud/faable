@@ -8,11 +8,8 @@ import { CredentialsStore } from "../lib/CredentialsStore";
 export const context = async () => {
   let api: FaableApi | undefined;
 
-  if (process.env.FAABLE_APIKEY) {
-    // Apikey in environment
-    const apikey = process.env.FAABLE_APIKEY;
-    api = FaableApi.create({ authStrategy: apikey_strategy, auth: { apikey } });
-  } else if (process.env.FAABLE_TOKEN) {
+  // Auth resolution: FAABLE_TOKEN → OIDC (CI) → local `faable login` credentials.
+  if (process.env.FAABLE_TOKEN) {
     // Token in environment
     const token = process.env.FAABLE_TOKEN;
     api = FaableApi.create({ authStrategy: bearer_strategy, auth: { token } });

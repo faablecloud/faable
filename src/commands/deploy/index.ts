@@ -1,6 +1,7 @@
 import { CommandModule } from 'yargs'
 import { context } from '../../api/context'
 import { cmd } from '../../lib/cmd'
+import { Configuration } from '../../lib/Configuration'
 import { log } from '../../log'
 import { check_environment } from './check_environment'
 import { git_context } from './git_context'
@@ -41,11 +42,15 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     // Resolve runtime
     const { runtime } = await runtime_detection(workdir)
 
-    const app_id = args.app_id || ctx.appId
+    // app_id resolution (the user never has to look one up):
+    //  1. explicit positional (monorepo escape hatch)
+    //  2. OIDC in CI — the backend resolves the app from the linked repository
+    //  3. locally — the app saved by `faable link` in faable.json
+    const app_id = args.app_id || ctx.appId || Configuration.instance().app_id
 
     if (!app_id) {
       throw new Error(
-        'Missing <app_id>, run inside github action or pass <app_id> after deploy command'
+        'No app linked to this repository. Run "faable link" to link it (or link it from the dashboard).'
       )
     }
     const app = await api.getApp(app_id)

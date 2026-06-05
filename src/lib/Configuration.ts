@@ -62,6 +62,6 @@ export class Configuration {
     return this.config.app_slug;
   }
   get app_id() {
-    return this.config.app_slug;
+    return this.config.app_id;
   }
 }
