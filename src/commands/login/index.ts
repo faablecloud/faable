@@ -1,8 +1,7 @@
 import { CommandModule } from "yargs";
 import { FaableApi } from "../../api/FaableApi";
-import { getDeviceCode, getDeviceToken } from "../../api/auth";
+import { getDeviceCode, getDeviceToken, getMe } from "../../api/auth";
 import { CredentialsStore } from "../../lib/CredentialsStore";
-import { bearer_strategy } from "../../api/strategies/bearer.strategy";
 import open from "open";
 import ora from "ora";
 import { log } from "../../log";
@@ -139,11 +138,9 @@ export const login: CommandModule = {
           const { access_token } = await getDeviceToken(device_code);
           if (access_token) {
             spinner.stop();
-            const tempApi = FaableApi.create({
-              auth: { token: access_token },
-              authStrategy: bearer_strategy,
-            });
-            const me = await tempApi.getMe();
+            // Validate the freshly issued token against the Auth server (it
+            // issued the token). The deploy API has no /me route.
+            const me = await getMe(access_token);
             await store.saveCredentials({ token: access_token, email: me.email });
             log.info(`✅ Successfully logged in as ${me.email}`);
             return;
