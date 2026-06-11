@@ -4,6 +4,8 @@ import { getIDToken } from "@actions/core";
 import { oidc_strategy } from "./strategies/oidc.strategy";
 import { bearer_strategy } from "./strategies/bearer.strategy";
 import { CredentialsStore } from "../lib/CredentialsStore";
+import { loadLiveCredentials } from "./session";
+import { log } from "../log";
 
 export const context = async () => {
   let api: FaableApi | undefined;
@@ -26,7 +28,8 @@ export const context = async () => {
     }
   } else {
     const store = new CredentialsStore();
-    const config = await store.loadCredentials();
+    // Auto-refreshes an expired access token via the stored refresh_token.
+    const config = await loadLiveCredentials(store);
     if (config) {
       if (config.token) {
         api = FaableApi.create({
@@ -48,4 +51,17 @@ export const context = async () => {
     api,
     appId,
   };
+};
+
+// Resolve the API client for a command that needs an authenticated session.
+// Exits with a uniform message when there is no session at all. An expired
+// session that could not be refreshed still surfaces here as a working `api`
+// whose first call returns 401 — FaableApi maps that to the same re-login hint.
+export const requireApi = async () => {
+  const ctx = await context();
+  if (!ctx.api) {
+    log.error("❌ Not logged in. Run 'faable login' first.");
+    process.exit(1);
+  }
+  return ctx as { api: FaableApi; appId?: string };
 };

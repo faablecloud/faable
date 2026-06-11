@@ -1,5 +1,5 @@
 import { CommandModule } from "yargs";
-import { context } from "../../api/context";
+import { requireApi } from "../../api/context";
 import prompts from "prompts";
 import { log } from "../../log";
 import { cmd } from "../../lib/cmd";
@@ -74,11 +74,7 @@ export const link: CommandModule<object, Options> = {
       }
     }
 
-    const { api } = await context();
-    if (!api) {
-      log.error("❌ Not logged in. Run 'faable login' first.");
-      process.exit(1);
-    }
+    const { api } = await requireApi();
 
     log.info("Checking local git repository...");
     const gitUrl = await getGitRemoteUrl(workdir);

@@ -53,3 +53,19 @@ export async function getMe(access_token: string) {
   });
   return res.data;
 }
+
+// Exchange a refresh token for a fresh access token (and a rotated refresh
+// token). The CLI is a public client, so no client_secret is required.
+export async function refreshToken(refresh_token: string) {
+  const res = await api.post<{
+    access_token: string;
+    token_type: string;
+    expires_in: number;
+    refresh_token?: string;
+  }>(`/oauth/token`, {
+    grant_type: "refresh_token",
+    client_id: CLIENT_ID,
+    refresh_token,
+  });
+  return res.data;
+}

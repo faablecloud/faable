@@ -101,6 +101,16 @@ export class FaableApi<T = any> {
           const res = e.response;
           const url = e.config?.url || "";
           if (res) {
+            // Uniform handling for an expired/invalid session across every
+            // command, regardless of which endpoint returned the 401.
+            if (res.status === 401) {
+              const expired = new Error(
+                "Your Faable session has expired or is invalid. Run `faable login` to sign in again.",
+                { cause: error }
+              );
+              (expired as any).status = 401;
+              throw expired;
+            }
             const serverMessage =
               res.data?.message || res.statusText || "Unknown Error";
             const wrapped = new Error(

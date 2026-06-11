@@ -1,5 +1,5 @@
 import { CommandModule } from 'yargs'
-import { context } from '../../api/context'
+import { requireApi } from '../../api/context'
 import { cmd } from '../../lib/cmd'
 import { Configuration } from '../../lib/Configuration'
 import { log } from '../../log'
@@ -36,12 +36,8 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
   handler: async args => {
     const workdir = args.workdir || process.cwd()
 
-    const ctx = await context()
+    const ctx = await requireApi()
     const { api } = ctx
-    if (!api) {
-      log.error("❌ Not logged in. Run 'faable login' first.")
-      process.exit(1)
-    }
 
     // Resolve runtime
     const { runtime } = await runtime_detection(workdir)

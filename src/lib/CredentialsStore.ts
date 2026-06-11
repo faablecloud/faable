@@ -7,6 +7,9 @@ import { log as baselog } from '../log'
 export interface FaableConfig {
   apikey?: string
   token?: string
+  // OAuth refresh token (offline_access). Used to silently mint a new access
+  // token when the stored one expires, so the user doesn't have to re-login.
+  refresh_token?: string
   email?: string
 }
 

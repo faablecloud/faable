@@ -1,6 +1,7 @@
 import { CommandModule } from "yargs";
 import { FaableApi } from "../../api/FaableApi";
 import { getDeviceCode, getDeviceToken, getMe } from "../../api/auth";
+import { isTokenLive } from "../../api/session";
 import { CredentialsStore } from "../../lib/CredentialsStore";
 import open from "open";
 import ora from "ora";
@@ -57,8 +58,14 @@ export const login: CommandModule = {
     // re-auth (and often scripted), so they skip the prompt and overwrite.
     if (!apikey && !token) {
       const existing = await store.loadCredentials();
-      if (existing && (existing.token || existing.apikey)) {
-        const who = existing.email ? ` as ${existing.email}` : "";
+      // Only a still-valid bearer session (or an API key) counts as "logged
+      // in". An expired token is a dead session, so skip the prompt and go
+      // straight to re-login instead of misleadingly saying "already logged in".
+      const hasLiveSession =
+        (!!existing?.token && isTokenLive(existing.token)) ||
+        !!existing?.apikey;
+      if (hasLiveSession) {
+        const who = existing?.email ? ` as ${existing.email}` : "";
         const { proceed } = await prompts({
           type: "confirm",
           name: "proceed",
@@ -157,13 +164,19 @@ export const login: CommandModule = {
         if (cancelled) return;
 
         try {
-          const { access_token } = await getDeviceToken(device_code);
+          const { access_token, refresh_token } = await getDeviceToken(device_code);
           if (access_token) {
             spinner.stop();
             // Validate the freshly issued token against the Auth server (it
             // issued the token). The deploy API has no /me route.
             const me = await getMe(access_token);
-            await store.saveCredentials({ token: access_token, email: me.email });
+            // Persist the refresh_token so the session can be renewed silently
+            // when the access token expires (see api/session.ts).
+            await store.saveCredentials({
+              token: access_token,
+              refresh_token,
+              email: me.email,
+            });
             log.info(`✅ Successfully logged in as ${me.email}`);
             return;
           }

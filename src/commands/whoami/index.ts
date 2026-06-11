@@ -2,6 +2,7 @@ import { CommandModule } from "yargs";
 import { log } from "../../log";
 
 import { getMe } from "../../api/auth";
+import { loadLiveCredentials } from "../../api/session";
 import { CredentialsStore } from "../../lib/CredentialsStore";
 
 export const whoami: CommandModule = {
@@ -9,7 +10,8 @@ export const whoami: CommandModule = {
   describe: "Display the current logged in user",
   handler: async () => {
     const store = new CredentialsStore();
-    const config = await store.loadCredentials();
+    // Auto-refreshes an expired token via the stored refresh_token.
+    const config = await loadLiveCredentials(store);
 
     // Bearer token from the environment (CI) or a local `faable login`.
     const token = process.env.FAABLE_TOKEN || config?.token;
