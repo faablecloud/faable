@@ -1,8 +1,22 @@
 import axios from "axios";
+import os from "os";
 
 
 const api = axios.create({baseURL:"https://faable.auth.faable.link"})
 const CLIENT_ID = "c879023b-e34f-4b0c-a262-210e556bc2e4"
+
+const PLATFORM_LABELS: Record<string, string> = {
+  darwin: "macOS",
+  win32: "Windows",
+  linux: "Linux",
+};
+
+// Human-friendly device name shown on the auth confirm page so the user can
+// recognise which device they are authorising, e.g. "marcs-mbp (macOS)".
+function deviceName() {
+  const platform = PLATFORM_LABELS[os.platform()] || os.platform();
+  return `${os.hostname()} (${platform})`;
+}
 
 export async function getDeviceCode() {
   const res = await api.post<{
@@ -15,6 +29,7 @@ export async function getDeviceCode() {
   }>(`/oauth/device/code`, {
     client_id: CLIENT_ID,
     scope: "openid email profile offline_access",
+    device_name: deviceName(),
   });
   return res.data;
 }

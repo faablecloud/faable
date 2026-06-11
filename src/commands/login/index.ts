@@ -4,6 +4,7 @@ import { getDeviceCode, getDeviceToken, getMe } from "../../api/auth";
 import { CredentialsStore } from "../../lib/CredentialsStore";
 import open from "open";
 import ora from "ora";
+import prompts from "prompts";
 import { log } from "../../log";
 
 const wait = (ms: number) =>
@@ -50,6 +51,27 @@ export const login: CommandModule = {
   handler: async (args) => {
     const { apikey, token } = args as any;
     const store = new CredentialsStore();
+
+    // Interactive flow only: if there's already a session, confirm before
+    // re-authenticating. Flag-based logins (--apikey/--token) are an explicit
+    // re-auth (and often scripted), so they skip the prompt and overwrite.
+    if (!apikey && !token) {
+      const existing = await store.loadCredentials();
+      if (existing && (existing.token || existing.apikey)) {
+        const who = existing.email ? ` as ${existing.email}` : "";
+        const { proceed } = await prompts({
+          type: "confirm",
+          name: "proceed",
+          message: `You are already logged in${who}. Log out and log in again?`,
+          initial: false,
+        });
+        if (!proceed) {
+          log.info("Keeping current session. Run `faable logout` to log out.");
+          return;
+        }
+        await store.deleteCredentials();
+      }
+    }
 
     if (apikey) {
       log.info("Logging in with API Key...");
