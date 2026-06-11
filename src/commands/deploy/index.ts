@@ -38,6 +38,10 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
 
     const ctx = await context()
     const { api } = ctx
+    if (!api) {
+      log.error("❌ Not logged in. Run 'faable login' first.")
+      process.exit(1)
+    }
 
     // Resolve runtime
     const { runtime } = await runtime_detection(workdir)

@@ -75,6 +75,10 @@ export const link: CommandModule<object, Options> = {
     }
 
     const { api } = await context();
+    if (!api) {
+      log.error("❌ Not logged in. Run 'faable login' first.");
+      process.exit(1);
+    }
 
     log.info("Checking local git repository...");
     const gitUrl = await getGitRemoteUrl(workdir);
