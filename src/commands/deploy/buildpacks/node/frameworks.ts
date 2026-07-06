@@ -2,7 +2,7 @@ import fs from "fs-extra";
 import path from "path";
 import { PackageJson } from "type-fest";
 import * as R from "ramda";
-import { log } from "../../../log";
+import { log } from "../../../../log";
 
 /**
  * A static framework produces a directory of static assets (a SPA) that needs
@@ -72,13 +72,13 @@ export const FRAMEWORKS: Framework[] = [
     type: "astro",
     deps: ["astro"],
     outputDir: "dist",
-    serveCommand: (dir) => `npx astro preview --host 0.0.0.0 --port $PORT`,
+    serveCommand: (_dir) => `npx astro preview --host 0.0.0.0 --port $PORT`,
   },
   {
     type: "gatsby",
     deps: ["gatsby"],
     outputDir: "public",
-    serveCommand: (dir) => `npx gatsby serve --host 0.0.0.0 --port $PORT`,
+    serveCommand: (_dir) => `npx gatsby serve --host 0.0.0.0 --port $PORT`,
   },
   {
     type: "cra",
@@ -105,7 +105,7 @@ export const FRAMEWORKS: Framework[] = [
     type: "vite",
     deps: ["vite"],
     outputDir: "dist",
-    serveCommand: (dir) => `npx vite preview --host 0.0.0.0 --port $PORT`,
+    serveCommand: (_dir) => `npx vite preview --host 0.0.0.0 --port $PORT`,
   },
 ];
 

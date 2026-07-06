@@ -1,19 +1,21 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../api/context'
-import { cmd } from '../../lib/cmd'
 import { Configuration } from '../../lib/Configuration'
 import { log } from '../../log'
+import {
+  buildpack_names,
+  detect_buildpack,
+  get_buildpack,
+  plan_summary
+} from './buildpacks'
 import { check_environment } from './check_environment'
 import { git_context } from './git_context'
-import { build_node } from './node-pipeline'
-import { build_python } from './python-pipeline'
-import { runtime_detection } from './runtime-detect/runtime_detection'
 import { upload_tag } from './upload_tag'
 
 export interface DeployCommandArgs {
   app_id: string
   workdir?: string
-  project_type?: string
+  buildpack?: string
 }
 
 export const deploy: CommandModule<unknown, DeployCommandArgs> = {
@@ -30,6 +32,13 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
         type: 'string',
         description: 'Working directory'
       })
+      .option('buildpack', {
+        alias: 'b',
+        type: 'string',
+        choices: buildpack_names(),
+        description:
+          'Force a specific buildpack (overrides auto-detection and faable.json)'
+      })
       .showHelpOnFail(false) as any
   },
 
@@ -39,8 +48,13 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     const ctx = await requireApi()
     const { api } = ctx
 
-    // Resolve runtime
-    const { runtime } = await runtime_detection(workdir)
+    // Resolve the buildpack plan (detection or forced override). All the
+    // build thinking happens here; build() below just executes the plan.
+    const config = Configuration.instance().deployConfig()
+    const plan = await detect_buildpack(
+      { workdir, config },
+      args.buildpack || config.buildpack
+    )
 
     // app_id resolution (the user never has to look one up):
     //  1. explicit positional (monorepo escape hatch)
@@ -58,37 +72,21 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     // Check if we can build docker images
     await check_environment()
 
-    log.info(
-      `🚀 Deploying "${app.name}" (${app.id}) runtime=${runtime.name}-${runtime.version}`
-    )
+    const runtime_label = plan.runtime.version
+      ? `${plan.runtime.name}-${plan.runtime.version}`
+      : plan.runtime.name
+    log.info(`🚀 Deploying "${app.name}" (${app.id}) runtime=${runtime_label}`)
+    log.info(`🧩 Build plan ${plan_summary(plan)}`)
 
     // get environment variables
     const env_vars = await api.getAppSecrets(app.id)
 
-    let type
-
-    if (runtime.name == 'node') {
-      const node_result = await build_node(app, {
-        workdir,
-        runtime,
-        env_vars
-      })
-      type = node_result.type
-    } else if (runtime.name == 'python') {
-      const python_result = await build_python(app, {
-        workdir,
-        runtime,
-        env_vars
-      })
-      type = python_result.type
-    } else if (runtime.name == 'docker') {
-      type = 'node'
-      await cmd(`docker build -t ${app.id} .`, {
-        enableOutput: true
-      })
-    } else {
-      throw new Error(`No build pipeline for runtime=${runtime.name}`)
+    const buildpack = get_buildpack(plan.buildpack)
+    if (!buildpack) {
+      throw new Error(`No buildpack registered for plan=${plan.buildpack}`)
     }
+    await buildpack.build({ workdir, config, app, env_vars }, plan)
+    const type = plan.type
 
     // Upload to Faable registry
     const { upload_tagname } = await upload_tag({ app, api })

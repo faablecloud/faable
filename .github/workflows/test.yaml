@@ -1,4 +1,4 @@
-name: Check blog
+name: CLI tests
 on:
   pull_request_target:
     types:
@@ -9,9 +9,9 @@ on:
       - main
 jobs:
   build-cli:
-    name: Package CLI
+    name: Test + package CLI
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
         with:
@@ -19,4 +19,5 @@ jobs:
       - uses: actions/setup-node@v6
 
       - run: npm i
+      - run: npm test
       - run: npm run build

@@ -1,5 +1,5 @@
-import { log } from "../../../log";
-import { cmd } from "../../../lib/cmd";
+import { log } from "../../../../log";
+import { cmd } from "../../../../lib/cmd";
 
 // Pinned for reproducible builds. `serve` is the standalone static server used
 // for frameworks without a bundled preview tool (CRA, Vue, Angular).

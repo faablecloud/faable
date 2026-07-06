@@ -15,7 +15,7 @@ jobs:
   release:
     name: release
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -23,6 +23,7 @@ jobs:
           node-version: "lts/*"
           cache: "npm"
       - run: npm ci
+      - run: npm test
       - run: npm run build
       - run: npm audit signatures
       - run: npm run release

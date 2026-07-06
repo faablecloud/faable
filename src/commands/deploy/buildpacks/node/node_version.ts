@@ -1,4 +1,3 @@
-import { StrategyFn } from "../RuntimeStrategy";
 import fs from "fs-extra";
 import path from "path";
 import { cmd } from "../../../../lib/cmd";
@@ -11,21 +10,19 @@ const getCurrentNodeVersion = async () => {
 };
 
 /**
- * Strategy to detect app name from package.json
- * @param api
- * @param workdir
- * @returns
+ * Resolve the Node version for the base image: `engines.node` from
+ * package.json (resolved to a concrete release via `npm view`), else the
+ * version running the deploy. Also validates the package has a `name`
+ * (required since the beginning; kept for compatibility).
  */
-export const strategy_nodejs: StrategyFn = async (workdir: string) => {
+export const resolve_node_version = async (workdir: string): Promise<string> => {
   const packageJSONFile = path.join(workdir, "package.json");
 
-  // Check we have a valid name
   const { name, engines } = fs.readJSONSync(packageJSONFile);
   if (!name) {
     throw new Error("Missing name in package.json");
   }
 
-  // Use engines.node if found
   let runtime_version = await getCurrentNodeVersion();
   if (engines?.node) {
     try {
@@ -44,11 +41,5 @@ export const strategy_nodejs: StrategyFn = async (workdir: string) => {
     log.info(`Node version ${runtime_version}`);
   }
 
-  return {
-    app_name: name,
-    runtime: {
-      name: "node",
-      version: runtime_version,
-    },
-  };
+  return runtime_version;
 };

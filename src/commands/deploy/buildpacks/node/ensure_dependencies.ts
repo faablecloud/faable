@@ -1,7 +1,7 @@
 import { existsSync } from "fs";
 import { dirname, join } from "path";
-import { log } from "../../../log";
-import { cmd } from "../../../lib/cmd";
+import { log } from "../../../../log";
+import { cmd } from "../../../../lib/cmd";
 
 // Installing can be slow on cold CI runners (no npm cache).
 const INSTALL_TIMEOUT = 15 * 60 * 1000; // 15 minute timeout

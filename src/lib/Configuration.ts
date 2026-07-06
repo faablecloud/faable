@@ -4,6 +4,8 @@ import { log } from "../log";
 interface ProjectConfig {
   startCommand?: string;
   buildCommand?: string;
+  /** Force a specific buildpack (node | python | docker) instead of auto-detection. */
+  buildpack?: string;
   app_slug?: string;
   app_id?:string
 }
@@ -56,6 +58,18 @@ export class Configuration {
 
   get buildCommand() {
     return this.config.buildCommand;
+  }
+
+  /**
+   * faable.json subset consumed by the deploy buildpacks. Buildpacks receive
+   * this via their context and never touch the singleton directly.
+   */
+  deployConfig() {
+    return {
+      startCommand: this.config.startCommand,
+      buildCommand: this.config.buildCommand,
+      buildpack: this.config.buildpack,
+    };
   }
 
   get app_slug() {
