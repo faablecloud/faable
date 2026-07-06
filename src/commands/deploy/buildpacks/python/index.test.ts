@@ -74,3 +74,40 @@ test("manifest present but unresolvable start → claims and throws (no fallthro
     detect(project({ "requirements.txt": "somelib\n" }))
   );
 });
+
+// --- detect_fallback: bare entrypoint, no manifest ---
+
+const fallback = (dir: string, config = {}) =>
+  python_buildpack.detect_fallback!({ workdir: dir, config });
+
+test("fallback: no entry files → null", async (t) => {
+  t.is(await fallback(project({ "util.py": "x = 1\n" })), null);
+});
+
+test("fallback: main.py with FastAPI import → uvicorn plan, server injected, no install_files", async (t) => {
+  const plan = await fallback(
+    project({ "main.py": "from fastapi import FastAPI\napp = FastAPI()\n" })
+  );
+  t.truthy(plan);
+  t.is(plan!.buildpack, "python");
+  t.is(plan!.start_command, "uvicorn main:app --host 0.0.0.0 --port $PORT");
+  t.is(plan!.install_command, "pip install --no-cache-dir uvicorn[standard]");
+  t.is(plan!.install_files, undefined);
+});
+
+test("fallback: wsgi.py + Procfile uses the Procfile start", async (t) => {
+  const plan = await fallback(
+    project({
+      "wsgi.py": "application = app\n",
+      Procfile: "web: gunicorn wsgi:application --bind 0.0.0.0:$PORT",
+    })
+  );
+  t.is(plan!.start_command, "gunicorn wsgi:application --bind 0.0.0.0:$PORT");
+});
+
+test("fallback: unrecognizable entry file → throws with the startCommand hint", async (t) => {
+  const err = await t.throwsAsync(() =>
+    fallback(project({ "main.py": "def run(): pass\n" }))
+  );
+  t.regex(err!.message, /startCommand/);
+});

@@ -1,0 +1,11 @@
+[cerebrium.deployment]
+name = "cerebrium-fastapi"
+python_version = "3.11"
+
+[cerebrium.hardware]
+cpu = 2
+memory = 2.0
+
+[cerebrium.dependencies.pip]
+fastapi = "latest"
+uvicorn = "latest"

@@ -1,4 +1,5 @@
 import { BuildPlan, Buildpack, DetectContext } from "./Buildpack";
+import { DetectError } from "./DetectError";
 import { docker_buildpack } from "./docker";
 import { node_buildpack } from "./node";
 import { python_buildpack } from "./python";
@@ -67,5 +68,5 @@ export const detect_buildpack = async (
     if (plan) return plan;
   }
 
-  throw new Error("Cannot detect project type");
+  throw new DetectError(ctx.workdir, BUILDPACKS);
 };

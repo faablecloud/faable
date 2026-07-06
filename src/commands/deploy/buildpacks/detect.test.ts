@@ -124,7 +124,7 @@ test("python claims the project even when start cannot resolve (no silent fallth
   );
 });
 
-test("Dockerfile beside a bare main.py → docker (no manifest claims it)", async (t) => {
+test("Dockerfile beside a bare main.py → docker (weak signals lose)", async (t) => {
   const plan = await detect(
     project({ Dockerfile: "FROM python:3.12\n", "main.py": FASTAPI_MAIN })
   );
@@ -133,6 +133,27 @@ test("Dockerfile beside a bare main.py → docker (no manifest claims it)", asyn
 
 test("empty dir throws", async (t) => {
   await t.throwsAsync(() => detect(project({})));
+});
+
+test("bare main.py (no manifest) → python via the fallback pass", async (t) => {
+  const plan = await detect(
+    project({ "main.py": "from fastapi import FastAPI\napp = FastAPI()\n" })
+  );
+  t.is(plan.buildpack, "python");
+  t.is(plan.start_command, "uvicorn main:app --host 0.0.0.0 --port $PORT");
+  t.is(plan.install_files, undefined);
+});
+
+test("cerebrium.toml is a strong python trigger (beats Dockerfile)", async (t) => {
+  const plan = await detect(
+    project({
+      "cerebrium.toml": `[cerebrium.dependencies.pip]\nfastapi = "latest"\n`,
+      "main.py": FASTAPI_MAIN,
+      Dockerfile: "FROM python:3.12\n",
+    })
+  );
+  t.is(plan.buildpack, "python");
+  t.is(plan.install_command, 'pip install --no-cache-dir "fastapi" && pip install --no-cache-dir uvicorn[standard]');
 });
 
 // --- override (--buildpack / faable.json buildpack) ---
