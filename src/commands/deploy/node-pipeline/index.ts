@@ -2,6 +2,7 @@ import { FaableApp, Secret } from "../../../api/FaableApi";
 import { build_docker } from "./build_docker";
 import { analyze_package } from "./analyze_package";
 import { build_project } from "./build_project";
+import { ensure_dependencies } from "./ensure_dependencies";
 import { inject_serve } from "./inject_serve";
 import { Runtime } from "../runtime-detect/RuntimeStrategy";
 import * as R from "ramda";
@@ -31,8 +32,12 @@ export const build_node = async (app: FaableApp, options: BuildNodeOptions) => {
   const env = R.fromPairs(env_vars.map((e) => [e.name, e.value]));
   log.info(`Building with env variables ${Object.keys(env).join(",")}`);
 
+  // The workflow no longer runs `npm ci` — install here when needed, before
+  // the build and before `COPY . .` packages node_modules into the image.
+  await ensure_dependencies(workdir);
+
   // Do build
-  await build_project({ app, build_script, env });
+  await build_project({ app, build_script, env, cwd: workdir });
 
   // Frameworks without a bundled static server (CRA/Vue/Angular) need `serve`
   // installed into node_modules before packaging, so it ships in the image.

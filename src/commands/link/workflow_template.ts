@@ -23,7 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
-      - run: npm ci
       - run: npx @faable/faable@latest deploy
 `;
 
