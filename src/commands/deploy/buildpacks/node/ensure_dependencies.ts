@@ -63,7 +63,12 @@ export const ensure_dependencies = async (
   const { run = defaultRun, hasTool = defaultHasTool, exists = existsSync } =
     deps;
 
-  if (has_node_modules(workdir, exists)) return;
+  if (has_node_modules(workdir, exists)) {
+    log.info(
+      `📦 Dependencies already installed — skipping install (fresh dependencies)`
+    );
+    return;
+  }
 
   const has = (file: string) => exists(join(workdir, file));
   let install = "npm install --no-audit --no-fund";

@@ -104,7 +104,7 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     })
 
     const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
-    log.info(`🌍 Deployment created (${deployment.id}) -> https://${app.url}`)
+    log.info(`Preparing to deploy in faable cloud · ${deployment.id}`)
     log.info(`📊 View it in the dashboard -> ${dashboard_url}`)
 
     // Wait (up to 5 minutes) for the deployment to be promoted (live)
@@ -131,7 +131,7 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     }
 
     if (promoted) {
-      log.info(`✅ Deployment promoted and live -> https://${app.url}`)
+      log.info(`🌍 Deployment promoted and live, visit: https://${app.url}`)
     } else {
       log.warn(
         `⌛ Timed out after 5min waiting for promotion. The deployment is still rolling out, check the dashboard -> ${dashboard_url}`
