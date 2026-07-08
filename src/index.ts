@@ -11,9 +11,17 @@ import { Configuration } from './lib/Configuration'
 import { notifyIfUpdateAvailable } from './lib/UpdateChecker'
 import { log } from './log'
 
+// yargs re-runs before-validation middlewares once per nested command level
+// (`deploy secrets` = 2 runs), so keep the banner and update check to one.
+let banner_shown = false
+
 const yg = yargs()
 yg.scriptName('faable')
+  // Keep CLI output in English regardless of the system locale
+  .locale('en')
   .middleware(async function (argv) {
+    if (banner_shown) return
+    banner_shown = true
     log.info(`Faable CLI ${version}`)
     // `upgrade` does its own (forced) check
     if (argv._[0] !== 'upgrade') {
