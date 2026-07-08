@@ -4,15 +4,21 @@ import { deploy } from './commands/deploy'
 import { link_deprecated } from './commands/link'
 import { login } from './commands/login'
 import { logout } from './commands/logout'
+import { upgrade } from './commands/upgrade'
 import { whoami } from './commands/whoami'
 import { version } from './config'
 import { Configuration } from './lib/Configuration'
+import { notifyIfUpdateAvailable } from './lib/UpdateChecker'
 import { log } from './log'
 
 const yg = yargs()
 yg.scriptName('faable')
-  .middleware(function (_argv) {
+  .middleware(async function (argv) {
     log.info(`Faable CLI ${version}`)
+    // `upgrade` does its own (forced) check
+    if (argv._[0] !== 'upgrade') {
+      await notifyIfUpdateAvailable(version)
+    }
   }, true)
   .option('c', {
     alias: 'config',
@@ -32,6 +38,7 @@ yg.scriptName('faable')
   .command(login)
   .command(logout)
   .command(whoami)
+  .command(upgrade)
   .command(link_deprecated)
   .demandCommand(1)
   .help()
