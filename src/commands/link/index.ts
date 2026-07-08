@@ -2,8 +2,8 @@ import { CommandModule } from "yargs";
 import { requireApi } from "../../api/context";
 import prompts from "prompts";
 import { log } from "../../log";
-import { cmd } from "../../lib/cmd";
 import { Configuration } from "../../lib/Configuration";
+import { getGitRemoteUrl } from "../../lib/git_remote";
 import {
   DEPLOY_DOCS_URL,
   DEPLOY_WORKFLOW_PATH,
@@ -13,24 +13,6 @@ import {
 } from "./workflow_template";
 
 type Options = { workdir: string };
-
-const getGitRemoteUrl = async (workdir: string): Promise<string | undefined> => {
-  try {
-    const { stdout } = await cmd("git remote get-url origin", { cwd: workdir });
-    const url = stdout?.toString().trim();
-    if (!url) return undefined;
-
-    // Extract org/repo from github urls
-    const match = url.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
-    if (match) {
-      return match[1];
-    }
-    return url;
-  } catch {
-    log.warn("Could not detect git remote origin URL.");
-    return undefined;
-  }
-};
 
 export const link: CommandModule<object, Options> = {
   command: "link",
@@ -156,6 +138,19 @@ export const link: CommandModule<object, Options> = {
     await setupDeployWorkflow(workdir);
   },
 };
+
+// Top-level `faable link` predates the per-product layout (`faable deploy link`).
+// Kept as a hidden alias so existing docs/scripts don't break; remove in a
+// future major.
+export const link_deprecated: CommandModule<object, Options> = {
+  ...link,
+  describe: false,
+  deprecated: true,
+  handler: async args => {
+    log.warn('⚠️ "faable link" is deprecated, use "faable deploy link".')
+    await link.handler(args)
+  }
+}
 
 const setupDeployWorkflow = async (workdir: string) => {
   if (workflowExists(workdir)) {

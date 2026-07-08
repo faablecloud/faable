@@ -39,6 +39,10 @@ export interface FaableAppRegistry {
 export interface Secret {
   id: string;
   related: string;
+  // "app" for the app's own secrets, "profile" for secrets inherited from
+  // the team profile (returned by GET /secret/:app_id but not editable
+  // through the app context).
+  related_model: "app" | "profile";
   name: string;
   value: string;
 }
@@ -166,6 +170,26 @@ export class FaableApi<T = any> {
 
   async getAppSecrets(app_id: string) {
     return firstPage(data(this.client.get<Page<Secret>>(`/secret/${app_id}`)));
+  }
+
+  // Replace the app's whole secret set (the endpoint deletes and recreates).
+  // This is the only mutation path that triggers an immediate restart of the
+  // app; the per-secret upsert/delete endpoints are not used by the CLI.
+  // The endpoint stamps the created secrets with the team from the request
+  // context, which a CLI user token does not carry — pass the app's team
+  // (from getApp) so it travels as the `x-faable-team` header.
+  async createSecretsBatch(
+    context_id: string,
+    team: string,
+    secrets: { name: string; value: string }[]
+  ) {
+    return data(
+      this.client.post<Secret[]>(
+        `/secret/createbatch`,
+        { context_id, secrets },
+        { headers: { "x-faable-team": team } }
+      )
+    );
   }
 
   async updateApp(

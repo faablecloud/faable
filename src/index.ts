@@ -1,7 +1,7 @@
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import { deploy } from './commands/deploy'
-import { link } from './commands/link'
+import { link_deprecated } from './commands/link'
 import { login } from './commands/login'
 import { logout } from './commands/logout'
 import { whoami } from './commands/whoami'
@@ -32,7 +32,7 @@ yg.scriptName('faable')
   .command(login)
   .command(logout)
   .command(whoami)
-  .command(link)
+  .command(link_deprecated)
   .demandCommand(1)
   .help()
   .fail(function (msg, err) {

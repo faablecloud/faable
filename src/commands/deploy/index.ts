@@ -2,6 +2,7 @@ import { CommandModule } from 'yargs'
 import { requireApi } from '../../api/context'
 import { Configuration } from '../../lib/Configuration'
 import { log } from '../../log'
+import { link } from '../link'
 import {
   buildpack_names,
   detect_buildpack,
@@ -10,6 +11,8 @@ import {
 } from './buildpacks'
 import { check_environment } from './check_environment'
 import { git_context } from './git_context'
+import { resolve_app_id } from './resolve_app_id'
+import { secrets } from './secrets'
 import { upload_tag } from './upload_tag'
 
 export interface DeployCommandArgs {
@@ -22,7 +25,11 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
   command: 'deploy [app_id]',
   describe: 'Deploy a faable app',
   builder: yargs => {
+    // Product subcommands live under `deploy` (yargs matches them before the
+    // app_id positional, so `faable deploy <app_id>` keeps working).
     return yargs
+      .command(secrets)
+      .command(link)
       .positional('app_id', {
         type: 'string',
         description: 'App Identifier'
@@ -56,17 +63,7 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
       args.buildpack || config.buildpack
     )
 
-    // app_id resolution (the user never has to look one up):
-    //  1. explicit positional (monorepo escape hatch)
-    //  2. OIDC in CI — the backend resolves the app from the linked repository
-    //  3. locally — the app saved by `faable link` in faable.json
-    const app_id = args.app_id || ctx.appId || Configuration.instance().app_id
-
-    if (!app_id) {
-      throw new Error(
-        'No app linked to this repository. Run "faable link" to link it (or link it from the dashboard).'
-      )
-    }
+    const app_id = await resolve_app_id(args.app_id, ctx.appId, api, workdir)
     const app = await api.getApp(app_id)
 
     // Check if we can build docker images
