@@ -156,16 +156,40 @@ export class FaableApi<T = any> {
     return data(this.client.get<FaableAppRegistry>(`/app/${app_id}/registry`));
   }
 
+  // `image`/`type` are optional to support the failure path: a failed build
+  // is recorded as a deployment without an image (and without `type`, which
+  // would otherwise rewrite the app's runtime_strategy server-side).
   async createDeployment(params: {
     app_id: string;
-    type: string;
-    image: string;
+    type?: string;
+    image?: string;
     github_commit?: string;
     github_ref?: string;
     github_actor?: string;
     github_commit_message?: string;
   }) {
     return data(this.client.post<{ id: string }>(`/deployment`, params));
+  }
+
+  // Phase transitions the CLI owns (e.g. BUILD_ERROR on a failed build).
+  // Runtime phases stay controller-territory.
+  async updateDeploymentStatus(deployment_id: string, status: { phase: string }) {
+    return data(this.client.post(`/status/${deployment_id}`, status));
+  }
+
+  // Attach the captured build/deploy output to a deployment. The base client
+  // timeout (10s) is too short for a multi-MB body on a slow uplink.
+  async uploadDeploymentLogs(
+    deployment_id: string,
+    body: { content: string; truncated?: boolean }
+  ) {
+    return data(
+      this.client.post<{ id: string; truncated: boolean; size: number }>(
+        `/deployment/${deployment_id}/logs`,
+        body,
+        { timeout: 60_000, maxBodyLength: Infinity, maxContentLength: Infinity }
+      )
+    );
   }
 
   async getAppSecrets(app_id: string) {

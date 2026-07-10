@@ -13,6 +13,7 @@ import { check_environment } from './check_environment'
 import { git_context } from './git_context'
 import { resolve_app_id } from './resolve_app_id'
 import { secrets } from './secrets'
+import { report_build_failure, upload_logs } from './upload_logs'
 import { upload_tag } from './upload_tag'
 
 export interface DeployCommandArgs {
@@ -66,39 +67,52 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     const app_id = await resolve_app_id(args.app_id, ctx.appId, api, workdir)
     const app = await api.getApp(app_id)
 
-    // Check if we can build docker images
-    await check_environment()
+    // From here on there is an app to attach logs to: any build/push failure
+    // is recorded as a BUILD_ERROR deployment with the captured output.
+    let deployment: { id: string }
+    try {
+      // Check if we can build docker images
+      await check_environment()
 
-    const runtime_label = plan.runtime.version
-      ? `${plan.runtime.name}-${plan.runtime.version}`
-      : plan.runtime.name
-    log.info(`🚀 Deploying "${app.name}" (${app.id}) runtime=${runtime_label}`)
-    log.info(`🧩 Build plan ${plan_summary(plan)}`)
+      const runtime_label = plan.runtime.version
+        ? `${plan.runtime.name}-${plan.runtime.version}`
+        : plan.runtime.name
+      log.info(
+        `🚀 Deploying "${app.name}" (${app.id}) runtime=${runtime_label}`
+      )
+      log.info(`🧩 Build plan ${plan_summary(plan)}`)
 
-    // get environment variables
-    const env_vars = await api.getAppSecrets(app.id)
+      // get environment variables
+      const env_vars = await api.getAppSecrets(app.id)
 
-    const buildpack = get_buildpack(plan.buildpack)
-    if (!buildpack) {
-      throw new Error(`No buildpack registered for plan=${plan.buildpack}`)
+      const buildpack = get_buildpack(plan.buildpack)
+      if (!buildpack) {
+        throw new Error(`No buildpack registered for plan=${plan.buildpack}`)
+      }
+      await buildpack.build({ workdir, config, app, env_vars }, plan)
+      const type = plan.type
+
+      // Upload to Faable registry
+      const { upload_tagname } = await upload_tag({ app, api })
+
+      // Capture the commit/ref/actor so the deployment records which commit
+      // it came from and who pushed it (env in CI, git fallback locally).
+      const git = await git_context({ workdir })
+
+      // Create a deployment for this image
+      deployment = await api.createDeployment({
+        app_id: app.id,
+        image: upload_tagname,
+        type,
+        ...git
+      })
+    } catch (error) {
+      await report_build_failure(api, { app, workdir })
+      throw error
     }
-    await buildpack.build({ workdir, config, app, env_vars }, plan)
-    const type = plan.type
 
-    // Upload to Faable registry
-    const { upload_tagname } = await upload_tag({ app, api })
-
-    // Capture the commit/ref/actor so the deployment records which commit it
-    // came from and who pushed it (env in CI, git fallback locally).
-    const git = await git_context({ workdir })
-
-    // Create a deployment for this image
-    const deployment = await api.createDeployment({
-      app_id: app.id,
-      image: upload_tagname,
-      type,
-      ...git
-    })
+    // Attach the build output to the deployment (best-effort).
+    await upload_logs(api, deployment.id)
 
     const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
     log.info(`Preparing to deploy in faable cloud · ${deployment.id}`)
