@@ -16,7 +16,7 @@ import { resolve_node_version } from "./node_version";
 
 const BANNER = `NODE_VERSION=$(node --version)
 NPM_VERSION=$(npm --version)
-YARN_VERSION=$(yarn --version)
+YARN_VERSION=$(yarn --version 2>/dev/null || echo "n/a")
 
 echo "Faable Cloud · [node $NODE_VERSION] [npm $NPM_VERSION] [yarn $YARN_VERSION]"`;
 

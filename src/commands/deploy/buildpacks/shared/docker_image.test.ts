@@ -8,7 +8,7 @@ import { render_dockerfile } from "./docker_image";
 
 const NODE_BANNER = `NODE_VERSION=$(node --version)
 NPM_VERSION=$(npm --version)
-YARN_VERSION=$(yarn --version)
+YARN_VERSION=$(yarn --version 2>/dev/null || echo "n/a")
 
 echo "Faable Cloud · [node $NODE_VERSION] [npm $NPM_VERSION] [yarn $YARN_VERSION]"`;
 
@@ -18,14 +18,15 @@ PIP_VERSION=$(pip --version 2>&1)
 echo "Faable Cloud · [$PYTHON_VERSION] [$PIP_VERSION]"`;
 
 test("node dockerfile: default npm start", (t) => {
-  t.snapshot(
-    render_dockerfile({
-      from: "node:22.1.0",
-      env: { NODE_ENV: "production" },
-      banner: NODE_BANNER,
-      start_command: "npm run start",
-    })
-  );
+  const rendered = render_dockerfile({
+    from: "node:22.1.0",
+    env: { NODE_ENV: "production" },
+    banner: NODE_BANNER,
+    start_command: "npm run start",
+  });
+  // node:*-slim ships without yarn — the banner must tolerate its absence
+  t.true(rendered.includes('yarn --version 2>/dev/null || echo "n/a"'));
+  t.snapshot(rendered);
 });
 
 test("node dockerfile: static framework serve command keeps $PORT escaped", (t) => {
