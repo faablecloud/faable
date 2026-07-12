@@ -106,8 +106,18 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
         type,
         ...git
       })
-    } catch (error) {
-      await report_build_failure(api, { app, workdir })
+    } catch (error: any) {
+      // A free-plan quota rejection (429 deployment_quota_exceeded) is not a
+      // build failure — the build itself succeeded. Skip the failure report
+      // so the app doesn't show a red build; the API's message (with the
+      // upgrade hint) still reaches the user via the error printer.
+      const isQuotaRejection =
+        error?.isFaableApiError &&
+        error?.response?.status === 429 &&
+        error?.response?.data?.code === 'deployment_quota_exceeded'
+      if (!isQuotaRejection) {
+        await report_build_failure(api, { app, workdir })
+      }
       throw error
     }
 
