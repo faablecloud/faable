@@ -13,7 +13,7 @@ import { check_environment } from './check_environment'
 import { git_context } from './git_context'
 import { resolve_app_id } from './resolve_app_id'
 import { secrets } from './secrets'
-import { report_build_failure, upload_logs } from './upload_logs'
+import { mark_build_failure, start_log_sync, upload_logs } from './upload_logs'
 import { upload_tag } from './upload_tag'
 
 export interface DeployCommandArgs {
@@ -67,9 +67,21 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     const app_id = await resolve_app_id(args.app_id, ctx.appId, api, workdir)
     const app = await api.getApp(app_id)
 
-    // From here on there is an app to attach logs to: any build/push failure
-    // is recorded as a BUILD_ERROR deployment with the captured output.
-    let deployment: { id: string }
+    // Capture the commit/ref/actor so the deployment records which commit
+    // it came from and who pushed it (env in CI, git fallback locally).
+    const git = await git_context({ workdir })
+
+    // Create-first: register the deployment BEFORE building. Gate rejections
+    // (free-plan quota 429, disabled app 409) surface here, at second 0 —
+    // before any build minutes are spent. The row is born QUEUED; the CLI
+    // owns it until the built image lands (or the build fails). `type` rides
+    // on the create as before — the buildpack plan is already resolved.
+    const deployment = await api.createDeployment({
+      app_id: app.id,
+      type: plan.type,
+      ...git
+    })
+
     try {
       // Check if we can build docker images
       await check_environment()
@@ -89,39 +101,37 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
       if (!buildpack) {
         throw new Error(`No buildpack registered for plan=${plan.buildpack}`)
       }
-      await buildpack.build({ workdir, config, app, env_vars }, plan)
-      const type = plan.type
 
-      // Upload to Faable registry
-      const { upload_tagname } = await upload_tag({ app, api })
+      // The build starts now: declare it (QUEUED → BUILDING) and stream the
+      // captured output to the deployment while it runs (best-effort).
+      await api
+        .updateDeploymentStatus(deployment.id, { phase: 'BUILDING' })
+        .catch((error: any) =>
+          log.warn(`Could not mark deployment BUILDING: ${error.message}`)
+        )
+      const stop_log_sync = start_log_sync(api, deployment.id)
+      try {
+        await buildpack.build({ workdir, config, app, env_vars }, plan)
 
-      // Capture the commit/ref/actor so the deployment records which commit
-      // it came from and who pushed it (env in CI, git fallback locally).
-      const git = await git_context({ workdir })
+        // Upload to Faable registry
+        const { upload_tagname } = await upload_tag({ app, api })
 
-      // Create a deployment for this image
-      deployment = await api.createDeployment({
-        app_id: app.id,
-        image: upload_tagname,
-        type,
-        ...git
-      })
-    } catch (error: any) {
-      // A free-plan quota rejection (429 deployment_quota_exceeded) is not a
-      // build failure — the build itself succeeded. Skip the failure report
-      // so the app doesn't show a red build; the API's message (with the
-      // upgrade hint) still reaches the user via the error printer.
-      const isQuotaRejection =
-        error?.isFaableApiError &&
-        error?.response?.status === 429 &&
-        error?.response?.data?.code === 'deployment_quota_exceeded'
-      if (!isQuotaRejection) {
-        await report_build_failure(api, { app, workdir })
+        // Complete the deployment with the built image — this is the handoff:
+        // the controller claims it and materializes the workload.
+        await api.completeDeployment(deployment.id, upload_tagname)
+      } finally {
+        stop_log_sync()
       }
+    } catch (error: any) {
+      // The deployment already exists (created pre-build), so a failed build
+      // marks THAT row BUILD_ERROR with the captured logs — no extra row, no
+      // second quota hit. Gate rejections can't reach here anymore: the
+      // create happens before any building.
+      await mark_build_failure(api, { deployment_id: deployment.id, app })
       throw error
     }
 
-    // Attach the build output to the deployment (best-effort).
+    // Attach the final build output to the deployment (best-effort).
     await upload_logs(api, deployment.id)
 
     const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`

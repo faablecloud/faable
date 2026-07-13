@@ -171,10 +171,21 @@ export class FaableApi<T = any> {
     return data(this.client.post<{ id: string }>(`/deployment`, params));
   }
 
-  // Phase transitions the CLI owns (e.g. BUILD_ERROR on a failed build).
-  // Runtime phases stay controller-territory.
+  // Phase transitions the CLI owns (BUILDING when the build starts,
+  // BUILD_ERROR on a failed build). Runtime phases stay controller-territory.
   async updateDeploymentStatus(deployment_id: string, status: { phase: string }) {
     return data(this.client.post(`/status/${deployment_id}`, status));
+  }
+
+  // Complete a create-first deployment with the built image (write-once
+  // server-side). Setting the image is what makes the controller claim the
+  // deployment and materialize it.
+  async completeDeployment(deployment_id: string, image: string) {
+    return data(
+      this.client.post<{ id: string }>(`/deployment/${deployment_id}`, {
+        image,
+      })
+    );
   }
 
   // Attach the captured build/deploy output to a deployment. The base client
