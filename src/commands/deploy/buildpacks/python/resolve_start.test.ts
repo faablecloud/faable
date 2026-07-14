@@ -2,7 +2,11 @@ import test from "ava";
 import { mkdtempSync, mkdirSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { resolve_start, with_server_injection } from "./resolve_start";
+import {
+  read_dependencies_text,
+  resolve_start,
+  with_server_injection,
+} from "./resolve_start";
 
 const NO_CONFIG = {};
 
@@ -63,6 +67,29 @@ test("module preference: app/main.py with pattern beats bare main.py without", (
   });
   const r = resolve_start(dir, "fastapi", NO_CONFIG);
   t.is(r.start_command, "uvicorn app.main:app --host 0.0.0.0 --port $PORT");
+});
+
+// Regression: a UTF-16 requirements.txt (PowerShell `>` / Notepad on Windows)
+// used to be read as UTF-8, so `\bfastapi\b` never matched and framework
+// detection was skipped — the deploy died with "Could not detect how to start
+// this Python app" despite a valid FastAPI app. read_dependencies_text now
+// decodes the BOM, so detection works. Real case: Gokul2100/task-manager-api.
+test("UTF-16 requirements.txt still detects FastAPI (BOM-aware read)", (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "faable-py-"));
+  mkdirSync(join(dir, "app"), { recursive: true });
+  writeFileSync(
+    join(dir, "requirements.txt"),
+    Buffer.concat([
+      Buffer.from([0xff, 0xfe]),
+      Buffer.from("fastapi==0.139.0\r\nuvicorn==0.51.0\r\n", "utf16le"),
+    ])
+  );
+  writeFileSync(join(dir, "app", "main.py"), "app = FastAPI(\n    title='x'\n)\n");
+
+  const deps = read_dependencies_text(dir);
+  const r = resolve_start(dir, deps, NO_CONFIG);
+  t.is(r.start_command, "uvicorn app.main:app --host 0.0.0.0 --port $PORT");
+  t.is(r.server, "uvicorn");
 });
 
 test("Flask: deps token + app = Flask( → gunicorn module:app", (t) => {

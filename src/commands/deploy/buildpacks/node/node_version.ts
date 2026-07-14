@@ -1,7 +1,7 @@
-import fs from "fs-extra";
 import path from "path";
 import { cmd } from "../../../../lib/cmd";
 import { log } from "../../../../log";
+import { read_json_file } from "../shared/read_text_file";
 
 const getCurrentNodeVersion = async () => {
   const out = await cmd(`node --version`);
@@ -18,7 +18,10 @@ const getCurrentNodeVersion = async () => {
 export const resolve_node_version = async (workdir: string): Promise<string> => {
   const packageJSONFile = path.join(workdir, "package.json");
 
-  const { name, engines } = fs.readJSONSync(packageJSONFile);
+  const { name, engines } = read_json_file<{
+    name?: string;
+    engines?: { node?: string };
+  }>(packageJSONFile);
   if (!name) {
     throw new Error("Missing name in package.json");
   }

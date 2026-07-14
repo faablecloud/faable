@@ -1,8 +1,8 @@
-import fs from "fs-extra";
 import path from "path";
 import { PackageJson } from "type-fest";
 import * as R from "ramda";
 import { log } from "../../../../log";
+import { read_json_file } from "../shared/read_text_file";
 
 /**
  * A static framework produces a directory of static assets (a SPA) that needs
@@ -43,7 +43,7 @@ const has_dep = (pkg: PackageJson, name: string) =>
 export const resolve_angular_output = (workdir: string): string => {
   const fallback = "dist";
   try {
-    const angular_json = fs.readJSONSync(path.join(workdir, "angular.json"));
+    const angular_json = read_json_file<any>(path.join(workdir, "angular.json"));
     const projects = angular_json?.projects ?? {};
     const project_name =
       angular_json?.defaultProject ?? Object.keys(projects)[0];

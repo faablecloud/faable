@@ -9,6 +9,7 @@ import {
 } from "../Buildpack";
 import { build_image, render_dockerfile } from "../shared/docker_image";
 import { has_any_of_files } from "../shared/has_any_of_files";
+import { read_text_file } from "../shared/read_text_file";
 import { PythonProvider } from "./providers/PythonProvider";
 import { cerebrium_provider } from "./providers/cerebrium";
 import { pipfile_provider } from "./providers/pipfile";
@@ -127,7 +128,7 @@ export const python_buildpack: Buildpack = {
     // Framework detection blob = the entry files themselves: an
     // `from fastapi import FastAPI` line carries the token detection needs.
     const deps = entries
-      .map((f) => fs.readFileSync(path.join(ctx.workdir, f)).toString())
+      .map((f) => read_text_file(path.join(ctx.workdir, f)))
       .join("\n")
       .toLowerCase();
 

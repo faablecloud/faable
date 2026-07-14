@@ -1,5 +1,5 @@
-import fs from "fs-extra";
 import path from "path";
+import { read_text_file } from "../../shared/read_text_file";
 import { PythonProvider, PythonProviderResult } from "./PythonProvider";
 import { parse_cerebrium_toml } from "./parse_cerebrium_toml";
 
@@ -14,7 +14,7 @@ export const cerebrium_provider: PythonProvider = {
   files: ["cerebrium.toml"],
   resolve(workdir: string): PythonProviderResult {
     const manifest = parse_cerebrium_toml(
-      fs.readFileSync(path.join(workdir, "cerebrium.toml")).toString()
+      read_text_file(path.join(workdir, "cerebrium.toml"))
     );
 
     let install_command: string | undefined;

@@ -1,5 +1,6 @@
 import fs from "fs-extra";
 import path from "path";
+import { read_text_file } from "../shared/read_text_file";
 
 const DEFAULT_VERSION = "3.11.3";
 
@@ -17,7 +18,7 @@ export const resolve_python_version = (
 ): string => {
   const runtime_config = path.join(workdir, "runtime.txt");
   if (fs.existsSync(runtime_config)) {
-    const runtime_data = fs.readFileSync(runtime_config).toString().trim();
+    const runtime_data = read_text_file(runtime_config).trim();
     if (!runtime_data.startsWith("python-")) {
       throw new Error(
         "runtime.txt must have runtime format with python-<version>"
@@ -28,7 +29,7 @@ export const resolve_python_version = (
 
   const python_version_file = path.join(workdir, ".python-version");
   if (fs.existsSync(python_version_file)) {
-    const version = fs.readFileSync(python_version_file).toString().trim();
+    const version = read_text_file(python_version_file).trim();
     if (version) return version;
   }
 
@@ -36,7 +37,7 @@ export const resolve_python_version = (
 
   const pyproject = path.join(workdir, "pyproject.toml");
   if (fs.existsSync(pyproject)) {
-    const toml = fs.readFileSync(pyproject).toString();
+    const toml = read_text_file(pyproject);
     const match = toml.match(
       /requires-python\s*=\s*["'][^0-9]*([0-9]+\.[0-9]+(?:\.[0-9]+)?)/
     );

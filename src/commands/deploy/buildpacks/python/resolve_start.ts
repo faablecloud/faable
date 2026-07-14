@@ -2,6 +2,7 @@ import fs from "fs-extra";
 import path from "path";
 import { log } from "../../../../log";
 import { DeployConfig } from "../Buildpack";
+import { read_text_file } from "../shared/read_text_file";
 import { parse_procfile } from "./parse_procfile";
 
 export type Server = "gunicorn" | "uvicorn" | null;
@@ -12,7 +13,7 @@ export const read_dependencies_text = (workdir: string): string => {
   return files
     .map((f) => path.join(workdir, f))
     .filter((p) => fs.existsSync(p))
-    .map((p) => fs.readFileSync(p).toString())
+    .map((p) => read_text_file(p))
     .join("\n")
     .toLowerCase();
 };
@@ -69,7 +70,7 @@ export const find_app_module = (
     if (!fs.existsSync(abs)) continue;
     const module = rel.replace(/\.py$/, "").split(path.sep).join(".");
     if (!first_existing) first_existing = module;
-    if (pattern.test(fs.readFileSync(abs).toString())) return module;
+    if (pattern.test(read_text_file(abs))) return module;
   }
   return first_existing;
 };

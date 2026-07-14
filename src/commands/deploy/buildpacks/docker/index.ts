@@ -1,4 +1,3 @@
-import fs from "fs-extra";
 import path from "path";
 import { cmd } from "../../../../lib/cmd";
 import { log } from "../../../../log";
@@ -9,6 +8,7 @@ import {
   DetectContext,
 } from "../Buildpack";
 import { has_any_of_files } from "../shared/has_any_of_files";
+import { read_json_file } from "../shared/read_text_file";
 
 // A package.json with a next dependency beside the Dockerfile means this is a
 // Next.js app shipped with a custom image: emit type "next" so the backend
@@ -16,7 +16,7 @@ import { has_any_of_files } from "../shared/has_any_of_files";
 // --buildpack override, since the node buildpack claims package.json first.
 const detect_next = (workdir: string): boolean => {
   try {
-    const pkg = fs.readJSONSync(path.join(workdir, "package.json"));
+    const pkg = read_json_file<any>(path.join(workdir, "package.json"));
     return Boolean(pkg?.dependencies?.next || pkg?.devDependencies?.next);
   } catch {
     return false;
