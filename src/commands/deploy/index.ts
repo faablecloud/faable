@@ -4,6 +4,7 @@ import { Configuration } from '../../lib/Configuration'
 import { log } from '../../log'
 import { link } from '../link'
 import {
+  BuildPlan,
   buildpack_names,
   detect_buildpack,
   get_buildpack,
@@ -56,13 +57,7 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     const ctx = await requireApi()
     const { api } = ctx
 
-    // Resolve the buildpack plan (detection or forced override). All the
-    // build thinking happens here; build() below just executes the plan.
     const config = Configuration.instance().deployConfig()
-    const plan = await detect_buildpack(
-      { workdir, config },
-      args.buildpack || config.buildpack
-    )
 
     const app_id = await resolve_app_id(args.app_id, ctx.appId, api, workdir)
     const app = await api.getApp(app_id)
@@ -71,11 +66,40 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     // it came from and who pushed it (env in CI, git fallback locally).
     const git = await git_context({ workdir })
 
+    // Resolve the buildpack plan (detection or forced override). All the build
+    // thinking happens here; build() below just executes the plan. Detection can
+    // fail (e.g. an app whose start command can't be inferred) — and it runs
+    // before the create-first deployment exists, so without this a detection
+    // failure would leave NO deployment row: no deploy-failed email, nothing in
+    // the dashboard, just a red X in the CI logs the user may never see. Record
+    // it as a failed deployment instead.
+    let plan: BuildPlan
+    try {
+      plan = await detect_buildpack(
+        { workdir, config },
+        args.buildpack || config.buildpack
+      )
+    } catch (error: any) {
+      // Log the reason into the build buffer first (so it rides along in the
+      // attached logs), then record a typeless BUILD_ERROR row — typeless so it
+      // can't rewrite the app's runtime_strategy. Best-effort: a create that
+      // itself fails (e.g. the free-plan quota gate) must not mask the original
+      // detection error.
+      log.error(error.message)
+      const failed = await api
+        .createDeployment({ app_id: app.id, ...git })
+        .catch(() => null)
+      if (failed) {
+        await mark_build_failure(api, { deployment_id: failed.id, app })
+      }
+      throw error
+    }
+
     // Create-first: register the deployment BEFORE building. Gate rejections
     // (free-plan quota 429, disabled app 409) surface here, at second 0 —
     // before any build minutes are spent. The row is born QUEUED; the CLI
     // owns it until the built image lands (or the build fails). `type` rides
-    // on the create as before — the buildpack plan is already resolved.
+    // on the create — the buildpack plan is already resolved.
     const deployment = await api.createDeployment({
       app_id: app.id,
       type: plan.type,
