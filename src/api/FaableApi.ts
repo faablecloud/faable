@@ -188,6 +188,18 @@ export class FaableApi<T = any> {
     );
   }
 
+  // Fetch a deployment with its runtime status, so the deploy command can
+  // watch for a terminal failure (ERROR/BUILD_ERROR + reason) while polling
+  // for promotion — and fail the run fast instead of timing out green.
+  async getDeployment(deployment_id: string) {
+    return data(
+      this.client.get<{
+        id: string;
+        status?: { phase?: string; reason?: string };
+      }>(`/deployment/${deployment_id}`)
+    );
+  }
+
   // Attach the captured build/deploy output to a deployment. The base client
   // timeout (10s) is too short for a multi-MB body on a slow uplink.
   async uploadDeploymentLogs(

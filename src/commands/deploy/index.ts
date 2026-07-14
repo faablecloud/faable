@@ -147,12 +147,23 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     log.info(`⏳ Waiting for deployment to be promoted...`)
 
     let promoted = false
+    let failure: { phase: string; reason?: string } | null = null
     while (Date.now() - start < timeoutMs) {
       await wait(intervalMs)
       try {
         const current = await api.getApp(app.id)
         if (current.status?.deployment === deployment.id) {
           promoted = true
+          break
+        }
+        // Watch for a terminal runtime failure so we fail fast (and red)
+        // instead of timing out green. The controller marks a crash-looping
+        // deployment ERROR — with a reason (e.g. a missing module) — within
+        // ~1min, long before this 5min promotion timeout.
+        const dep = await api.getDeployment(deployment.id)
+        const phase = dep.status?.phase
+        if (phase === "ERROR" || phase === "BUILD_ERROR") {
+          failure = { phase, reason: dep.status?.reason }
           break
         }
       } catch (_error) {
@@ -163,6 +174,15 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
 
     if (promoted) {
       log.info(`🌍 Deployment promoted and live, visit: https://${app.url}`)
+    } else if (failure) {
+      // Fail the command (non-zero exit → red GitHub Action) and surface the
+      // reason the controller captured so the user sees WHY without digging.
+      log.error(`❌ Deployment failed (${failure.phase}).`)
+      if (failure.reason) log.error(failure.reason)
+      log.error(`Check the logs in the dashboard -> ${dashboard_url}`)
+      throw new Error(
+        `Deployment ${deployment.id} failed with phase ${failure.phase}`
+      )
     } else {
       log.warn(
         `⌛ Timed out after 5min waiting for promotion. The deployment is still rolling out, check the dashboard -> ${dashboard_url}`
