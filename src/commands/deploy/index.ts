@@ -135,7 +135,7 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
         )
       const stop_log_sync = start_log_sync(api, deployment.id)
       try {
-        await buildpack.build({ workdir, config, app, env_vars }, plan)
+        await buildpack.build({ workdir, config, app, env_vars, deployment }, plan)
 
         // Upload to Faable registry, tagged by version and pinned to digest
         const { image_ref } = await upload_tag({

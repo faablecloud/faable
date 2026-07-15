@@ -47,7 +47,15 @@ export const node_buildpack: Buildpack = {
   },
 
   async build(ctx: BuildContext, plan: BuildPlan): Promise<void> {
-    const env = R.fromPairs(ctx.env_vars.map((e) => [e.name, e.value]));
+    const env = {
+      ...R.fromPairs(ctx.env_vars.map((e) => [e.name, e.value])),
+      // Platform-injected build-time identity, mirroring the runtime env the
+      // controller sets on the pod. FAABLE_DEPLOY_ID (build id ≡ runtime id)
+      // is the deterministic Next.js buildId source — user secrets can't
+      // override either. See arch/deploy/version-skew-coexistence.md.
+      FAABLE_APP_ID: ctx.app.id,
+      FAABLE_DEPLOY_ID: ctx.deployment.id,
+    };
     log.info(`Building with env variables ${Object.keys(env).join(",")}`);
 
     // The workflow no longer runs `npm ci` — install here when needed, before

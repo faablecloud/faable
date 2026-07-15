@@ -18,6 +18,13 @@ export interface DetectContext {
 export interface BuildContext extends DetectContext {
   app: FaableApp;
   env_vars: Secret[];
+  /**
+   * Deployment row this build belongs to (created before the build —
+   * create-first flow). Its id is the canonical version identity: it becomes
+   * the image tag and the `FAABLE_DEPLOY_ID` build-time env (deterministic
+   * Next.js buildId source).
+   */
+  deployment: { id: string };
 }
 
 /**
