@@ -137,12 +137,16 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
       try {
         await buildpack.build({ workdir, config, app, env_vars }, plan)
 
-        // Upload to Faable registry
-        const { upload_tagname } = await upload_tag({ app, api })
+        // Upload to Faable registry, tagged by version and pinned to digest
+        const { image_ref } = await upload_tag({
+          app,
+          api,
+          deployment_id: deployment.id
+        })
 
         // Complete the deployment with the built image — this is the handoff:
         // the controller claims it and materializes the workload.
-        await api.completeDeployment(deployment.id, upload_tagname)
+        await api.completeDeployment(deployment.id, image_ref)
       } finally {
         stop_log_sync()
       }
