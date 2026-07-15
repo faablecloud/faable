@@ -13,6 +13,7 @@ import { build_project } from "./build_project";
 import { ensure_dependencies } from "./ensure_dependencies";
 import { inject_serve } from "./inject_serve";
 import { resolve_node_version } from "./node_version";
+import { wrap_next_config } from "./wrap_next_config";
 
 const BANNER = `NODE_VERSION=$(node --version)
 NPM_VERSION=$(npm --version)
@@ -66,7 +67,17 @@ export const node_buildpack: Buildpack = {
     const build_command = plan.build_script
       ? `npm run ${plan.build_script}`
       : ctx.config.buildCommand;
-    await build_project({ command: build_command, env, cwd: ctx.workdir });
+
+    // Next: wrap next.config for the duration of the build so the buildId is
+    // the deployment id (transparent version-skew protection). Restored
+    // BEFORE the docker build — `COPY . .` must package the original config.
+    const wrapped =
+      plan.type === "next" ? await wrap_next_config(ctx.workdir, env) : null;
+    try {
+      await build_project({ command: build_command, env, cwd: ctx.workdir });
+    } finally {
+      await wrapped?.restore();
+    }
 
     // Frameworks without a bundled static server (CRA/Vue/Angular) need
     // `serve` installed into node_modules before packaging.
