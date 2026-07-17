@@ -6,12 +6,15 @@ import { link } from '../link'
 import {
   BuildPlan,
   buildpack_names,
+  configure_buildpacks,
   detect_buildpack,
   get_buildpack,
   plan_summary
-} from './buildpacks'
+} from '@faabletools/buildpacks'
+import { cmd } from '../../lib/cmd'
 import { check_environment } from './check_environment'
 import { git_context } from './git_context'
+import { deploy_remote } from './remote'
 import { resolve_app_id } from './resolve_app_id'
 import { secrets } from './secrets'
 import { mark_build_failure, start_log_sync, upload_logs } from './upload_logs'
@@ -21,6 +24,8 @@ export interface DeployCommandArgs {
   app_id: string
   workdir?: string
   buildpack?: string
+  remote?: boolean
+  local?: boolean
 }
 
 export const deploy: CommandModule<unknown, DeployCommandArgs> = {
@@ -48,11 +53,27 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
         description:
           'Force a specific buildpack (overrides auto-detection and faable.json)'
       })
+      .option('remote', {
+        type: 'boolean',
+        description:
+          'Build server-side (remote build), regardless of the app build_mode'
+      })
+      .option('local', {
+        type: 'boolean',
+        description:
+          'Build locally with Docker, even if the app is set to remote builds'
+      })
+      .conflicts('remote', 'local')
       .showHelpOnFail(false) as any
   },
 
   handler: async args => {
     const workdir = args.workdir || process.cwd()
+
+    // Wire the shared buildpacks package to the CLI's sinks: pino (which tees
+    // into the build-log buffer) and cmd() (which captures subprocess output
+    // into the same buffer). Must happen before any detect/build call.
+    configure_buildpacks({ log, exec: cmd })
 
     const ctx = await requireApi()
     const { api } = ctx
@@ -95,12 +116,38 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
       throw error
     }
 
+    // Remote build path (v2, arch/deploy/deploy-v2-remote-build.md): the
+    // server decides via the app's build_mode; --remote/--local override for
+    // testing. Pre-build failures with a server-decided mode fall back to the
+    // local build below (deploy_remote returns null); with --remote they
+    // fail hard.
+    let deployment: { id: string }
+    const want_remote =
+      !args.local && (Boolean(args.remote) || app.build_mode === 'remote')
+    const remote_deployment = want_remote
+      ? await deploy_remote({
+          api,
+          app,
+          plan,
+          git,
+          workdir,
+          explicit: Boolean(args.remote)
+        })
+      : null
+
+    if (remote_deployment) {
+      deployment = remote_deployment
+    } else {
+      if (want_remote) {
+        log.warn('↩️ Falling back to a local build')
+      }
+
     // Create-first: register the deployment BEFORE building. Gate rejections
     // (free-plan quota 429, disabled app 409) surface here, at second 0 —
     // before any build minutes are spent. The row is born QUEUED; the CLI
     // owns it until the built image lands (or the build fails). `type` rides
     // on the create — the buildpack plan is already resolved.
-    const deployment = await api.createDeployment({
+    deployment = await api.createDeployment({
       app_id: app.id,
       type: plan.type,
       ...git
@@ -161,6 +208,7 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
 
     // Attach the final build output to the deployment (best-effort).
     await upload_logs(api, deployment.id)
+    } // end local build path (remote builds upload their own logs server-side)
 
     const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
     log.info(`Preparing to deploy in faable cloud · ${deployment.id}`)

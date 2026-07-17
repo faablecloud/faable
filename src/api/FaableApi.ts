@@ -7,6 +7,8 @@ export interface FaableApp {
   url: string;
   team: string;
   repository:string
+  // Remote-build rollout gate (server-decided; the CLI follows it).
+  build_mode?: "local" | "remote";
   status?: {
     phase: string;
     deployment: string | null;
@@ -159,16 +161,52 @@ export class FaableApi<T = any> {
   // `image`/`type` are optional to support the failure path: a failed build
   // is recorded as a deployment without an image (and without `type`, which
   // would otherwise rewrite the app's runtime_strategy server-side).
+  // `source` is the remote-build path (v2): content-addressed manifest +
+  // serialized BuildPlan; the platform builds and completes the image.
   async createDeployment(params: {
     app_id: string;
     type?: string;
     image?: string;
+    source?: {
+      manifest: { path: string; sha: string; size: number; mode?: number }[];
+      plan?: unknown;
+    };
     github_commit?: string;
     github_ref?: string;
     github_actor?: string;
     github_commit_message?: string;
   }) {
     return data(this.client.post<{ id: string }>(`/deployment`, params));
+  }
+
+  // Remote builds: diff the source manifest against the CAS. Returns
+  // presigned PUTs (sha-pinned by signature) for the missing blobs only.
+  async uploadMissing(
+    app_id: string,
+    files: { path: string; sha: string; size: number }[]
+  ) {
+    return data(
+      this.client.post<{
+        uploads: { sha: string; url: string; headers: Record<string, string> }[];
+      }>(
+        `/upload/missing`,
+        {
+          app_id,
+          files: files.map(({ path, sha, size }) => ({ path, sha, size })),
+        },
+        { timeout: 60_000 }
+      )
+    );
+  }
+
+  // Remote builds: read the build output the builder attaches to the
+  // deployment (same endpoint the CLI writes to in local builds).
+  async getDeploymentLogs(deployment_id: string) {
+    return data(
+      this.client.get<{ content: string; truncated: boolean; size: number }>(
+        `/deployment/${deployment_id}/logs`
+      )
+    );
   }
 
   // Phase transitions the CLI owns (BUILDING when the build starts,

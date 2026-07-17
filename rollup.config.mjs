@@ -1,6 +1,5 @@
 import typescript from "@rollup/plugin-typescript";
 import json from "@rollup/plugin-json";
-import copy from "rollup-plugin-copy";
 import autoExternal from "rollup-plugin-auto-external";
 
 export default {
@@ -18,13 +17,5 @@ export default {
     typescript(),
     // commonjs(),
     // nodeResolve(),
-    copy({
-      targets: [
-        {
-          src: "src/commands/deploy/buildpacks/shared/templates/**/*",
-          dest: "dist/commands/deploy/buildpacks/shared/templates",
-        },
-      ],
-    })
   ],
 };
