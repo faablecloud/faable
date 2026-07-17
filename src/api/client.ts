@@ -12,7 +12,9 @@ export function prepare_client<T>({
 }: FaableClientConfig<T> = {}) {
   const strategy: AuthStrategy | undefined = authStrategy && authStrategy(auth);
   const client = axios.create({
-    baseURL: "https://api.faable.com",
+    // FAABLE_API_URL: point the CLI at another Deploy API frontend
+    // (e.g. https://deploy.staging.faable.com for staging-gated testing).
+    baseURL: process.env.FAABLE_API_URL || "https://api.faable.com",
     timeout: 10000,
   });
 
