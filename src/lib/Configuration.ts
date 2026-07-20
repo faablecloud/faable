@@ -6,6 +6,8 @@ interface ProjectConfig {
   buildCommand?: string;
   /** Force a specific buildpack (node | python | docker) instead of auto-detection. */
   buildpack?: string;
+  /** Next.js knobs. `standalone: false` opts out of the standalone image profile (remote builds). */
+  next?: { standalone?: boolean };
   app_slug?: string;
   app_id?:string
 }
@@ -69,6 +71,7 @@ export class Configuration {
       startCommand: this.config.startCommand,
       buildCommand: this.config.buildCommand,
       buildpack: this.config.buildpack,
+      next: this.config.next,
     };
   }
 
