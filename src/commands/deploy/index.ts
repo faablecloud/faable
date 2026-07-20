@@ -17,6 +17,7 @@ import { git_context } from './git_context'
 import { deploy_remote } from './remote'
 import { resolve_app_id } from './resolve_app_id'
 import { secrets } from './secrets'
+import { is_superseded } from './superseded'
 import { mark_build_failure, start_log_sync, upload_logs } from './upload_logs'
 import { upload_tag } from './upload_tag'
 
@@ -224,6 +225,10 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
 
     let promoted = false
     let failure: { phase: string; reason?: string } | null = null
+    let superseded: string | null = null
+    // The pointer at wait-start is the PREVIOUS deployment (older than ours)
+    // — only a pointer CHANGE to something that isn't us needs a look.
+    const initialActiveId = app.status?.deployment
     while (Date.now() - start < timeoutMs) {
       await wait(intervalMs)
       try {
@@ -231,6 +236,23 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
         if (current.status?.deployment === deployment.id) {
           promoted = true
           break
+        }
+        // Superseded: the pointer moved to a deployment at least as new as
+        // ours (twin workflows on the same push, or a rapid follow-up
+        // deploy). It only moves forward — waiting longer can never succeed.
+        const activeId = current.status?.deployment
+        if (activeId && activeId !== initialActiveId) {
+          const active = await api.getDeployment(activeId).catch(() => null)
+          if (
+            active &&
+            is_superseded(
+              deployment as { id: string; createdAt: string },
+              active as { id: string; createdAt: string }
+            )
+          ) {
+            superseded = activeId
+            break
+          }
         }
         // Watch for a terminal runtime failure so we fail fast (and red)
         // instead of timing out green. The controller marks a crash-looping
@@ -242,6 +264,12 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
           failure = { phase, reason: dep.status?.reason }
           break
         }
+        // CANCELED: the platform superseded this build before it produced a
+        // runnable (a sibling deployment of the app won the promotion).
+        if (phase === "CANCELED") {
+          superseded = dep.status?.reason ?? "canceled"
+          break
+        }
       } catch (_error) {
         // Ignore transient errors while polling and keep waiting
         log.debug(`Polling app status failed, retrying...`)
@@ -250,6 +278,13 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
 
     if (promoted) {
       log.info(`🌍 Deployment promoted and live, visit: https://${app.url}`)
+    } else if (superseded) {
+      // Not a failure: the app IS live, just on a sibling deployment (e.g.
+      // duplicated workflows firing on the same push). Green exit — there is
+      // nothing for the user to fix in THIS run.
+      log.warn(
+        `⚠️ Deployment superseded — a newer deployment of this app was promoted (${superseded}). The app is live: https://${app.url}`
+      )
     } else if (failure) {
       // Fail the command (non-zero exit → red GitHub Action) and surface the
       // reason the controller captured so the user sees WHY without digging.
