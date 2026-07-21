@@ -5,11 +5,15 @@ import { AuthStrategyBuilder } from "./types";
 
 type TokenExchange = {access_token:string, app_id:string}
 
-const exchangeGithubOidcToken = async(gh_token:string)=>{
+const exchangeGithubOidcToken = async(gh_token:string, target_app_id?:string)=>{
   const client = create_base_client()
   try {
+    // Monorepo: several apps share one repo, so the exchange can't infer which
+    // app the workflow targets — pass the explicit app_id (`faable deploy
+    // <app_id>`). The api verifies it's linked to the OIDC token's repository.
     const res = await client.post<TokenExchange>("/auth/github-oidc",{
-      token:gh_token
+      token:gh_token,
+      ...(target_app_id ? { app_id: target_app_id } : {})
     })
     const {access_token, app_id} = res.data
     return {access_token, app_id}
@@ -42,32 +46,28 @@ const exchangeGithubOidcToken = async(gh_token:string)=>{
   }
 }
 
-export const oidc_strategy: AuthStrategyBuilder<{idToken:string}> = (
-  config
-) => {
-  const { idToken } = config;
+export const oidc_strategy: AuthStrategyBuilder<{
+  idToken: string;
+  appId?: string;
+}> = (config) => {
+  const { idToken, appId } = config;
   if (!idToken) {
     throw new Error("Missing idToken.");
   }
 
   let token_ex:TokenExchange;
+  const ensure = async () => {
+    if (!token_ex) token_ex = await exchangeGithubOidcToken(idToken, appId);
+    return token_ex;
+  };
 
   return {
     headers: async () => {
-      if(!token_ex){
-        const ex =  await exchangeGithubOidcToken(idToken)
-        token_ex = ex
-      }
+      const ex = await ensure();
       return {
-        Authorization: `Bearer ${token_ex.access_token}`,
+        Authorization: `Bearer ${ex.access_token}`,
       };
     },
-    app_id: async () => {
-      if(!token_ex){
-        const ex = await exchangeGithubOidcToken(idToken)
-        token_ex = ex
-      }
-      return token_ex.app_id;
-    }
+    app_id: async () => (await ensure()).app_id,
   };
 };

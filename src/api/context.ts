@@ -7,7 +7,7 @@ import { CredentialsStore } from "../lib/CredentialsStore";
 import { loadLiveCredentials } from "./session";
 import { log } from "../log";
 
-export const context = async () => {
+export const context = async (targetAppId?: string) => {
   let api: FaableApi | undefined;
 
   // Auth resolution: FAABLE_TOKEN → OIDC (CI) → local `faable login` credentials.
@@ -20,7 +20,12 @@ export const context = async () => {
     try {
       const idToken =
         process.env.FAABLE_ID_TOKEN || (await getIDToken("https://faable.com"));
-      api = FaableApi.create({ authStrategy: oidc_strategy, auth: { idToken } });
+      // targetAppId disambiguates a monorepo (several apps, one repo) in the
+      // OIDC exchange — from `faable deploy <app_id>`.
+      api = FaableApi.create({
+        authStrategy: oidc_strategy,
+        auth: { idToken, appId: targetAppId },
+      });
     } catch (_) {
       console.error(
         "Error fetching token, configure 'permissions: id-token: write'"
@@ -57,8 +62,8 @@ export const context = async () => {
 // Exits with a uniform message when there is no session at all. An expired
 // session that could not be refreshed still surfaces here as a working `api`
 // whose first call returns 401 — FaableApi maps that to the same re-login hint.
-export const requireApi = async () => {
-  const ctx = await context();
+export const requireApi = async (targetAppId?: string) => {
+  const ctx = await context(targetAppId);
   if (!ctx.api) {
     log.error("❌ Not logged in. Run 'faable login' first.");
     process.exit(1);

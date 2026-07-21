@@ -76,7 +76,9 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     // into the same buffer). Must happen before any detect/build call.
     configure_buildpacks({ log, exec: cmd })
 
-    const ctx = await requireApi()
+    // Pass the explicit app target to the OIDC exchange so a monorepo (several
+    // apps, one repo) can be disambiguated in CI.
+    const ctx = await requireApi(args.app_id)
     const { api } = ctx
 
     const config = Configuration.instance().deployConfig()
