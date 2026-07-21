@@ -49,14 +49,14 @@ test("symlinks are rejected with an actionable error", async (t) => {
   const dir = git_fixture();
   symlinkSync("src/index.js", join(dir, "link.js"));
   await t.throwsAsync(() => collect_manifest(dir), {
-    message: /Symlinks are not supported.*--local/s,
+    message: /Symlinks are not supported/s,
   });
 });
 
-test("a non-git directory is rejected toward --local", async (t) => {
+test("a non-git directory is rejected", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "faable-nogit-"));
   writeFileSync(join(dir, "package.json"), "{}");
   await t.throwsAsync(() => collect_manifest(dir), {
-    message: /git repository.*--local/s,
+    message: /git repository/s,
   });
 });

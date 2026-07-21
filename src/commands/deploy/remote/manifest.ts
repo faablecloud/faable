@@ -23,8 +23,8 @@ const MAX_FILE_BYTES = 100 * 1024 * 1024;
  * them like a fresh clone would.
  *
  * Symlinks are rejected (no representation in the manifest by design — see
- * deploy-v2-remote-build.md) and a non-git directory is unsupported in the
- * MVP (deploy with --local instead).
+ * deploy-v2-remote-build.md) and a non-git directory is unsupported (the source
+ * tree is collected via git).
  */
 export const collect_manifest = async (
   workdir: string
@@ -34,7 +34,7 @@ export const collect_manifest = async (
   }).catch(() => null);
   if (!inside || String(inside.stdout).trim() !== "true") {
     throw new Error(
-      "Remote builds need a git repository (the source tree is collected via git). Deploy with --local instead."
+      "Deploys need a git repository (the source tree is collected via git). Initialize one with `git init` and commit your files."
     );
   }
 
@@ -72,7 +72,7 @@ export const collect_manifest = async (
     if (stat.isDirectory()) continue;
     if (stat.isSymbolicLink()) {
       throw new Error(
-        `Symlinks are not supported in remote builds: ${rel}. Deploy with --local instead.`
+        `Symlinks are not supported: ${rel}. Replace the symlink with the real file.`
       );
     }
     if (stat.size > MAX_FILE_BYTES) {
