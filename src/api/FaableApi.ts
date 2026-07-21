@@ -9,6 +9,9 @@ export interface FaableApp {
   repository:string
   // Remote-build rollout gate (server-decided; the CLI follows it).
   build_mode?: "local" | "remote";
+  // Monorepo Root Directory (Vercel-style; server-decided source of truth).
+  // The app lives in <repo>/<root_dir>; the CLI resolves the plan there.
+  root_dir?: string | null;
   status?: {
     phase: string;
     deployment: string | null;

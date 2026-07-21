@@ -84,6 +84,14 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     const app_id = await resolve_app_id(args.app_id, ctx.appId, api, workdir)
     const app = await api.getApp(app_id)
 
+    // Monorepo Root Directory: the server is the source of truth
+    // (App.root_dir), so no repo config file is needed. A local
+    // faable.json rootDir (dev override) still wins if set.
+    if (!config.rootDir && app.root_dir) {
+      config.rootDir = app.root_dir
+      log.info(`📁 Monorepo root directory (from app): ${app.root_dir}`)
+    }
+
     // Capture the commit/ref/actor so the deployment records which commit
     // it came from and who pushed it (env in CI, git fallback locally).
     const git = await git_context({ workdir })
