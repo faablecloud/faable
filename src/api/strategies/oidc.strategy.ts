@@ -26,20 +26,23 @@ const exchangeGithubOidcToken = async(gh_token:string, target_app_id?:string)=>{
       if (status === 404) {
         throw new Error(
           'No app linked to this repository. Run "faable link" locally to link it, ' +
-            "or link it from the dashboard (https://dashboard.faable.com)."
+            "or link it from the dashboard (https://dashboard.faable.com).",
+          { cause: err }
         )
       }
       // Monorepo: several apps are linked to the same repository.
       if (status === 400) {
         throw new Error(
           serverMessage ||
-            "This repository has multiple linked apps. Specify which one with `faable deploy <app_id>`."
+            "This repository has multiple linked apps. Specify which one with `faable deploy <app_id>`.",
+          { cause: err }
         )
       }
       throw new Error(
         `Faable OIDC token exchange failed (${status ?? "network error"})${
           serverMessage ? `: ${serverMessage}` : ""
-        }`
+        }`,
+        { cause: err }
       )
     }
     throw err

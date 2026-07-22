@@ -1,6 +1,22 @@
-import { AxiosError, AxiosInstance, AxiosResponse } from "axios";
+import {
+  AxiosError,
+  AxiosInstance,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from "axios";
 import { create_base_client } from "./base_client";
 import { AuthStrategy, AuthStrategyBuilder } from "./strategies/types";
+
+// Socket-level failures where no response ever arrived: the connection died
+// before the server produced anything, so a single retry is safe for any
+// method (a reset mid-flight means the request was not processed).
+const RESET_CODES = new Set(["ECONNRESET", "EPIPE"]);
+const RETRY_DELAY_MS = 300;
+
+const is_connection_reset = (e: AxiosError) =>
+  e.isAxiosError &&
+  !e.response &&
+  (RESET_CODES.has(e.code ?? "") || e.message.includes("socket hang up"));
 export interface FaableApp {
   id: string;
   name: string;
@@ -100,6 +116,23 @@ export class FaableApi<T = any> {
         return Promise.reject(error);
       }
     );
+
+    // Registered before the error-wrapping interceptor so it sees the raw
+    // axios error. Retries once per request; the retried call re-enters the
+    // full chain (auth headers included).
+    const client = this.client;
+    this.client.interceptors.response.use(undefined, async (error) => {
+      const e: AxiosError = error;
+      const config = e.config as
+        | (InternalAxiosRequestConfig & { _retried?: boolean })
+        | undefined;
+      if (config && !config._retried && is_connection_reset(e)) {
+        config._retried = true;
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+        return client.request(config);
+      }
+      throw error;
+    });
 
     this.client.interceptors.response.use(
       (response) => response,
