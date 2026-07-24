@@ -9,6 +9,8 @@ export interface DeployRemoteProps {
   api: FaableApi;
   app: FaableApp;
   git: Awaited<ReturnType<typeof git_context>>;
+  /** Proposed release version (see release_version.ts); omitted when unknown. */
+  release?: string;
   workdir: string;
 }
 
@@ -26,7 +28,7 @@ export interface DeployRemoteProps {
 export const deploy_remote = async (
   props: DeployRemoteProps
 ): Promise<{ id: string }> => {
-  const { api, app, git, workdir } = props;
+  const { api, app, git, release, workdir } = props;
 
   log.info(`☁️ Remote build`);
 
@@ -39,6 +41,7 @@ export const deploy_remote = async (
   const deployment = await api.createDeployment({
     app_id: app.id,
     source: { manifest },
+    ...(release ? { release } : {}),
     ...git,
   });
 

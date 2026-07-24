@@ -207,6 +207,7 @@ export class FaableApi<T = any> {
       manifest: { path: string; sha: string; size: number; mode?: number }[];
       plan?: unknown;
     };
+    release?: string;
     github_commit?: string;
     github_ref?: string;
     github_actor?: string;

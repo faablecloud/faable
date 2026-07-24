@@ -4,6 +4,7 @@ import { Configuration } from '../../lib/Configuration'
 import { log } from '../../log'
 import { link } from '../link'
 import { git_context } from './git_context'
+import { propose_release } from './release_version'
 import { deploy_remote } from './remote'
 import { resolve_app_id } from './resolve_app_id'
 import { secrets } from './secrets'
@@ -12,6 +13,7 @@ import { is_superseded } from './superseded'
 export interface DeployCommandArgs {
   app_id: string
   workdir?: string
+  release?: string
 }
 
 export const deploy: CommandModule<unknown, DeployCommandArgs> = {
@@ -31,6 +33,11 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
         alias: 'w',
         type: 'string',
         description: 'Working directory'
+      })
+      .option('release', {
+        type: 'string',
+        description:
+          'Release version to record on the deployment (injected as FAABLE_RELEASE). Defaults to FAABLE_RELEASE env or the latest git tag'
       })
       .showHelpOnFail(false) as any
   },
@@ -60,6 +67,14 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     // it came from and who pushed it (env in CI, git fallback locally).
     const git = await git_context({ workdir })
 
+    // Propose the release version (--release > FAABLE_RELEASE > git tag).
+    // Optional: when absent the platform injects no FAABLE_RELEASE and the
+    // app falls back to its own version source.
+    const proposed = await propose_release({ workdir, explicit: args.release })
+    if (proposed) {
+      log.info(`🏷️ Release: ${proposed.release} (from ${proposed.source})`)
+    }
+
     // Remote build only (arch/deploy/remote-artifact-default-cutover.md): the
     // CLI no longer builds — it uploads the source and the platform builds
     // server-side (framework detection, buildpacks, artifact/image output all
@@ -67,7 +82,13 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     // (build_mode=local opt-out, or the global kill-switch off) or a build
     // error throws and exits red.
     log.info(`🚀 Deploying "${app.name}" (${app.id})`)
-    const deployment = await deploy_remote({ api, app, git, workdir })
+    const deployment = await deploy_remote({
+      api,
+      app,
+      git,
+      release: proposed?.release,
+      workdir
+    })
 
     const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
     log.info(`Preparing to deploy in faable cloud · ${deployment.id}`)
