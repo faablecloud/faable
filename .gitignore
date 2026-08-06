@@ -1,6 +1,7 @@
 node_modules
-.tsimp
 dist
-.env
-# TS incremental build artifact (tsc --incremental)
-*.tsbuildinfo
+.DS_Store
+.faable
+.next
+.claude
+.playwright-mcp
