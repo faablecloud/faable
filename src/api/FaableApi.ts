@@ -28,6 +28,11 @@ export interface FaableApp {
   // Monorepo Root Directory (Vercel-style; server-decided source of truth).
   // The app lives in <repo>/<root_dir>; the CLI resolves the plan there.
   root_dir?: string | null;
+  github_branch?: string;
+  // Push-to-deploy trigger (deploy v4). 'webhook' = the platform deploys
+  // every push server-side; null/absent = the repo's own GitHub Actions
+  // workflow deploys (legacy or user-managed CI).
+  deploy_trigger?: string | null;
   status?: {
     phase: string;
     deployment: string | null;
