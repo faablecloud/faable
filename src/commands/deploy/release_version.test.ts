@@ -22,13 +22,13 @@ test("FAABLE_RELEASE env wins over git", async (t) => {
   t.deepEqual(got, { release: "2.0.0-rc.1", source: "FAABLE_RELEASE env" });
 });
 
-test("falls back to the latest v-prefixed git tag, stripped", async (t) => {
+test("falls back to the latest v-prefixed git tag, VERBATIM", async (t) => {
   const got = await propose_release({
     env: {},
     run: async (command) =>
       command.includes('--match "v[0-9]*"') ? "v1.31.0" : undefined,
   });
-  t.deepEqual(got, { release: "1.31.0", source: "git tag v1.31.0" });
+  t.deepEqual(got, { release: "v1.31.0", source: "git tag v1.31.0" });
 });
 
 test("retries without --match for unprefixed release tags", async (t) => {
@@ -40,13 +40,13 @@ test("retries without --match for unprefixed release tags", async (t) => {
   t.deepEqual(got, { release: "3.2.1", source: "git tag 3.2.1" });
 });
 
-test("non-version tags are rejected → undefined", async (t) => {
+test("non-version tags are releases too — free text, no validation", async (t) => {
   const got = await propose_release({
     env: {},
     run: async (command) =>
       command.includes("--match") ? undefined : "nightly",
   });
-  t.is(got, undefined);
+  t.deepEqual(got, { release: "nightly", source: "git tag nightly" });
 });
 
 test("no git repo / no tags → undefined (deploy proceeds without release)", async (t) => {
