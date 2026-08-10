@@ -6,7 +6,7 @@ interface ProjectConfig {
   buildCommand?: string;
   /** Force a specific buildpack (node | python | docker) instead of auto-detection. */
   buildpack?: string;
-  /** Monorepo Root Directory (dev override; server-side App.root_dir is the source of truth). */
+  /** Monorepo Root Directory (the supported user option; a platform-managed App.root_dir override wins). */
   rootDir?: string;
   /** Next.js knobs. `standalone: false` opts out of the standalone image profile (remote builds). */
   next?: { standalone?: boolean };

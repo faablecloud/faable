@@ -55,12 +55,15 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     const app_id = await resolve_app_id(args.app_id, ctx.appId, api, workdir)
     const app = await api.getApp(app_id)
 
-    // Monorepo Root Directory: the server is the source of truth
-    // (App.root_dir), so no repo config file is needed. A local
-    // faable.json rootDir (dev override) still wins if set.
-    if (!config.rootDir && app.root_dir) {
+    // Monorepo Root Directory — single precedence rule everywhere
+    // (arch/deploy/root-dir-faable-json.md): App.root_dir (platform
+    // override, exceptional) > repo faable.json rootDir (the supported
+    // user option) > repo root. Matches the remote builder.
+    if (app.root_dir) {
       config.rootDir = app.root_dir
-      log.info(`📁 Monorepo root directory (from app): ${app.root_dir}`)
+      log.info(`📁 Root directory: ${app.root_dir} (platform override)`)
+    } else if (config.rootDir) {
+      log.info(`📁 Root directory: ${config.rootDir} (from faable.json)`)
     }
 
     // Capture the commit/ref/actor so the deployment records which commit
