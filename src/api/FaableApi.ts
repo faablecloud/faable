@@ -33,11 +33,32 @@ export interface FaableApp {
   // every push server-side; null/absent = the repo's own GitHub Actions
   // workflow deploys (legacy or user-managed CI).
   deploy_trigger?: string | null;
+  // What the platform build detected (buildpack/framework/runtime), reported
+  // by the builder before building — present on failed builds too.
+  detected?: {
+    buildpack: string;
+    framework?: string;
+    runtime: { name: string; version?: string };
+  } | null;
   status?: {
     phase: string;
     deployment: string | null;
   };
 }
+
+export interface FaableDeployment {
+  id: string;
+  release?: string;
+  github_commit?: string;
+  github_commit_message?: string;
+  trigger?: string | null;
+  createdAt?: string;
+  status?: { phase?: string; reason?: string };
+}
+
+// Runtime log line as the API serves it (Loki-backed, newest first, last
+// 24h, up to 200 lines): [ns_timestamp, text, deployment_id].
+export type AppLogLine = [string | number, string, string?];
 
 export interface GithubRepo {
   id: number;
@@ -379,6 +400,50 @@ export class FaableApi<T = any> {
 
   async getMe() {
     return data(this.client.get<{ email: string; id: string }>(`/auth/me`));
+  }
+
+  // Runtime logs of the app (Loki-backed; last 24h, up to 200 lines, newest
+  // first). Optionally scoped to one deployment.
+  async getAppLogs(app_id: string, params: { deployment_id?: string } = {}) {
+    return data(
+      this.client.get<AppLogLine[]>(`/app/${app_id}/logs`, { params })
+    );
+  }
+
+  // Deployments of an app, newest first (the API's list index sorts
+  // createdAt desc). Team pinned via header — same reason as domains.
+  async listDeployments(app_id: string, team: string) {
+    return firstPage(
+      data(
+        this.client.get<Page<FaableDeployment>>(`/deployment`, {
+          params: { app_id },
+          headers: { "x-faable-team": team },
+        })
+      )
+    );
+  }
+
+  // Build and deploy the current head of the deploy branch server-side —
+  // the same path a push webhook takes, same-commit dedupe included.
+  async deployNow(app_id: string) {
+    return data(
+      this.client.post<{ status: "created"; commit: string; branch: string }>(
+        `/app/${app_id}/deploy`
+      )
+    );
+  }
+
+  // Rebuild a failed deployment from its recorded source (CAS manifest or
+  // git ref). The API enforces the guards: failed phase only, never older
+  // than what production serves.
+  async redeployDeployment(deployment_id: string, team: string) {
+    return data(
+      this.client.post<FaableDeployment>(
+        `/deployment/${deployment_id}/redeploy`,
+        undefined,
+        { headers: { "x-faable-team": team } }
+      )
+    );
   }
 
   // Domains are team-scoped rows; a CLI user token carries no default team,

@@ -5,6 +5,13 @@ import { log } from '../../log'
 import { link } from '../link'
 import { domains } from './domains'
 import { git_context } from './git_context'
+import { deployments } from './inspect/deployments'
+import { apps_list } from './inspect/list'
+import { logs } from './inspect/logs'
+import { open_app } from './inspect/open'
+import { redeploy } from './inspect/redeploy'
+import { status } from './inspect/status'
+import { trigger } from './inspect/trigger'
 import { propose_release } from './release_version'
 import { deploy_remote } from './remote'
 import { resolve_app_id } from './resolve_app_id'
@@ -26,6 +33,13 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     return yargs
       .command(secrets)
       .command(domains)
+      .command(logs)
+      .command(status)
+      .command(apps_list)
+      .command(deployments)
+      .command(open_app)
+      .command(trigger)
+      .command(redeploy)
       .command(link)
       .positional('app_id', {
         type: 'string',
