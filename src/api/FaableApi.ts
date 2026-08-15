@@ -62,6 +62,26 @@ export interface FaableAppRegistry {
   password: string;
 }
 
+export interface FaableDomain {
+  id: string;
+  fqdn: string;
+  tls: boolean;
+  app_id?: string | null;
+  verified: boolean;
+  active: boolean;
+  team: string;
+  // Outcome of the DNS verification worker's latest check. `dns_expected`
+  // carries the CNAME target(s) the user must configure — the same
+  // `<domain.id>.faable.link` the dashboard instructions show.
+  status?: {
+    dns_state?: "pending" | "ok" | "misconfigured" | "error";
+    dns_checked_at?: string | null;
+    dns_expected?: string[];
+    dns_observed?: string[];
+    dns_message?: string | null;
+  };
+}
+
 export interface Secret {
   id: string;
   related: string;
@@ -359,5 +379,46 @@ export class FaableApi<T = any> {
 
   async getMe() {
     return data(this.client.get<{ email: string; id: string }>(`/auth/me`));
+  }
+
+  // Domains are team-scoped rows; a CLI user token carries no default team,
+  // so every call pins the app's team via `x-faable-team` (same pattern as
+  // createSecretsBatch).
+  async listDomains(app_id: string, team: string) {
+    return firstPage(
+      data(
+        this.client.get<Page<FaableDomain>>(`/domain`, {
+          params: { app_id },
+          headers: { "x-faable-team": team },
+        })
+      )
+    );
+  }
+
+  async createDomain(
+    team: string,
+    params: { fqdn: string; app_id: string; tls?: boolean }
+  ) {
+    return data(
+      this.client.post<FaableDomain>(`/domain`, params, {
+        headers: { "x-faable-team": team },
+      })
+    );
+  }
+
+  async getDomain(domain_id: string, team: string) {
+    return data(
+      this.client.get<FaableDomain>(`/domain/${domain_id}`, {
+        headers: { "x-faable-team": team },
+      })
+    );
+  }
+
+  async deleteDomain(domain_id: string, team: string) {
+    return data(
+      this.client.delete(`/domain/${domain_id}`, {
+        headers: { "x-faable-team": team },
+      })
+    );
   }
 }

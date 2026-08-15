@@ -3,6 +3,7 @@ import { requireApi } from '../../api/context'
 import { Configuration } from '../../lib/Configuration'
 import { log } from '../../log'
 import { link } from '../link'
+import { domains } from './domains'
 import { git_context } from './git_context'
 import { propose_release } from './release_version'
 import { deploy_remote } from './remote'
@@ -24,6 +25,7 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     // app_id positional, so `faable deploy <app_id>` keeps working).
     return yargs
       .command(secrets)
+      .command(domains)
       .command(link)
       .positional('app_id', {
         type: 'string',
