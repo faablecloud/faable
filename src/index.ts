@@ -49,6 +49,10 @@ yg.scriptName('faable')
   .command(upgrade)
   .command(link_deprecated)
   .demandCommand(1)
+  // Reject unknown (sub)commands loudly. Without this, a typo'd or
+  // not-yet-existing command (`faable secrets list` on a version where it
+  // lived elsewhere) exited silently with just the version banner.
+  .strictCommands()
   .help()
   .fail(function (msg, err) {
     if (err) {
@@ -57,8 +61,11 @@ yg.scriptName('faable')
       return
     }
     if (msg) {
+      // Validation failure (unknown command, missing subcommand…): show the
+      // help, then fail red — a bad invocation must not exit 0.
       yg.showHelp()
-      log.info(msg)
+      log.error(`❌ ${msg}`)
+      process.exit(1)
     }
   })
   .parse(hideBin(process.argv), {})

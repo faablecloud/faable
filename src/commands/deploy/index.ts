@@ -26,7 +26,10 @@ export interface DeployCommandArgs {
 
 export const deploy: CommandModule<unknown, DeployCommandArgs> = {
   command: 'deploy [app_id]',
-  describe: 'Deploy a faable app',
+  // Name the subcommand groups so `faable --help` makes them discoverable
+  // without digging into `faable deploy --help`.
+  describe:
+    'Deploy a faable app and manage it (secrets, domains, logs, deployments…)',
   builder: yargs => {
     // Product subcommands live under `deploy` (yargs matches them before the
     // app_id positional, so `faable deploy <app_id>` keeps working).
