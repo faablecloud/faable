@@ -1,5 +1,6 @@
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
+import { auth } from './commands/auth'
 import { deploy } from './commands/deploy'
 import { link_deprecated } from './commands/link'
 import { login } from './commands/login'
@@ -22,6 +23,9 @@ yg.scriptName('faable')
   .middleware(async function (argv) {
     if (banner_shown) return
     banner_shown = true
+    // --json mode is for piping: keep stdout machine-clean (no banner, no
+    // update-check notice).
+    if (argv.json) return
     log.info(`Faable CLI ${version}`)
     // `upgrade` does its own (forced) check
     if (argv._[0] !== 'upgrade') {
@@ -43,6 +47,7 @@ yg.scriptName('faable')
     }
   }, true)
   .command(deploy)
+  .command(auth)
   .command(login)
   .command(logout)
   .command(whoami)
