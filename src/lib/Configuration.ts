@@ -10,6 +10,8 @@ interface ProjectConfig {
   rootDir?: string;
   /** Next.js knobs. `standalone: false` opts out of the standalone image profile (remote builds). */
   next?: { standalone?: boolean };
+  /** Legacy: older CLIs wrote these on `faable link`. Still honored when
+   * present, but the link now lives only in the API (app.repository). */
   app_slug?: string;
   app_id?:string
 }
@@ -35,13 +37,6 @@ export class Configuration {
         log.warn(`Cannot read Faable config file ${file}`);
       }
     }
-  }
-
-  saveConfig(updates: Partial<ProjectConfig>) {
-    this.config = { ...this.config, ...updates };
-    const config_path = path.join(process.cwd(), this.config_file);
-    fs.writeJSONSync(config_path, this.config, { spaces: 2 });
-    log.info(`Configuration saved to: ${this.config_file}`);
   }
 
   public static instance() {
@@ -78,9 +73,6 @@ export class Configuration {
     };
   }
 
-  get app_slug() {
-    return this.config.app_slug;
-  }
   get app_id() {
     return this.config.app_id;
   }

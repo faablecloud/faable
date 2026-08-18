@@ -2,7 +2,6 @@ import { CommandModule } from "yargs";
 import { requireApi } from "../../api/context";
 import prompts from "prompts";
 import { log } from "../../log";
-import { Configuration } from "../../lib/Configuration";
 import { getGitRemoteUrl } from "../../lib/git_remote";
 
 const DEPLOY_DOCS_URL = "https://faable.com/docs/deploy/github-actions";
@@ -35,9 +34,32 @@ export const link: CommandModule<object, Options> = {
       );
     }
 
-    const config = Configuration.instance();
-    if (config.app_id) {
-      log.info(`This repository is already linked to app: "${config.app_slug}" (${config.app_id})`);
+    log.info("Checking local git repository...");
+    const gitUrl = await getGitRemoteUrl(workdir);
+    if (!gitUrl) {
+      log.error(
+        "No git remote URL detected. Add a GitHub 'origin' remote and try again."
+      );
+      return;
+    }
+
+    const { api } = await requireApi();
+
+    const apps = await api.list();
+    if (apps.length === 0) {
+      log.error("No apps found in your account. Create one first at https://faable.com");
+      return;
+    }
+
+    // The link lives in the API (app.repository) — every command resolves the
+    // app from the git remote, so nothing is written locally. Warn (and
+    // confirm) when the repository is already linked to an app.
+    const alreadyLinked = apps.filter((app) => app.repository === gitUrl);
+    if (alreadyLinked.length > 0) {
+      const names = alreadyLinked
+        .map((app) => `"${app.name}" (${app.id})`)
+        .join(", ");
+      log.info(`This repository is already linked to: ${names}`);
       const { relink } = await prompts({
         type: "toggle",
         name: "relink",
@@ -49,17 +71,6 @@ export const link: CommandModule<object, Options> = {
       if (!relink) {
         return;
       }
-    }
-
-    const { api } = await requireApi();
-
-    log.info("Checking local git repository...");
-    const gitUrl = await getGitRemoteUrl(workdir);
-
-    const apps = await api.list();
-    if (apps.length === 0) {
-      log.error("No apps found in your account. Create one first at https://faable.com");
-      return;
     }
 
     const { selectedApp } = await prompts({
@@ -78,13 +89,6 @@ export const link: CommandModule<object, Options> = {
     }
 
     log.info(`Linking to "${selectedApp.name}" (${selectedApp.id})...`);
-
-    if (!gitUrl) {
-      log.error(
-        "No git remote URL detected. Add a GitHub 'origin' remote and try again."
-      );
-      return;
-    }
 
     // The API verifies that the user has a connected GitHub identity AND
     // access to the repository before persisting the link.
@@ -123,10 +127,6 @@ export const link: CommandModule<object, Options> = {
     }
 
     log.info(`Linked repository ${gitUrl} to ${selectedApp.name}.`);
-
-    // Save locally for CLI convenience (only after the API confirms the link)
-    Configuration.instance().saveConfig({ app_slug: selectedApp.name, app_id:selectedApp.id });
-    log.info(`Successfully linked local repository to ${selectedApp.name}.`);
 
     // Deploy v4: push-to-deploy is server-side by default — no workflow to
     // scaffold. A repo that brings its own Faable workflow keeps deploying
