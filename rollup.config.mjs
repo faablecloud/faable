@@ -11,11 +11,5 @@ export default {
     preserveModules: true,
     preserveModulesRoot: "src",
   },
-  plugins: [
-    autoExternal(),
-    json(),
-    typescript(),
-    // commonjs(),
-    // nodeResolve(),
-  ],
+  plugins: [autoExternal(), json(), typescript()],
 };
