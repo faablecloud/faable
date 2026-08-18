@@ -6,10 +6,11 @@ import { log } from '../../log'
 // app_id resolution (the user never has to look one up):
 //  1. explicit (positional on `deploy`, --app on subcommands)
 //  2. OIDC in CI — the backend resolves the app from the linked repository
-//  3. locally — the app saved by `faable deploy link` in faable.json
+//  3. locally — a legacy app_id in faable.json (older CLIs wrote it on
+//     `faable deploy link`; the current link only persists in the API)
 //  4. locally — the app whose linked repository matches the git origin remote
 //     of the working directory (repos are connected in the dashboard when the
-//     app is created, so most working copies never ran `link`)
+//     app is created, or via `faable deploy link`)
 export const resolve_app_id = async (
   explicit: string | undefined,
   ctxAppId: string | undefined,

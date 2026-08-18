@@ -115,12 +115,29 @@ export interface Secret {
 }
 
 
-type Page<Q> = { results: Q[] };
+type Page<Q> = { results: Q[]; next?: string | null };
 
 const firstPage = async <T, Q extends Promise<Page<T>>>(
   res: Q
 ): Promise<Awaited<Q>["results"]> => {
   const items = (await res).results;
+  return items;
+};
+
+// Walk the cursor to exhaustion. `list()` needs this instead of `firstPage`:
+// a user who sees many apps (admins see all of them) gets a multi-page
+// listing, and matching by repository against a truncated first page made
+// every repo-resolved command answer "No app linked to this repository".
+const allPages = async <T>(
+  fetch_page: (next?: string) => Promise<Page<T>>
+): Promise<T[]> => {
+  const items: T[] = [];
+  let next: string | undefined;
+  do {
+    const page = await fetch_page(next);
+    items.push(...page.results);
+    next = page.next ?? undefined;
+  } while (next);
   return items;
 };
 
@@ -225,7 +242,13 @@ export class FaableApi<T = any> {
   }
 
   async list() {
-    return firstPage(data(this.client.get<Page<FaableApp>>(`/app`)));
+    return allPages<FaableApp>((next) =>
+      data(
+        this.client.get<Page<FaableApp>>(`/app`, {
+          params: { pageSize: 200, ...(next ? { next } : {}) },
+        })
+      )
+    );
   }
 
   async getBySlug(slug: string) {
