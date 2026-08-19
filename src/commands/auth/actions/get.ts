@@ -36,6 +36,7 @@ export const actions_get: CommandModule<unknown, ActionsGetArgs> = {
     log.info(`  Trigger: ${action.trigger ?? '-'}`)
     log.info(`  Enabled: ${yes_no(action.enabled)}`)
     log.info(`  Order:   ${action.order ?? 0}`)
+    log.info(`  Revision: ${(action as any).revision ?? 1} (updated ${action.updatedAt ?? '-'})`)
     log.info(`  Created: ${action.createdAt ?? '-'}`)
     if (args.code) {
       log.info('  Code:')

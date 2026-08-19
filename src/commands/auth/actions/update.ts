@@ -76,7 +76,7 @@ export const actions_update: CommandModule<unknown, ActionsUpdateArgs> = {
 
     if (args.json) return print_json(action)
     log.info(
-      `✅ Updated action ${action.id} (${action.name}, trigger ${action.trigger}, enabled: ${action.enabled ? '✓' : '✗'})`
+      `✅ Updated action ${action.id} (${action.name}, trigger ${action.trigger}, enabled: ${action.enabled ? '✓' : '✗'}, revision ${(action as any).revision ?? '-'})`
     )
   })
 }
