@@ -3,6 +3,7 @@ import { actions_create } from './create'
 import { actions_get } from './get'
 import { actions_list } from './list'
 import { actions_rm } from './rm'
+import { actions_update } from './update'
 
 export const actions: CommandModule = {
   command: 'actions',
@@ -12,6 +13,7 @@ export const actions: CommandModule = {
       .command(actions_list)
       .command(actions_get)
       .command(actions_create)
+      .command(actions_update)
       .command(actions_rm)
       .demandCommand(1)
       .showHelpOnFail(false) as any,
