@@ -6,6 +6,7 @@ import { link } from '../link'
 import { domains } from './domains'
 import { git_context } from './git_context'
 import { deployments } from './inspect/deployments'
+import { inspect } from './inspect/inspect'
 import { apps_list } from './inspect/list'
 import { logs } from './inspect/logs'
 import { open_app } from './inspect/open'
@@ -40,6 +41,7 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
       .command(status)
       .command(apps_list)
       .command(deployments)
+      .command(inspect)
       .command(open_app)
       .command(trigger)
       .command(redeploy)

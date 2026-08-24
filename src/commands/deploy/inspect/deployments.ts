@@ -43,5 +43,6 @@ export const deployments: CommandModule<unknown, DeploymentsArgs> = {
       const live = d.id === app.status?.deployment ? '  ← live' : ''
       log.info(`  ${deployment_row(d)}${live}`)
     }
+    log.info(`Full record of one: faable deploy inspect <deployment_id>`)
   }
 }

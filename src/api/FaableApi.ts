@@ -35,11 +35,7 @@ export interface FaableApp {
   deploy_trigger?: string | null;
   // What the platform build detected (buildpack/framework/runtime), reported
   // by the builder before building — present on failed builds too.
-  detected?: {
-    buildpack: string;
-    framework?: string;
-    runtime: { name: string; version?: string };
-  } | null;
+  detected?: DeploymentDetected | null;
   status?: {
     phase: string;
     deployment: string | null;
@@ -48,12 +44,58 @@ export interface FaableApp {
 
 export interface FaableDeployment {
   id: string;
+  app_id?: string;
+  team?: string;
   release?: string;
+  image?: string;
   github_commit?: string;
   github_commit_message?: string;
+  github_ref?: string;
+  github_actor?: string;
+  // Ref to the build payload row (source manifest + runnable descriptor).
+  // Present on every remote build; absent on a legacy image deploy.
+  artifact_id?: string;
+  artifact_ready_at?: string;
+  // Set when this deployment is a rebuild of a failed one.
+  redeploy_of?: string;
+  quota_released_at?: string;
   trigger?: string | null;
+  detected?: DeploymentDetected;
   createdAt?: string;
-  status?: { phase?: string; reason?: string };
+  status?: {
+    phase?: string;
+    reason?: string;
+    controlled_at?: string;
+    controlled_by?: string;
+    // Artifact deploys: the digest-pinned runtime image the controller
+    // resolved at first materialization (write-once).
+    runtime_image?: string;
+  };
+}
+
+// Platform-detected stack, reported by the builder BEFORE building (so it
+// survives a failed build). Same shape on the app and on the deployment.
+export interface DeploymentDetected {
+  buildpack: string;
+  framework?: string;
+  runtime: { name: string; version?: string };
+}
+
+// The deploy-v3 runnable descriptor, served by GET /artifact/:id. The source
+// manifest is deliberately not part of this view.
+export interface FaableArtifact {
+  id: string;
+  deployment_id: string;
+  app_id: string;
+  artifact?: {
+    sha256: string;
+    size: number;
+    format: string;
+    runtime: { name: string; version?: string | null };
+    profile: string;
+    start_command?: string | null;
+  };
+  purged_at?: string;
 }
 
 // Runtime log line as the API serves it (Loki-backed, newest first, last
@@ -337,11 +379,15 @@ export class FaableApi<T = any> {
   // for promotion — and fail the run fast instead of timing out green.
   async getDeployment(deployment_id: string) {
     return data(
-      this.client.get<{
-        id: string;
-        status?: { phase?: string; reason?: string };
-      }>(`/deployment/${deployment_id}`)
+      this.client.get<FaableDeployment>(`/deployment/${deployment_id}`)
     );
+  }
+
+  // Build payload of a deployment (runnable descriptor: runtime, profile,
+  // size, checksum). Authorized by the caller's access to the parent
+  // deployment, so no team header is needed — same posture as getDeployment.
+  async getArtifact(artifact_id: string) {
+    return data(this.client.get<FaableArtifact>(`/artifact/${artifact_id}`));
   }
 
   // Attach the captured build/deploy output to a deployment. The base client
