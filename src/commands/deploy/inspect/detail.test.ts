@@ -132,7 +132,7 @@ test('deployment_detail renders a live artifact deployment', t => {
   t.is(field(lines, 'Image'), undefined)
   t.true(field(lines, 'Created')?.startsWith('18m ago ('))
   // Live deployment: the useful follow-up is the runtime log, not the build.
-  t.is(field(lines, 'Logs'), 'faable deploy logs')
+  t.is(field(lines, 'Logs'), 'faable deploy logs -a app_1')
 })
 
 test('every label lines up in the same column', t => {
@@ -181,9 +181,12 @@ test('deployment_detail spells out a failure and how to retry it', t => {
   const out = lines.join('\n')
   t.true(out.includes('  Reason:\n    npm ci failed\n    missing lockfile'))
   // A build that never produced a runnable has no runtime logs to offer.
-  t.is(field(lines, 'Build'), 'faable deploy logs --build -d deployment_bad')
+  t.is(
+    field(lines, 'Build'),
+    'faable deploy logs --build -d deployment_bad -a app_1'
+  )
   t.is(field(lines, 'Logs'), undefined)
-  t.is(field(lines, 'Retry'), 'faable deploy redeploy deployment_bad')
+  t.is(field(lines, 'Retry'), 'faable deploy redeploy deployment_bad -a app_1')
 })
 
 test('deployment_detail falls back to the app stack when the build detected none', t => {
@@ -209,7 +212,7 @@ test('deployment_detail falls back to the app stack when the build detected none
   // Still building: point at the live tail.
   t.is(
     field(lines, 'Follow'),
-    'faable deploy logs --build -d deployment_x --follow'
+    'faable deploy logs --build -d deployment_x -a app_1 --follow'
   )
 })
 
@@ -223,8 +226,11 @@ test('a retired deployment points at both of its log sources', t => {
     }
   })
 
-  t.is(field(lines, 'Logs'), 'faable deploy logs -d deployment_old')
-  t.is(field(lines, 'Build'), 'faable deploy logs --build -d deployment_old')
+  t.is(field(lines, 'Logs'), 'faable deploy logs -d deployment_old -a app_1')
+  t.is(
+    field(lines, 'Build'),
+    'faable deploy logs --build -d deployment_old -a app_1'
+  )
 })
 
 test('a crashed deployment offers runtime logs, build output and a retry', t => {
@@ -237,7 +243,55 @@ test('a crashed deployment offers runtime logs, build output and a retry', t => 
     }
   })
 
-  t.is(field(lines, 'Logs'), 'faable deploy logs -d deployment_crash')
-  t.is(field(lines, 'Build'), 'faable deploy logs --build -d deployment_crash')
-  t.is(field(lines, 'Retry'), 'faable deploy redeploy deployment_crash')
+  t.is(field(lines, 'Logs'), 'faable deploy logs -d deployment_crash -a app_1')
+  t.is(
+    field(lines, 'Build'),
+    'faable deploy logs --build -d deployment_crash -a app_1'
+  )
+  t.is(
+    field(lines, 'Retry'),
+    'faable deploy redeploy deployment_crash -a app_1'
+  )
+})
+
+// The rule behind every assertion above, pinned once so a new phase branch
+// can't quietly ship a command that only runs inside the app's checkout.
+// These lines exist to be copied — and `faable deploy inspect` is itself run
+// from wherever the user happens to be — so each one has to carry `-a`.
+test('every suggested command names the app explicitly', t => {
+  const phases = [
+    'BUILD_ERROR',
+    'ERROR',
+    'BUILDING',
+    'QUEUED',
+    'UNKNOWN',
+    'READY',
+    'SUPERSEDED'
+  ]
+
+  for (const phase of phases) {
+    for (const live of [false, true]) {
+      const lines = deployment_detail({
+        app: live
+          ? { ...app, status: { ...app.status, deployment: 'deployment_p' } }
+          : app,
+        deployment: {
+          id: 'deployment_p',
+          createdAt: minutes_ago(1),
+          status: { phase }
+        }
+      })
+      const suggestions = lines.filter(l => l.includes('faable deploy'))
+      t.true(
+        suggestions.length > 0,
+        `${phase} (live=${live}) suggested nothing`
+      )
+      for (const line of suggestions) {
+        t.true(
+          line.includes('-a app_1'),
+          `${phase} (live=${live}): "${line.trim()}" would fail outside the repo`
+        )
+      }
+    }
+  }
 })

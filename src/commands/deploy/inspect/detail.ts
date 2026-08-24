@@ -49,18 +49,32 @@ const label = (name: string, value: string): string =>
 // rendered as labeled lines so they stay in the same column as the record.
 // A BUILD_ERROR never ran, so it has no runtime logs to offer; a retired
 // deployment does (for 24h — the runtime window), plus its frozen build output.
-const next_steps = (d: FaableDeployment, is_live: boolean): string[] => {
+//
+// Every one carries `-a <app_id>`. These lines exist to be copied, and all of
+// these commands call resolve_app_id first — which, without an explicit app,
+// falls back to matching the git remote of the working directory. A suggestion
+// that only runs inside one checkout is a suggestion that fails the moment it
+// is pasted anywhere else, `faable deploy inspect` having been run from
+// somewhere else being the very case that produces these lines.
+const next_steps = (
+  d: FaableDeployment,
+  app_id: string,
+  is_live: boolean
+): string[] => {
   const phase = d.status?.phase ?? ''
-  const runtime = label('Logs', `faable deploy logs -d ${d.id}`)
-  const build = label('Build', `faable deploy logs --build -d ${d.id}`)
-  const retry = label('Retry', `faable deploy redeploy ${d.id}`)
+  const a = `-a ${app_id}`
+  const runtime = label('Logs', `faable deploy logs -d ${d.id} ${a}`)
+  const build = label('Build', `faable deploy logs --build -d ${d.id} ${a}`)
+  const retry = label('Retry', `faable deploy redeploy ${d.id} ${a}`)
 
   if (phase === 'BUILD_ERROR') return [build, retry]
   if (phase === 'ERROR') return [runtime, build, retry]
   if (phase === 'BUILDING' || phase === 'QUEUED' || phase === 'UNKNOWN') {
-    return [label('Follow', `faable deploy logs --build -d ${d.id} --follow`)]
+    return [
+      label('Follow', `faable deploy logs --build -d ${d.id} ${a} --follow`)
+    ]
   }
-  if (is_live) return [label('Logs', 'faable deploy logs')]
+  if (is_live) return [label('Logs', `faable deploy logs ${a}`)]
   return [runtime, build]
 }
 
@@ -139,6 +153,6 @@ export const deployment_detail = (args: {
     }
   }
 
-  lines.push(...next_steps(d, is_live))
+  lines.push(...next_steps(d, app.id, is_live))
   return lines
 }
