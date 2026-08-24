@@ -126,7 +126,10 @@ test('deployment_detail renders a live artifact deployment', t => {
     'next-standalone · node 22 · 41.2 MB (sealed 16m ago)'
   )
   t.is(field(lines, 'Start'), 'node server.js')
-  t.is(field(lines, 'Runtime'), 'ghcr.io/faable/node-22@sha256:be')
+  // Platform internals never reach the terminal: neither the per-deploy image
+  // nor the runtime image (registry host = our infrastructure).
+  t.is(field(lines, 'Runtime'), undefined)
+  t.is(field(lines, 'Image'), undefined)
   t.true(field(lines, 'Created')?.startsWith('18m ago ('))
   // Live deployment: the useful follow-up is the runtime log, not the build.
   t.is(field(lines, 'Logs'), 'faable deploy logs')

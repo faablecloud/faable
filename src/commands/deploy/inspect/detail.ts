@@ -123,10 +123,10 @@ export const deployment_detail = (args: {
       label('Purged', `${when(artifact.purged_at)} — source no longer stored`)
     )
   }
-  if (d.image) lines.push(label('Image', d.image))
-  if (d.status?.runtime_image) {
-    lines.push(label('Runtime', d.status.runtime_image))
-  }
+  // Deliberately NOT rendered: `image` and `status.runtime_image`. Both are
+  // full registry references to OUR infrastructure (account, region, repo
+  // naming) — platform internals with no use to the app's owner. The runtime
+  // that matters is already on the Artifact line.
   if (d.redeploy_of) lines.push(label('Rebuild of', d.redeploy_of))
   if (d.quota_released_at) {
     lines.push(label('Quota', `hold released ${when(d.quota_released_at)}`))

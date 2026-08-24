@@ -118,13 +118,6 @@ export interface GithubInstallation {
   app_slug: string;
 }
 
-export interface FaableAppRegistry {
-  hostname: string;
-  image: string;
-  user: string;
-  password: string;
-}
-
 export interface FaableDomain {
   id: string;
   fqdn: string;
@@ -299,10 +292,6 @@ export class FaableApi<T = any> {
 
   async getApp(app_id: string) {
     return data(this.client.get<FaableApp>(`/app/${app_id}`));
-  }
-
-  async getRegistry(app_id: string) {
-    return data(this.client.get<FaableAppRegistry>(`/app/${app_id}/registry`));
   }
 
   // `image`/`type` are optional to support the failure path: a failed build
