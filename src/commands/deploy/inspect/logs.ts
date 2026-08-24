@@ -44,7 +44,14 @@ export const logs: CommandModule<unknown, LogsArgs> = {
           'With --build: keep tailing the output while the build runs'
       })
       .example('$0 deploy logs', 'Runtime logs of the linked app (last 24h)')
-      .example('$0 deploy logs --build', 'Build output of the latest deployment')
+      .example(
+        '$0 deploy logs -d deployment_a1b2c3',
+        'Runtime logs of ONE deployment (last 24h)'
+      )
+      .example(
+        '$0 deploy logs --build',
+        'Build output of the latest deployment'
+      )
       .example(
         '$0 deploy logs --build --follow',
         'Tail the build that is running right now'
@@ -104,14 +111,25 @@ export const logs: CommandModule<unknown, LogsArgs> = {
     const lines = await ctx.api.getAppLogs(app_id, {
       deployment_id: args.deployment
     })
+    // Say WHICH scope came back empty: with -d the 24h window is usually the
+    // reason (a retired deployment stopped writing when it stopped serving).
+    const scope = args.deployment
+      ? `${args.deployment} (${app.name})`
+      : `${app.name} (${app_id})`
     if (lines.length === 0) {
+      log.info(`📭 No runtime logs in the last 24h for ${scope}.`)
       log.info(
-        `📭 No runtime logs in the last 24h for ${app.name} (${app_id}).`
+        `For build output, use: faable deploy logs --build${
+          args.deployment ? ` -d ${args.deployment}` : ''
+        }`
       )
-      log.info(`For build output, use: faable deploy logs --build`)
       return
     }
-    log.info(`📜 Runtime logs of ${app.name} (last 24h, newest last):`)
+    log.info(
+      `📜 Runtime logs of ${app.name}${
+        args.deployment ? ` · ${args.deployment}` : ''
+      } (last 24h, newest last):`
+    )
     for (const line of format_log_lines(lines)) {
       process.stdout.write(line + '\n')
     }
