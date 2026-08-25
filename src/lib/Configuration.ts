@@ -4,7 +4,7 @@ import { log } from "../log";
 interface ProjectConfig {
   startCommand?: string;
   buildCommand?: string;
-  /** Force a specific buildpack (node | python | docker) instead of auto-detection. */
+  /** Force a specific buildpack (php | node | python | docker) instead of auto-detection. */
   buildpack?: string;
   /** Monorepo Root Directory (the supported user option; a platform-managed App.root_dir override wins). */
   rootDir?: string;
