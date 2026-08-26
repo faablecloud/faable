@@ -27,7 +27,7 @@
   ],
   "dependencies": {
     "@actions/core": "^3.0.0",
-    "@faable/auth-sdk": "^2.5.18",
+    "@faable/auth-sdk": "^2.5.39",
     "axios": "^1.18.1",
     "fs-extra": "^11.3.2",
     "open": "^11.0.0",
