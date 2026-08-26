@@ -140,23 +140,43 @@ export const login: CommandModule = {
       log.warn("Could not open browser automatically.");
     }
 
+    const start = Date.now();
+    const timeoutMs = expires_in * 1000;
+    let currentInterval = interval;
+
+    // The user has a deadline and no way to see it: the code dies on the
+    // server whether or not they are still typing, and the only feedback used
+    // to be the spinner going quiet for minutes and then failing. Show what is
+    // left. See arch/auth/cli-device-code-first-login.md.
+    const remainingLabel = () => {
+      const left = Math.max(0, timeoutMs - (Date.now() - start));
+      const mins = Math.floor(left / 60000);
+      const secs = Math.floor((left % 60000) / 1000);
+      return `${mins}:${secs.toString().padStart(2, "0")}`;
+    };
+    const waitingText = (suffix = "") =>
+      `Waiting for confirmation in browser… (code expires in ${remainingLabel()})${suffix}`;
+
     const spinner = ora({
-      text: "Waiting for confirmation in browser…",
+      text: waitingText(),
       spinner: "dots",
     }).start();
+    const ticker = setInterval(() => {
+      spinner.text = waitingText(
+        currentInterval > interval ? ` (slowed polling to ${currentInterval}s)` : ""
+      );
+    }, 1000);
+    ticker.unref?.();
 
     let cancelled = false;
     const onSigint = () => {
       cancelled = true;
+      clearInterval(ticker);
       spinner.stop();
       process.stderr.write("\nLogin cancelled.\n");
       process.exit(130);
     };
     process.once("SIGINT", onSigint);
-
-    const start = Date.now();
-    const timeoutMs = expires_in * 1000;
-    let currentInterval = interval;
 
     try {
       while (!cancelled && Date.now() - start < timeoutMs) {
@@ -189,7 +209,6 @@ export const login: CommandModule = {
 
           if (error === "slow_down") {
             currentInterval += 5;
-            spinner.text = `Waiting for confirmation in browser… (slowing polling to ${currentInterval}s)`;
             continue;
           }
 
@@ -217,6 +236,7 @@ export const login: CommandModule = {
       log.error("❌ Code expired. Run `faable login` again to start over.");
       process.exit(1);
     } finally {
+      clearInterval(ticker);
       process.removeListener("SIGINT", onSigint);
     }
   },
