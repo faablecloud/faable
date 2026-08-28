@@ -1,3 +1,4 @@
+import { AxiosError } from "axios";
 import { CredentialsStore, FaableConfig } from "../lib/CredentialsStore";
 import { refreshToken } from "./auth";
 import { log } from "../log";
@@ -44,7 +45,18 @@ export const loadLiveCredentials = async (
       await store.saveCredentials(next);
       log.debug?.("Refreshed access token");
       return next;
-    } catch {
+    } catch (e) {
+      // The auth server marks a suspension with a stable machine code on the
+      // token endpoint's RFC 6749 error body. "Run `faable login` again"
+      // would be a lie here — login is denied too — so say what actually
+      // happened and stop instead of letting a generic 401 mislead.
+      const body = (e as AxiosError<{ error_code?: string }>)?.response?.data;
+      if (body?.error_code === "user_suspended") {
+        log.error(
+          "❌ Your account has been suspended. Contact support@faable.com."
+        );
+        process.exit(1);
+      }
       // Refresh failed — keep the stale config; the API call's 401 (or
       // requireApi) will tell the user to run `faable login` again.
     }
