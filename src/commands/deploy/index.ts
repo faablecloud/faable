@@ -1,3 +1,4 @@
+import prompts from 'prompts'
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../api/context'
 import { Configuration } from '../../lib/Configuration'
@@ -24,6 +25,7 @@ export interface DeployCommandArgs {
   app_id: string
   workdir?: string
   release?: string
+  yes?: boolean
 }
 
 export const deploy: CommandModule<unknown, DeployCommandArgs> = {
@@ -62,6 +64,13 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
         description:
           'Release version to record on the deployment (injected as FAABLE_RELEASE). Defaults to FAABLE_RELEASE env or the latest git tag'
       })
+      .option('yes', {
+        alias: 'y',
+        type: 'boolean',
+        default: false,
+        description:
+          'Skip the confirmation prompt (only asked in interactive terminals — CI is unaffected)'
+      })
       .showHelpOnFail(false) as any
   },
 
@@ -77,6 +86,26 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
 
     const app_id = await resolve_app_id(args.app_id, ctx.appId, api, workdir)
     const app = await api.getApp(app_id)
+
+    // Guard against the `faable deploy <app_id> <subcommand>` typo: yargs
+    // doesn't recognize an unmatched trailing token as the subcommand, so it
+    // silently falls through to THIS handler and deploys `workdir` instead.
+    // Only prompts in a real terminal — CI (non-TTY) keeps deploying
+    // unattended exactly as before, so existing pipelines need no changes.
+    if (!args.yes && process.stdout.isTTY) {
+      const { confirm } = await prompts({
+        type: 'toggle',
+        name: 'confirm',
+        message: `Deploy "${app.name}" (${app.id}) from ${workdir}?`,
+        initial: false,
+        active: 'yes',
+        inactive: 'no'
+      })
+      if (!confirm) {
+        log.info('Cancelled.')
+        return
+      }
+    }
 
     // Monorepo Root Directory — single precedence rule everywhere
     // (arch/deploy/root-dir-faable-json.md): App.root_dir (platform
