@@ -4,11 +4,11 @@ import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
 import { TenantArgs, json_option, tenant_options } from '../options'
 import { print_json } from '../render'
+import { formatTriggers } from './triggers'
 
 interface ActionsCreateArgs extends TenantArgs {
   name: string
-  trigger: string
-  codeFile?: string
+  codeFile: string
   disabled?: boolean
   order?: number
 }
@@ -24,18 +24,12 @@ export const actions_create: CommandModule<unknown, ActionsCreateArgs> = {
         demandOption: true,
         description: 'Action name (max 200 chars)'
       })
-      .option('trigger', {
-        alias: 't',
-        type: 'string',
-        choices: ['post-login', 'continue', 'client-credentials'],
-        demandOption: true,
-        description:
-          'Trigger point (client-credentials runs on M2M token grants: no user, no redirect)'
-      })
       .option('code-file', {
         alias: 'f',
         type: 'string',
-        description: 'Path to a JS file with the action code'
+        demandOption: true,
+        description:
+          'Path to a JS file with the action code. The triggers are derived from the hooks it exports (exports.onExecutePostLogin / onExecuteContinue / onExecuteClientCredentials)'
       })
       .option('disabled', {
         type: 'boolean',
@@ -47,29 +41,29 @@ export const actions_create: CommandModule<unknown, ActionsCreateArgs> = {
         description: 'Execution order (lower runs first, default 0)'
       })
       .example(
-        '$0 auth actions create -n add-claims -t post-login -f ./claims.js',
-        'Create a post-login action from a file'
+        '$0 auth actions create -n add-claims -f ./claims.js',
+        'Create an action from a file; its triggers follow the exported hooks'
       )
       .showHelpOnFail(false) as any,
   handler: withAuthHints(async args => {
-    let code: string | undefined
-    if (args.codeFile) {
-      if (!(await fs.pathExists(args.codeFile))) {
-        throw new Error(`Code file not found: ${args.codeFile}`)
-      }
-      code = await fs.readFile(args.codeFile, 'utf8')
+    if (!(await fs.pathExists(args.codeFile))) {
+      throw new Error(`Code file not found: ${args.codeFile}`)
     }
+    const code = await fs.readFile(args.codeFile, 'utf8')
 
     const api = await requireAuthAdmin(args)
     const action = await api.actionCreate({
       name: args.name,
-      trigger: args.trigger,
-      ...(code !== undefined ? { code } : {}),
+      code,
       ...(args.disabled ? { enabled: false } : {}),
       ...(args.order !== undefined ? { order: args.order } : {})
-    })
+      // `trigger` is gone from the API (auth ≥ v1.58): triggers are derived
+      // from the code. Cast until the SDK types catch up with that release.
+    } as any)
 
     if (args.json) return print_json(action)
-    log.info(`✅ Created action ${action.id} (${action.name}, trigger ${action.trigger})`)
+    log.info(
+      `✅ Created action ${action.id} (${action.name}, triggers ${formatTriggers(action)})`
+    )
   })
 }

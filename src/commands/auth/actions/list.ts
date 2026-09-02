@@ -12,7 +12,7 @@ export const actions_list: CommandModule<unknown, ListArgs> = {
     json_option(list_options(tenant_options(yargs)))
       .option('query', {
         type: 'string',
-        description: 'FaableQL filter, e.g. "trigger:post-login"'
+        description: 'FaableQL filter, e.g. "enabled:true"'
       })
       .showHelpOnFail(false) as any,
   handler: withAuthHints(async args => {
@@ -32,7 +32,7 @@ export const actions_list: CommandModule<unknown, ListArgs> = {
     const rows = items.map(a => [
       a.id ?? '-',
       a.name ?? '-',
-      a.trigger ?? '-',
+      formatTriggers(a as any),
       yes_no(a.enabled),
       String(a.order ?? 0),
       when(a.createdAt)

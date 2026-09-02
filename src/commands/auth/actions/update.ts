@@ -4,6 +4,7 @@ import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
 import { TenantArgs, json_option, tenant_options } from '../options'
 import { print_json } from '../render'
+import { formatTriggers } from './triggers'
 
 interface ActionsUpdateArgs extends TenantArgs {
   action_id: string
@@ -31,7 +32,8 @@ export const actions_update: CommandModule<unknown, ActionsUpdateArgs> = {
       .option('code-file', {
         alias: 'f',
         type: 'string',
-        description: 'Path to a JS file with the new action code'
+        description:
+          'Path to a JS file with the new action code (triggers are re-derived from the hooks it exports)'
       })
       .option('order', {
         type: 'number',
@@ -76,7 +78,7 @@ export const actions_update: CommandModule<unknown, ActionsUpdateArgs> = {
 
     if (args.json) return print_json(action)
     log.info(
-      `✅ Updated action ${action.id} (${action.name}, trigger ${action.trigger}, enabled: ${action.enabled ? '✓' : '✗'}, revision ${(action as any).revision ?? '-'})`
+      `✅ Updated action ${action.id} (${action.name}, triggers ${formatTriggers(action as any)}, enabled: ${action.enabled ? '✓' : '✗'}, revision ${(action as any).revision ?? '-'})`
     )
   })
 }

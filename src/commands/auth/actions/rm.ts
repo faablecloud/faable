@@ -2,6 +2,7 @@ import prompts from 'prompts'
 import { CommandModule } from 'yargs'
 import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
+import { formatTriggers } from './triggers'
 import { TenantArgs, tenant_options } from '../options'
 
 interface ActionsRmArgs extends TenantArgs {
@@ -35,7 +36,7 @@ export const actions_rm: CommandModule<unknown, ActionsRmArgs> = {
       const { confirm } = await prompts({
         type: 'toggle',
         name: 'confirm',
-        message: `Delete action "${action.name}" (${action.id}, trigger ${action.trigger})?`,
+        message: `Delete action "${action.name}" (${action.id}, triggers ${formatTriggers(action as any)})?`,
         initial: false,
         active: 'yes',
         inactive: 'no'

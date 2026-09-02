@@ -33,7 +33,7 @@ export const actions_get: CommandModule<unknown, ActionsGetArgs> = {
 
     log.info(`⚙️ ${action.id}`)
     log.info(`  Name:    ${action.name ?? '-'}`)
-    log.info(`  Trigger: ${action.trigger ?? '-'}`)
+    log.info(`  Triggers: ${formatTriggers(action as any)}`)
     log.info(`  Enabled: ${yes_no(action.enabled)}`)
     log.info(`  Order:   ${action.order ?? 0}`)
     log.info(`  Revision: ${(action as any).revision ?? 1} (updated ${action.updatedAt ?? '-'})`)
