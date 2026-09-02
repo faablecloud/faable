@@ -5,6 +5,7 @@ import { log } from '../../log'
 import { link } from '../link'
 import { domains } from './domains'
 import { git_context } from './git_context'
+import { cancel } from './inspect/cancel'
 import { deployments } from './inspect/deployments'
 import { inspect } from './inspect/inspect'
 import { apps_list } from './inspect/list'
@@ -45,6 +46,7 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
       .command(open_app)
       .command(trigger)
       .command(redeploy)
+      .command(cancel)
       .command(link)
       .positional('app_id', {
         type: 'string',
@@ -163,14 +165,14 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
         // ~1min, long before this 5min promotion timeout.
         const dep = await api.getDeployment(deployment.id)
         const phase = dep.status?.phase
-        if (phase === "ERROR" || phase === "BUILD_ERROR") {
+        if (phase === 'ERROR' || phase === 'BUILD_ERROR') {
           failure = { phase, reason: dep.status?.reason }
           break
         }
         // CANCELED: the platform superseded this build before it produced a
         // runnable (a sibling deployment of the app won the promotion).
-        if (phase === "CANCELED") {
-          superseded = dep.status?.reason ?? "canceled"
+        if (phase === 'CANCELED') {
+          superseded = dep.status?.reason ?? 'canceled'
           break
         }
       } catch (_error) {
