@@ -27,9 +27,10 @@ export const actions_create: CommandModule<unknown, ActionsCreateArgs> = {
       .option('trigger', {
         alias: 't',
         type: 'string',
-        choices: ['post-login', 'continue'],
+        choices: ['post-login', 'continue', 'client-credentials'],
         demandOption: true,
-        description: 'Trigger point'
+        description:
+          'Trigger point (client-credentials runs on M2M token grants: no user, no redirect)'
       })
       .option('code-file', {
         alias: 'f',
