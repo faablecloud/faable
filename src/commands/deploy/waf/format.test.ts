@@ -69,3 +69,50 @@ test('a disabled binding says so before listing anything', t => {
 
   t.regex(out[0], /WAF disabled for this app/)
 })
+
+test('a user-agent rule says it has no path restriction', t => {
+  // Printing it as a bare pattern would hide that it applies to the whole app.
+  const out = format_waf({
+    enabled: true,
+    platform_profiles: [],
+    rules: [{ user_agent: 'YisouSpider', action: 'deny', match: 'user_agent' }]
+  }).join('\n')
+
+  t.regex(out, /UA ~ YisouSpider \(any path\)/)
+  t.regex(out, /403/)
+})
+
+test('a combined rule shows both halves', t => {
+  const out = format_waf({
+    enabled: true,
+    platform_profiles: [],
+    rules: [
+      {
+        pattern: '^/login',
+        user_agent: 'YisouSpider',
+        action: 'deny',
+        match: 'path_user_agent'
+      }
+    ]
+  }).join('\n')
+
+  t.regex(out, /\^\/login \+ UA ~ YisouSpider/)
+})
+
+test('a monitor-probes platform profile does not read like a block', t => {
+  const out = format_waf({
+    enabled: true,
+    platform_profiles: [
+      {
+        name: 'monitor-probes',
+        action: 'probe',
+        match: 'user_agent',
+        rule_count: 10
+      }
+    ],
+    rules: []
+  }).join('\n')
+
+  t.regex(out, /by user-agent/)
+  t.notRegex(out, /blocked at the edge/)
+})

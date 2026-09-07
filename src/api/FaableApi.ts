@@ -118,11 +118,19 @@ export interface GithubInstallation {
   app_slug: string
 }
 
-/** One WAF rule an app's owners authored (GET/POST /app/:id/waf). */
+/**
+ * One WAF rule an app's owners authored (GET/POST /app/:id/waf).
+ *
+ * `match` says which fields are meaningful: 'path' → `pattern`, 'user_agent' →
+ * `user_agent`, 'path_user_agent' → both, and BOTH must match for the rule to
+ * fire.
+ */
 export interface FaableWafRule {
-  pattern: string
+  pattern?: string
+  user_agent?: string
   /** 'deny' → 403 at the edge; 'sink' → synthetic 404, the app is not woken. */
   action: string
+  match?: string
   description?: string
 }
 
@@ -133,8 +141,10 @@ export interface FaableWafRule {
 export interface FaableWafPlatformProfile {
   name: string
   action: string
+  /** What the ruleset matches on — without it a `probe` reads like a block. */
+  match?: string
   rule_count: number
-  rules?: Array<{ pattern: string; description?: string }>
+  rules?: Array<{ pattern: string; user_agent?: string; description?: string }>
 }
 
 export interface FaableAppWaf {
@@ -601,17 +611,26 @@ export class FaableApi<T = any> {
 
   async addAppWafRule(
     app_id: string,
-    params: { pattern: string; action: 'deny' | 'sink'; description?: string }
+    params: {
+      pattern?: string
+      user_agent?: string
+      action: 'deny' | 'sink'
+      description?: string
+      force?: boolean
+    }
   ) {
     return data(
       this.client.post<FaableAppWaf>(`/app/${app_id}/waf/rules`, params)
     )
   }
 
-  async removeAppWafRule(app_id: string, pattern: string) {
+  async removeAppWafRule(
+    app_id: string,
+    params: { pattern?: string; user_agent?: string; action?: 'deny' | 'sink' }
+  ) {
     return data(
       this.client.delete<FaableAppWaf>(`/app/${app_id}/waf/rules`, {
-        data: { pattern }
+        data: params
       })
     )
   }

@@ -4,21 +4,28 @@ import { resolve_app_id } from '../resolve_app_id'
 import { add_rule } from './add_rule'
 
 interface WafBlockArgs {
-  pattern: string
+  pattern?: string
+  userAgent?: string
   app?: string
   description?: string
+  force?: boolean
 }
 
 export const waf_block: CommandModule<unknown, WafBlockArgs> = {
-  command: 'block <pattern>',
-  describe: 'Block a path at the edge with a 403 (never reaches your app)',
+  command: 'block [pattern]',
+  describe: 'Block requests at the edge with a 403 (they never reach your app)',
   builder: yargs =>
     yargs
       .positional('pattern', {
         type: 'string',
-        demandOption: true,
         description:
           'Anchored path regex, e.g. ^/\\.well-known/ (quote it in your shell)'
+      })
+      .option('user-agent', {
+        alias: 'u',
+        type: 'string',
+        description:
+          'RE2 fragment matched against User-Agent, e.g. YisouSpider. With a path, BOTH must match.'
       })
       .option('app', {
         alias: 'a',
@@ -30,9 +37,33 @@ export const waf_block: CommandModule<unknown, WafBlockArgs> = {
         type: 'string',
         description: 'Why this rule exists (shown in `waf list`)'
       })
+      .option('force', {
+        type: 'boolean',
+        default: false,
+        description:
+          'Accept a user-agent that also matches a known search/AI crawler or uptime monitor'
+      })
+      .check(({ pattern, userAgent }: any) => {
+        if (!pattern && !userAgent) {
+          throw new Error(
+            'Give a path pattern, --user-agent, or both.\n' +
+              "  e.g. faable deploy waf block '^/wp-admin'\n" +
+              '       faable deploy waf block --user-agent YisouSpider'
+          )
+        }
+        return true
+      })
       .example(
         "$0 deploy waf block '^/\\.well-known/'",
         'Stop scanner probes under /.well-known from waking the app'
+      )
+      .example(
+        '$0 deploy waf block --user-agent YisouSpider',
+        'Refuse one crawler outright, on every path'
+      )
+      .example(
+        "$0 deploy waf block '^/api/' --user-agent curl",
+        'Refuse /api/ to that user-agent only, leaving browsers untouched'
       )
       .showHelpOnFail(false) as any,
   handler: async args => {
@@ -46,8 +77,10 @@ export const waf_block: CommandModule<unknown, WafBlockArgs> = {
       app_name: app.name,
       app_url: app.url,
       pattern: args.pattern,
+      user_agent: args.userAgent,
       action: 'deny',
-      description: args.description
+      description: args.description,
+      force: args.force
     })
   }
 }

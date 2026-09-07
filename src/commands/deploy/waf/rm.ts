@@ -2,30 +2,56 @@ import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
+import { describe_selector } from './add_rule'
 
 interface WafRmArgs {
-  pattern: string
+  pattern?: string
+  userAgent?: string
+  action?: 'deny' | 'sink'
   app?: string
 }
 
 export const waf_rm: CommandModule<unknown, WafRmArgs> = {
-  command: 'rm <pattern>',
+  command: 'rm [pattern]',
   describe: 'Remove one of your WAF rules',
   builder: yargs =>
     yargs
       .positional('pattern', {
         type: 'string',
-        demandOption: true,
-        description: 'The exact pattern to remove (see `faable deploy waf list`)'
+        description:
+          'The exact pattern to remove (see `faable deploy waf list`)'
+      })
+      // A rule is addressed by everything that defines it, not by its path
+      // alone: "/login" and "/login for YisouSpider" are two different rules
+      // that share a pattern, and removing one must not take out the other.
+      .option('user-agent', {
+        alias: 'u',
+        type: 'string',
+        description: 'The user-agent of the rule to remove'
+      })
+      .option('action', {
+        type: 'string',
+        choices: ['deny', 'sink'] as const,
+        description: 'Only needed when the same rule exists as both'
       })
       .option('app', {
         alias: 'a',
         type: 'string',
         description: 'App Identifier (defaults to the linked app)'
       })
+      .check(({ pattern, userAgent }: any) => {
+        if (!pattern && !userAgent) {
+          throw new Error('Give the path pattern, --user-agent, or both.')
+        }
+        return true
+      })
       .example(
         "$0 deploy waf rm '^/robots\\.txt$'",
         'Stop handling /robots.txt at the edge'
+      )
+      .example(
+        '$0 deploy waf rm --user-agent YisouSpider',
+        'Stop blocking that crawler'
       )
       .showHelpOnFail(false) as any,
   handler: async args => {
@@ -33,11 +59,20 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
     const app_id = await resolve_app_id(args.app, ctx.appId, ctx.api)
     const app = await ctx.api.getApp(app_id)
 
-    await ctx.api.removeAppWafRule(app_id, args.pattern)
+    await ctx.api.removeAppWafRule(app_id, {
+      pattern: args.pattern,
+      user_agent: args.userAgent,
+      action: args.action
+    })
 
-    log.info(`🗑️  Removed ${args.pattern} from ${app.name} (${app_id}).`)
     log.info(
-      `Requests for it reach your app again within ~20s, once the edge picks up the change.`
+      `🗑️  Removed ${describe_selector({
+        pattern: args.pattern,
+        user_agent: args.userAgent
+      })} from ${app.name} (${app_id}).`
+    )
+    log.info(
+      `They reach your app again within ~20s, once the edge picks up the change.`
     )
   }
 }
