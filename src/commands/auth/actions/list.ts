@@ -4,6 +4,7 @@ import { log } from '../../../log'
 import { ListArgs, json_option, list_options, tenant_options } from '../options'
 import { fetch_items } from '../paging'
 import { print_json, table_lines, when, yes_no } from '../render'
+import { formatTriggers } from './triggers'
 
 export const actions_list: CommandModule<unknown, ListArgs> = {
   command: 'list',

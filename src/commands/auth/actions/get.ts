@@ -3,6 +3,7 @@ import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
 import { TenantArgs, json_option, tenant_options } from '../options'
 import { print_json, yes_no } from '../render'
+import { formatTriggers } from './triggers'
 
 interface ActionsGetArgs extends TenantArgs {
   action_id: string
