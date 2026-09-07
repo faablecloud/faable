@@ -118,6 +118,32 @@ export interface GithubInstallation {
   app_slug: string
 }
 
+/** One WAF rule an app's owners authored (GET/POST /app/:id/waf). */
+export interface FaableWafRule {
+  pattern: string
+  /** 'deny' → 403 at the edge; 'sink' → synthetic 404, the app is not woken. */
+  action: string
+  description?: string
+}
+
+/**
+ * A platform ruleset protecting this app. `rules` is only populated for
+ * admins — the global patterns are not tenant-readable.
+ */
+export interface FaableWafPlatformProfile {
+  name: string
+  action: string
+  rule_count: number
+  rules?: Array<{ pattern: string; description?: string }>
+}
+
+export interface FaableAppWaf {
+  /** Master toggle of the app's WAF binding (admin-controlled). */
+  enabled: boolean
+  platform_profiles: FaableWafPlatformProfile[]
+  rules: FaableWafRule[]
+}
+
 export interface FaableDomain {
   id: string
   fqdn: string
@@ -559,6 +585,33 @@ export class FaableApi<T = any> {
     return data(
       this.client.delete(`/domain/${domain_id}`, {
         headers: { 'x-faable-team': team }
+      })
+    )
+  }
+
+  // ── per-app WAF ───────────────────────────────────────────────────────────
+  //
+  // No `x-faable-team` header on any of these: the routes are scoped by the
+  // app in the path (the server reads the team off the App row), and sending
+  // a team override would only narrow the lookup.
+
+  async getAppWaf(app_id: string) {
+    return data(this.client.get<FaableAppWaf>(`/app/${app_id}/waf`))
+  }
+
+  async addAppWafRule(
+    app_id: string,
+    params: { pattern: string; action: 'deny' | 'sink'; description?: string }
+  ) {
+    return data(
+      this.client.post<FaableAppWaf>(`/app/${app_id}/waf/rules`, params)
+    )
+  }
+
+  async removeAppWafRule(app_id: string, pattern: string) {
+    return data(
+      this.client.delete<FaableAppWaf>(`/app/${app_id}/waf/rules`, {
+        data: { pattern }
       })
     )
   }

@@ -20,6 +20,7 @@ import { deploy_remote } from './remote'
 import { resolve_app_id } from './resolve_app_id'
 import { secrets } from './secrets'
 import { is_superseded } from './superseded'
+import { waf } from './waf'
 
 export interface DeployCommandArgs {
   app_id: string
@@ -40,6 +41,7 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
     return yargs
       .command(secrets)
       .command(domains)
+      .command(waf)
       .command(logs)
       .command(status)
       .command(apps_list)
