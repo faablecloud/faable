@@ -34,7 +34,7 @@ const exchangeGithubOidcToken = async(gh_token:string, target_app_id?:string)=>{
       if (status === 400) {
         throw new Error(
           serverMessage ||
-            "This repository has multiple linked apps. Specify which one with `faable deploy <app_id>`.",
+            "This repository has multiple linked apps. Specify which one with `faable deploy --app <app_id>`.",
           { cause: err }
         )
       }

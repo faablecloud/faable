@@ -4,7 +4,7 @@ import { getGitRemoteUrl } from '../../lib/git_remote'
 import { log } from '../../log'
 
 // app_id resolution (the user never has to look one up):
-//  1. explicit (positional on `deploy`, --app on subcommands)
+//  1. explicit (--app, on `deploy` and on every subcommand)
 //  2. OIDC in CI — the backend resolves the app from the linked repository
 //  3. locally — a legacy app_id in faable.json (older CLIs wrote it on
 //     `faable deploy link`; the current link only persists in the API)
@@ -32,12 +32,12 @@ export const resolve_app_id = async (
     if (matches.length > 1) {
       const ids = matches.map(app => `${app.name} (${app.id})`).join(', ')
       throw new Error(
-        `Repository ${repository} is linked to several apps: ${ids}. Pass the app explicitly.`
+        `Repository ${repository} is linked to several apps: ${ids}. Pass one with --app <app_id>.`
       )
     }
   }
 
   throw new Error(
-    'No app linked to this repository. Link it from the dashboard (or run "faable deploy link"), or pass the app explicitly.'
+    'No app linked to this repository. Link it from the dashboard (or run "faable deploy link"), or pass one with --app <app_id>.'
   )
 }

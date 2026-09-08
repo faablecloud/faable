@@ -23,21 +23,26 @@ import { is_superseded } from './superseded'
 import { waf } from './waf'
 
 export interface DeployCommandArgs {
-  app_id: string
+  app?: string
   workdir?: string
   release?: string
   yes?: boolean
 }
 
 export const deploy: CommandModule<unknown, DeployCommandArgs> = {
-  command: 'deploy [app_id]',
+  // No positional: `deploy` takes ONLY subcommands. An app_id typed where a
+  // subcommand belongs (`faable deploy app_xxx secrets list`) used to be
+  // swallowed by an `[app_id]` positional and silently DEPLOYED instead of
+  // running the subcommand; with no positional, .strictCommands() in
+  // src/index.ts rejects it as an unknown command. Target another app with
+  // --app, exactly like every subcommand does.
+  command: 'deploy',
   // Name the subcommand groups so `faable --help` makes them discoverable
   // without digging into `faable deploy --help`.
   describe:
     'Deploy a faable app and manage it (secrets, domains, logs, deployments…)',
   builder: yargs => {
-    // Product subcommands live under `deploy` (yargs matches them before the
-    // app_id positional, so `faable deploy <app_id>` keeps working).
+    // Product subcommands live under `deploy`.
     return yargs
       .command(secrets)
       .command(domains)
@@ -52,9 +57,11 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
       .command(redeploy)
       .command(cancel)
       .command(link)
-      .positional('app_id', {
+      .option('app', {
+        alias: 'a',
         type: 'string',
-        description: 'App Identifier'
+        description:
+          'App Identifier (defaults to the app linked to this repository)'
       })
       .option('workdir', {
         alias: 'w',
@@ -73,6 +80,11 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
         description:
           'Skip the confirmation prompt (only asked in interactive terminals — CI is unaffected)'
       })
+      .example('$0 deploy', 'Deploy the app linked to the current directory')
+      .example(
+        '$0 deploy --app app_a1b2c3',
+        'Deploy another app (monorepo: several apps, one repo)'
+      )
       .showHelpOnFail(false) as any
   },
 
@@ -81,19 +93,16 @@ export const deploy: CommandModule<unknown, DeployCommandArgs> = {
 
     // Pass the explicit app target to the OIDC exchange so a monorepo (several
     // apps, one repo) can be disambiguated in CI.
-    const ctx = await requireApi(args.app_id)
+    const ctx = await requireApi(args.app)
     const { api } = ctx
 
     const config = Configuration.instance().deployConfig()
 
-    const app_id = await resolve_app_id(args.app_id, ctx.appId, api, workdir)
+    const app_id = await resolve_app_id(args.app, ctx.appId, api, workdir)
     const app = await api.getApp(app_id)
 
-    // Guard against the `faable deploy <app_id> <subcommand>` typo: yargs
-    // doesn't recognize an unmatched trailing token as the subcommand, so it
-    // silently falls through to THIS handler and deploys `workdir` instead.
-    // Only prompts in a real terminal — CI (non-TTY) keeps deploying
-    // unattended exactly as before, so existing pipelines need no changes.
+    // Confirm which app/dir is about to go out. Only in a real terminal — CI
+    // (non-TTY) deploys unattended, so pipelines need no changes.
     if (!args.yes && process.stdout.isTTY) {
       const { confirm } = await prompts({
         type: 'toggle',

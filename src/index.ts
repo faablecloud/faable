@@ -70,6 +70,16 @@ yg.scriptName('faable')
       // help, then fail red — a bad invocation must not exit 0.
       yg.showHelp()
       log.error(`❌ ${msg}`)
+      // The one unknown command worth naming: an app id passed positionally.
+      // `faable deploy <app_id> secrets list` used to deploy the working
+      // directory instead of listing secrets, so the id now lives in a flag —
+      // say so, or the migration reads as the CLI having lost a feature.
+      const stray = /Unknown commands?: (app_[A-Za-z0-9_-]+)/.exec(msg)
+      if (stray) {
+        log.error(
+          `The app id goes in a flag, not as an argument: faable deploy --app ${stray[1]} [subcommand]`
+        )
+      }
       process.exit(1)
     }
   })

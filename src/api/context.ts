@@ -21,7 +21,7 @@ export const context = async (targetAppId?: string) => {
       const idToken =
         process.env.FAABLE_ID_TOKEN || (await getIDToken("https://faable.com"));
       // targetAppId disambiguates a monorepo (several apps, one repo) in the
-      // OIDC exchange — from `faable deploy <app_id>`.
+      // OIDC exchange — from `faable deploy --app <app_id>`.
       api = FaableApi.create({
         authStrategy: oidc_strategy,
         auth: { idToken, appId: targetAppId },
