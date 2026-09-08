@@ -9,17 +9,73 @@
   Your React, Node.js or Python apps, up to the cloud in seconds.
 </p>
 
-## Faable
+## Faable CLI
 
-Faable is the best platform to build modern architectures that scale precisely
-to meet demand. We handle the hard stuff so you can focus on building cloud
-ready apps. Make your business cloud driven and join those awesome companies.
+`@faable/faable` is the command-line interface for the Faable platform. It covers
+**Faable Deploy** (ship and operate apps) and **Faable Auth** (manage an identity
+tenant: users, login-flow actions, OAuth clients and the audit log) from one binary.
 
-To install the latest version of Faable CLI:
+Full reference: **[faable.com/docs/cli](https://faable.com/docs/cli)**.
+
+To install the latest version:
 
 ```bash
 npm i -g @faable/faable
 ```
+
+## Commands
+
+| Group | What it does | Docs |
+| --- | --- | --- |
+| `faable login` / `whoami` / `logout` | Session management (device flow; CI uses OIDC, no login needed) | [Authentication](https://faable.com/docs/cli#authentication) |
+| `faable deploy` | Deploy the current directory, then `status`, `logs`, `deployments`, `inspect`, `trigger`, `redeploy`, `cancel`, `open`, `list` | [Deployment](https://faable.com/docs/cli#deployment) |
+| `faable deploy secrets` | Environment variables: `list`, `set` (`KEY=VALUE` or `--env-file`), `rm` | [Secrets](https://faable.com/docs/cli#secrets) |
+| `faable deploy domains` | Custom domains: `add` (prints the CNAME), `list`, `check`, `rm` | [Domains](https://faable.com/docs/cli#domains) |
+| `faable deploy waf` | Edge rules: `block` (403), `sink` (404 without waking the app), `list`, `rm` | [Edge rules](https://faable.com/docs/cli#edge-rules-waf) |
+| `faable auth users` | `list` (FaableQL filters), `get` (federated identities included), `suspend`, `reinstate` | [Users](https://faable.com/docs/cli#users) |
+| `faable auth actions` | Login-flow hooks: `list`, `get --code`, `create`, `update`, `rm` | [Actions](https://faable.com/docs/cli#actions) |
+| `faable auth clients` | OAuth clients: `list`, `get --secret`, `create`, `rm` | [OAuth clients](https://faable.com/docs/cli#oauth-clients) |
+| `faable auth logs` | Audit log (read-only): `list` with filters, `get` | [Audit logs](https://faable.com/docs/cli#audit-logs) |
+
+Every command has `--help`; read commands accept `--json` for output you can pipe
+to `jq`. The complete table is in the
+[command reference](https://faable.com/docs/cli#command-reference).
+
+### Deploy
+
+```bash
+faable login
+faable deploy                       # deploy the current directory
+faable deploy status                # phase, URL and detected stack
+faable deploy logs --build          # build output (--follow to tail)
+faable deploy secrets set KEY=value
+faable deploy domains add app.example.com
+```
+
+### Faable Auth
+
+`faable auth` manages a [Faable Auth](https://faable.com/docs/auth) tenant and
+reuses your `faable login` session. Point it at your tenant with
+`--auth-url https://<account>.auth.faable.link` (or `FAABLE_AUTH_URL`).
+
+```bash
+faable auth users list --query email_verified:false --limit 50
+faable auth users get user_abc123                   # includes GitHub/… identities
+faable auth users suspend user_abc123 -r "abuse: crypto miner"
+
+# Bulk: pipe ids from a filtered listing
+faable auth users list --suspended --json | jq -r '.[].id' | faable auth users reinstate -y
+
+faable auth actions create -n add-claims -t post-login -f ./claims.js
+faable auth clients create -n my-app --callback https://app.example.com/callback
+faable auth logs list --origin oauth --status failed --since 2026-08-01
+```
+
+See [`faable auth` in the docs](https://faable.com/docs/cli#faable-auth) for
+every flag, and the Faable Auth guides on
+[suspending users](https://faable.com/docs/auth/suspend-users),
+[login flows](https://faable.com/docs/auth/login-flows) and
+[audit logs](https://faable.com/docs/auth/logs).
 
 ## Runtimes
 
@@ -71,5 +127,6 @@ Precedence: `faable.json` → `Procfile` → auto-detection. The container liste
 
 ## Documentation
 
-For details on how to use Faable CLI, check out our
-[documentation](https://faable.com/docs).
+- [CLI reference](https://faable.com/docs/cli) — every command and flag
+- [Faable Deploy](https://faable.com/docs/deploy) — runtimes, push-to-deploy, secrets, domains
+- [Faable Auth](https://faable.com/docs/auth) — the identity server managed by `faable auth`
