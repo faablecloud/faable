@@ -11,12 +11,17 @@ import { log } from '../../log'
 //  4. locally — the app whose linked repository matches the git origin remote
 //     of the working directory (repos are connected in the dashboard when the
 //     app is created, or via `faable deploy link`)
-export const resolve_app_id = async (
+//
+// "No app here" is an answer, not an error — a bare `faable deploy` in an
+// unlinked directory lists the subcommands instead of failing, and only the
+// caller knows which of the two it wants. An AMBIGUOUS repository does throw:
+// several apps is a question only the user can answer.
+export const find_app_id = async (
   explicit: string | undefined,
   ctxAppId: string | undefined,
   api: FaableApi,
   workdir = process.cwd()
-): Promise<string> => {
+): Promise<string | null> => {
   const app_id = explicit || ctxAppId || Configuration.instance().app_id
   if (app_id) return app_id
 
@@ -36,6 +41,19 @@ export const resolve_app_id = async (
       )
     }
   }
+
+  return null
+}
+
+// The same, for callers that have nothing to offer without an app.
+export const resolve_app_id = async (
+  explicit: string | undefined,
+  ctxAppId: string | undefined,
+  api: FaableApi,
+  workdir = process.cwd()
+): Promise<string> => {
+  const app_id = await find_app_id(explicit, ctxAppId, api, workdir)
+  if (app_id) return app_id
 
   throw new Error(
     'No app linked to this repository. Link it from the dashboard (or run "faable deploy link"), or pass one with --app <app_id>.'

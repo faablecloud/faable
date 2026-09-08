@@ -1,11 +1,7 @@
-import prompts from 'prompts'
 import { CommandModule } from 'yargs'
-import { requireApi } from '../../api/context'
-import { Configuration } from '../../lib/Configuration'
-import { log } from '../../log'
 import { link } from '../link'
 import { domains } from './domains'
-import { git_context } from './git_context'
+import { capture_deploy_help } from './help'
 import { cancel } from './inspect/cancel'
 import { deployments } from './inspect/deployments'
 import { inspect } from './inspect/inspect'
@@ -15,234 +11,51 @@ import { open_app } from './inspect/open'
 import { redeploy } from './inspect/redeploy'
 import { status } from './inspect/status'
 import { trigger } from './inspect/trigger'
-import { propose_release } from './release_version'
-import { deploy_remote } from './remote'
-import { resolve_app_id } from './resolve_app_id'
+import { launch } from './launch'
 import { secrets } from './secrets'
-import { is_superseded } from './superseded'
 import { waf } from './waf'
 
-export interface DeployCommandArgs {
-  app?: string
-  workdir?: string
-  release?: string
-  yes?: boolean
-}
+export type { DeployCommandArgs } from './launch'
 
-export const deploy: CommandModule<unknown, DeployCommandArgs> = {
-  // No positional: `deploy` takes ONLY subcommands. An app_id typed where a
-  // subcommand belongs (`faable deploy app_xxx secrets list`) used to be
-  // swallowed by an `[app_id]` positional and silently DEPLOYED instead of
-  // running the subcommand; with no positional, .strictCommands() in
-  // src/index.ts rejects it as an unknown command. Target another app with
-  // --app, exactly like every subcommand does.
+// `faable deploy` — the deploy product. A command group and nothing else: it
+// holds no handler of its own, so every verb is a subcommand and the
+// hierarchy has no exception to remember. Deploying is `launch`, registered
+// as the group's default ($0) so `faable deploy` on its own still deploys the
+// current directory — the shortcut is an alias, not a second code path.
+//
+// The group deliberately has no positional. An app id typed where a
+// subcommand belongs (`faable deploy app_xxx secrets list`) used to be
+// swallowed by an `[app_id]` positional and silently DEPLOYED instead of
+// running the subcommand; .strictCommands() in src/index.ts now rejects it as
+// an unknown command. Another app is targeted with --app on `launch` and on
+// every subcommand alike.
+export const deploy: CommandModule = {
   command: 'deploy',
   // Name the subcommand groups so `faable --help` makes them discoverable
   // without digging into `faable deploy --help`.
   describe:
     'Deploy a faable app and manage it (secrets, domains, logs, deployments…)',
-  builder: yargs => {
-    // Product subcommands live under `deploy`.
-    return yargs
-      .command(secrets)
-      .command(domains)
-      .command(waf)
-      .command(logs)
-      .command(status)
-      .command(apps_list)
-      .command(deployments)
-      .command(inspect)
-      .command(open_app)
-      .command(trigger)
-      .command(redeploy)
-      .command(cancel)
-      .command(link)
-      .option('app', {
-        alias: 'a',
-        type: 'string',
-        description:
-          'App Identifier (defaults to the app linked to this repository)'
-      })
-      .option('workdir', {
-        alias: 'w',
-        type: 'string',
-        description: 'Working directory'
-      })
-      .option('release', {
-        type: 'string',
-        description:
-          'Release version to record on the deployment (injected as FAABLE_RELEASE). Defaults to FAABLE_RELEASE env or the latest git tag'
-      })
-      .option('yes', {
-        alias: 'y',
-        type: 'boolean',
-        default: false,
-        description:
-          'Skip the confirmation prompt (only asked in interactive terminals — CI is unaffected)'
-      })
-      .example('$0 deploy', 'Deploy the app linked to the current directory')
-      .example(
-        '$0 deploy --app app_a1b2c3',
-        'Deploy another app (monorepo: several apps, one repo)'
-      )
-      .showHelpOnFail(false) as any
-  },
+  builder: yargs =>
+    capture_deploy_help(
+      yargs
+        .command(launch)
+        .command(secrets)
+        .command(domains)
+        .command(waf)
+        .command(logs)
+        .command(status)
+        .command(apps_list)
+        .command(deployments)
+        .command(inspect)
+        .command(open_app)
+        .command(trigger)
+        .command(redeploy)
+        .command(cancel)
+        .command(link)
+        .showHelpOnFail(false)
+    ) as any,
 
-  handler: async args => {
-    const workdir = args.workdir || process.cwd()
-
-    // Pass the explicit app target to the OIDC exchange so a monorepo (several
-    // apps, one repo) can be disambiguated in CI.
-    const ctx = await requireApi(args.app)
-    const { api } = ctx
-
-    const config = Configuration.instance().deployConfig()
-
-    const app_id = await resolve_app_id(args.app, ctx.appId, api, workdir)
-    const app = await api.getApp(app_id)
-
-    // Confirm which app/dir is about to go out. Only in a real terminal — CI
-    // (non-TTY) deploys unattended, so pipelines need no changes.
-    if (!args.yes && process.stdout.isTTY) {
-      const { confirm } = await prompts({
-        type: 'toggle',
-        name: 'confirm',
-        message: `Deploy "${app.name}" (${app.id}) from ${workdir}?`,
-        initial: false,
-        active: 'yes',
-        inactive: 'no'
-      })
-      if (!confirm) {
-        log.info('Cancelled.')
-        return
-      }
-    }
-
-    // Monorepo Root Directory — single precedence rule everywhere
-    // (arch/deploy/root-dir-faable-json.md): App.root_dir (platform
-    // override, exceptional) > repo faable.json rootDir (the supported
-    // user option) > repo root. Matches the remote builder.
-    if (app.root_dir) {
-      config.rootDir = app.root_dir
-      log.info(`📁 Root directory: ${app.root_dir} (platform override)`)
-    } else if (config.rootDir) {
-      log.info(`📁 Root directory: ${config.rootDir} (from faable.json)`)
-    }
-
-    // Capture the commit/ref/actor so the deployment records which commit
-    // it came from and who pushed it (env in CI, git fallback locally).
-    const git = await git_context({ workdir })
-
-    // Propose the release version (--release > FAABLE_RELEASE > git tag).
-    // Optional: when absent the platform injects no FAABLE_RELEASE and the
-    // app falls back to its own version source.
-    const proposed = await propose_release({ workdir, explicit: args.release })
-    if (proposed) {
-      log.info(`🏷️ Release: ${proposed.release} (from ${proposed.source})`)
-    }
-
-    // Remote build only (arch/deploy/remote-artifact-default-cutover.md): the
-    // CLI no longer builds — it uploads the source and the platform builds
-    // server-side (framework detection, buildpacks, artifact/image output all
-    // live in the builder). No Docker, no local fallback: a rejected admission
-    // (build_mode=local opt-out, or the global kill-switch off) or a build
-    // error throws and exits red.
-    log.info(`🚀 Deploying "${app.name}" (${app.id})`)
-    const deployment = await deploy_remote({
-      api,
-      app,
-      git,
-      release: proposed?.release,
-      workdir
-    })
-
-    const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
-    log.info(`Preparing to deploy in faable cloud · ${deployment.id}`)
-    log.info(`📊 View it in the dashboard -> ${dashboard_url}`)
-
-    // Wait (up to 5 minutes) for the deployment to be promoted (live)
-    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-    const timeoutMs = 5 * 60 * 1000
-    const intervalMs = 5000
-    const start = Date.now()
-
-    log.info(`⏳ Waiting for deployment to be promoted...`)
-
-    let promoted = false
-    let failure: { phase: string; reason?: string } | null = null
-    let superseded: string | null = null
-    // The pointer at wait-start is the PREVIOUS deployment (older than ours)
-    // — only a pointer CHANGE to something that isn't us needs a look.
-    const initialActiveId = app.status?.deployment
-    while (Date.now() - start < timeoutMs) {
-      await wait(intervalMs)
-      try {
-        const current = await api.getApp(app.id)
-        if (current.status?.deployment === deployment.id) {
-          promoted = true
-          break
-        }
-        // Superseded: the pointer moved to a deployment at least as new as
-        // ours (twin workflows on the same push, or a rapid follow-up
-        // deploy). It only moves forward — waiting longer can never succeed.
-        const activeId = current.status?.deployment
-        if (activeId && activeId !== initialActiveId) {
-          const active = await api.getDeployment(activeId).catch(() => null)
-          if (
-            active &&
-            is_superseded(
-              deployment as { id: string; createdAt: string },
-              active as { id: string; createdAt: string }
-            )
-          ) {
-            superseded = activeId
-            break
-          }
-        }
-        // Watch for a terminal runtime failure so we fail fast (and red)
-        // instead of timing out green. The controller marks a crash-looping
-        // deployment ERROR — with a reason (e.g. a missing module) — within
-        // ~1min, long before this 5min promotion timeout.
-        const dep = await api.getDeployment(deployment.id)
-        const phase = dep.status?.phase
-        if (phase === 'ERROR' || phase === 'BUILD_ERROR') {
-          failure = { phase, reason: dep.status?.reason }
-          break
-        }
-        // CANCELED: the platform superseded this build before it produced a
-        // runnable (a sibling deployment of the app won the promotion).
-        if (phase === 'CANCELED') {
-          superseded = dep.status?.reason ?? 'canceled'
-          break
-        }
-      } catch (_error) {
-        // Ignore transient errors while polling and keep waiting
-        log.debug(`Polling app status failed, retrying...`)
-      }
-    }
-
-    if (promoted) {
-      log.info(`🌍 Deployment promoted and live, visit: https://${app.url}`)
-    } else if (superseded) {
-      // Not a failure: the app IS live, just on a sibling deployment (e.g.
-      // duplicated workflows firing on the same push). Green exit — there is
-      // nothing for the user to fix in THIS run.
-      log.warn(
-        `⚠️ Deployment superseded — a newer deployment of this app was promoted (${superseded}). The app is live: https://${app.url}`
-      )
-    } else if (failure) {
-      // Fail the command (non-zero exit → red GitHub Action) and surface the
-      // reason the controller captured so the user sees WHY without digging.
-      log.error(`❌ Deployment failed (${failure.phase}).`)
-      if (failure.reason) log.error(failure.reason)
-      log.error(`Check the logs in the dashboard -> ${dashboard_url}`)
-      throw new Error(
-        `Deployment ${deployment.id} failed with phase ${failure.phase}`
-      )
-    } else {
-      log.warn(
-        `⌛ Timed out after 5min waiting for promotion. The deployment is still rolling out, check the dashboard -> ${dashboard_url}`
-      )
-    }
-  }
+  // Unreachable: `launch` is the default command, so yargs routes a bare
+  // `faable deploy` there before it ever gets here.
+  handler: () => {}
 }

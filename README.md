@@ -28,7 +28,7 @@ npm i -g @faable/faable
 | Group | What it does | Docs |
 | --- | --- | --- |
 | `faable login` / `whoami` / `logout` | Session management (device flow; CI uses OIDC, no login needed) | [Authentication](https://faable.com/docs/cli#authentication) |
-| `faable deploy` | Deploy the current directory, then `status`, `logs`, `deployments`, `inspect`, `trigger`, `redeploy`, `cancel`, `open`, `list` | [Deployment](https://faable.com/docs/cli#deployment) |
+| `faable deploy` | `launch` (the default: a bare `faable deploy` deploys the current directory), then `status`, `logs`, `deployments`, `inspect`, `trigger`, `redeploy`, `cancel`, `open`, `list` | [Deployment](https://faable.com/docs/cli#deployment) |
 | `faable deploy secrets` | Environment variables: `list`, `set` (`KEY=VALUE` or `--env-file`), `rm` | [Secrets](https://faable.com/docs/cli#secrets) |
 | `faable deploy domains` | Custom domains: `add` (prints the CNAME), `list`, `check`, `rm` | [Domains](https://faable.com/docs/cli#domains) |
 | `faable deploy waf` | Edge rules: `block` (403), `sink` (404 without waking the app), `list`, `rm` | [Edge rules](https://faable.com/docs/cli#edge-rules-waf) |
@@ -45,7 +45,8 @@ to `jq`. The complete table is in the
 
 ```bash
 faable login
-faable deploy                       # deploy the current directory
+faable deploy                       # deploy the current directory (= deploy launch)
+faable deploy launch --app app_x    # deploy another app, from anywhere
 faable deploy status                # phase, URL and detected stack
 faable deploy logs --build          # build output (--follow to tail)
 faable deploy secrets set KEY=value

@@ -65,11 +65,21 @@ test('a bare app id fails too', async t => {
   t.notRegex(output, /Deploying/)
 })
 
-test('--app is the documented way to target another app', async t => {
+test('every verb under deploy is a subcommand, deploying included', async t => {
   const { code, output } = await run(['deploy', '--help'])
 
   t.is(code, 0)
-  t.regex(output, /-a, --app/)
+  // `launch` is the deploy itself and the group's default, so a bare
+  // `faable deploy` is an alias rather than a second code path.
+  t.regex(output, /faable deploy launch/)
+  t.regex(output, /\[default\]/)
   // No positional in the usage line — that is the whole point.
   t.notRegex(output, /deploy \[app_id\]/)
+})
+
+test('--app is the documented way to target another app', async t => {
+  const { code, output } = await run(['deploy', 'launch', '--help'])
+
+  t.is(code, 0)
+  t.regex(output, /-a, --app/)
 })
