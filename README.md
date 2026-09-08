@@ -72,61 +72,41 @@ faable auth logs list --origin oauth --status failed --since 2026-08-01
 ```
 
 See [`faable auth` in the docs](https://faable.com/docs/cli#faable-auth) for
-every flag, and the Faable Auth guides on
-[suspending users](https://faable.com/docs/auth/suspend-users),
-[login flows](https://faable.com/docs/auth/login-flows) and
+every flag. The concepts behind each group are documented in Faable Auth:
+[users & suspension](https://faable.com/docs/auth/suspend-users),
+[actions](https://faable.com/docs/auth/extensibility/actions),
+[login flows](https://faable.com/docs/auth/login-flows),
+[OAuth clients](https://faable.com/docs/auth/clients) and
 [audit logs](https://faable.com/docs/auth/logs).
-
-## Runtimes
-
-`faable deploy` auto-detects the runtime from the files in your project (no
-config needed in the common case):
-
-| Detected by | Runtime |
-| --- | --- |
-| `package.json` | Node.js (Next.js, Vite, Astro, Gatsby, CRA, Vue, Angular, …) |
-| `requirements.txt` / `pyproject.toml` / `Pipfile` | Python |
-| `Dockerfile` | Your own image (any language) |
-
-> A project with a `package.json` is always treated as Node. To deploy a Python
-> backend that also has a `package.json`, ship a `Dockerfile` instead.
-
-### Node.js / static frameworks
-
-SPA frameworks are built and served automatically. If the project has **no
-`start` script**, the built output is served statically (e.g. Vite → `npx vite
-preview`, CRA/Vue/Angular → `serve`). If it defines a `start` script (custom SSR,
-Next.js, Nuxt, Remix, …), that command is used.
-
-### Python
-
-The start command is detected from your framework:
-
-| Framework | Detected from | Start command |
-| --- | --- | --- |
-| Django | `manage.py` + the package with `wsgi.py` | `gunicorn <pkg>.wsgi:application` |
-| FastAPI / ASGI | `fastapi`/`uvicorn`/`starlette` dep | `uvicorn <module>:app` |
-| Flask | `flask` dep | `gunicorn <module>:app` |
-
-Dependencies are installed inside the image from `requirements.txt`,
-`pyproject.toml` or `Pipfile`. `gunicorn`/`uvicorn` are installed automatically
-if missing.
-
-Pin the Python version with a `runtime.txt` (`python-3.11.3`), a
-`.python-version`, or `requires-python` in `pyproject.toml`.
-
-### Overriding detection
-
-When auto-detection doesn't fit, set the commands explicitly:
-
-- `faable.json` — `{ "buildCommand": "...", "startCommand": "..." }`
-- `Procfile` — a `web:` line, e.g. `web: gunicorn app:app --bind 0.0.0.0:$PORT`
-
-Precedence: `faable.json` → `Procfile` → auto-detection. The container listens on
-`$PORT` (80).
 
 ## Documentation
 
-- [CLI reference](https://faable.com/docs/cli) — every command and flag
-- [Faable Deploy](https://faable.com/docs/deploy) — runtimes, push-to-deploy, secrets, domains
-- [Faable Auth](https://faable.com/docs/auth) — the identity server managed by `faable auth`
+The CLI is a thin client: what it deploys and what it manages is documented in
+the public docs, not here.
+
+### CLI
+
+- [Command reference](https://faable.com/docs/cli#command-reference) — every command and flag
+- [Authentication](https://faable.com/docs/cli#authentication) — `login`, `whoami`, `logout`
+- [Deployment](https://faable.com/docs/cli#deployment) · [Inspecting](https://faable.com/docs/cli#inspecting) · [Secrets](https://faable.com/docs/cli#secrets) · [Domains](https://faable.com/docs/cli#domains) · [Edge rules](https://faable.com/docs/cli#edge-rules-waf) · [Faable Auth](https://faable.com/docs/cli#faable-auth)
+
+### Faable Deploy
+
+- [Get started](https://faable.com/docs/deploy/get-started) — first deploy in minutes
+- [How deployment works](https://faable.com/docs/deploy/how-it-works) — push-to-deploy, builds and releases
+- [Runtime](https://faable.com/docs/deploy/runtime) — supported languages, framework detection, `faable.json` / `Procfile` overrides
+- [What the builder expects](https://faable.com/docs/deploy/build-requirements) — build and start commands, `$PORT`, monorepos
+- [Environment & releases](https://faable.com/docs/deploy/environment) — secrets, env vars and release versions
+- [Custom domains](https://faable.com/docs/deploy/domains/custom-domain) and [SSL certificates](https://faable.com/docs/deploy/domains/ssl-certificates)
+- [Web Application Firewall](https://faable.com/docs/deploy/security-waf) — the edge rules behind `faable deploy waf`
+- [Deploy from your own CI](https://faable.com/docs/deploy/github-actions) — OIDC, no login needed
+- Framework guides: [Next.js](https://faable.com/docs/deploy/guides/guide-next), [Vite](https://faable.com/docs/deploy/guides/guide-vite), [Astro](https://faable.com/docs/deploy/guides/guide-astro), [Express](https://faable.com/docs/deploy/guides/guide-express), [Django](https://faable.com/docs/deploy/guides/guide-django), [FastAPI](https://faable.com/docs/deploy/guides/guide-fastapi), [Flask](https://faable.com/docs/deploy/guides/guide-flask), [PHP](https://faable.com/docs/deploy/guides/guide-php)
+
+### Faable Auth
+
+- [Get started](https://faable.com/docs/auth/get-started) — create a tenant
+- [Clients](https://faable.com/docs/auth/clients) · [Connections](https://faable.com/docs/auth/connections) · [Social login](https://faable.com/docs/auth/social) · [Passwordless](https://faable.com/docs/auth/passwordless)
+- [Suspend users](https://faable.com/docs/auth/suspend-users) — what `users suspend` / `reinstate` do to sessions and tokens
+- [Login flows](https://faable.com/docs/auth/login-flows) and [actions](https://faable.com/docs/auth/extensibility/actions) — the hooks managed by `auth actions`
+- [Logs](https://faable.com/docs/auth/logs) — the audit trail read by `auth logs`
+- [OAuth 2.0 flows](https://faable.com/docs/auth/oauth-flows) · [OpenID Connect](https://faable.com/docs/auth/oidc) · [Validate access tokens](https://faable.com/docs/auth/validate-access-tokens)
