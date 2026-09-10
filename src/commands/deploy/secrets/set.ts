@@ -125,8 +125,10 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
     const merged = merge_app_secrets(existing, parsed)
     await ctx.api.createSecretsBatch(app.id, app.team, merged)
 
-    const current = new Set(
-      existing.filter(s => s.related_model === 'app').map(s => s.name)
+    const current = new Map(
+      existing
+        .filter(s => s.related_model === 'app')
+        .map(s => [s.name, s.value] as const)
     )
     const updated = parsed.filter(({ name }) => current.has(name)).length
     if (parsed.length <= MAX_DETAILED) {
@@ -141,6 +143,18 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
       log.info(`🔑 ${parsed.length - updated} added, ${updated} updated`)
     }
     log.info(`✅ ${parsed.length} secret(s) saved to ${app_id}.`)
-    log.info(`ℹ️ The app is restarting to apply the changes.`)
+
+    // Only claim the restart when something actually changed. Setting a name
+    // to the value it already has is a no-op end to end — the API compares
+    // before writing and never emits the event, so the pod keeps running —
+    // and this line used to promise a restart that was not coming.
+    const changed = parsed.some(
+      ({ name, value }) => current.get(name) !== value
+    )
+    log.info(
+      changed
+        ? `ℹ️ The app is restarting to apply the changes.`
+        : `ℹ️ Already up to date — the app was not restarted.`
+    )
   }
 }
