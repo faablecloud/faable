@@ -32,12 +32,22 @@ export const format_waf = (waf: FaableAppWaf): string[] => {
   for (const p of waf.platform_profiles) {
     // Say what the ruleset matches ON, not just what it answers: without it a
     // `probe` profile of user-agents reads as if it blocked paths.
-    const on = p.match === 'user_agent' ? ' by user-agent' : ''
+    const on =
+      p.match === 'user_agent'
+        ? ' by user-agent'
+        : p.match === 'query'
+          ? ' by query parameter'
+          : ''
     out.push(
       `  • ${p.name} — ${p.rule_count} rule(s)${on}, ${action_label(p.action)}`
     )
     for (const r of p.rules ?? []) {
-      const what = p.match === 'user_agent' ? `UA ~ ${r.pattern}` : r.pattern
+      const what =
+        p.match === 'user_agent'
+          ? `UA ~ ${r.pattern}`
+          : p.match === 'query'
+            ? `?${r.pattern}`
+            : r.pattern
       out.push(`      ${what}${r.description ? `  # ${r.description}` : ''}`)
     }
   }
@@ -58,14 +68,18 @@ export const format_waf = (waf: FaableAppWaf): string[] => {
 /**
  * What a rule selects, in one line.
  *
- * The three shapes have to be visibly different here: a user-agent rule has no
- * path restriction (it applies to the whole app) and a combined one is an AND,
- * so printing either as a bare pattern would misrepresent its reach.
+ * The five shapes have to be visibly different here: a user-agent or query rule
+ * has no path restriction (it applies to the whole app) and the combined ones
+ * are ANDs, so printing any of them as a bare pattern would misrepresent its
+ * reach. The `?` prefix marks a query parameter — `rest_route` on its own would
+ * read like a path.
  */
 export const rule_subject = (r: FaableWafRule): string => {
   if (r.pattern && r.user_agent) {
     return `${r.pattern} + UA ~ ${r.user_agent}`
   }
+  if (r.pattern && r.query) return `${r.pattern} + ?${r.query}`
   if (r.user_agent) return `UA ~ ${r.user_agent} (any path)`
+  if (r.query) return `?${r.query} (any path)`
   return r.pattern ?? '(unknown)'
 }

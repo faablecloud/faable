@@ -1,5 +1,5 @@
 import test from 'ava'
-import { action_label, format_waf } from './format'
+import { action_label, format_waf, rule_subject } from './format'
 
 test('action labels explain what the caller will actually see', t => {
   t.is(action_label('deny'), '403 (blocked at the edge)')
@@ -115,4 +115,20 @@ test('a monitor-probes platform profile does not read like a block', t => {
 
   t.regex(out, /by user-agent/)
   t.notRegex(out, /blocked at the edge/)
+})
+
+test('a query rule says it has no path restriction', t => {
+  t.is(
+    rule_subject({ query: 'rest_route', action: 'deny' }),
+    '?rest_route (any path)'
+  )
+})
+
+test('a path+query rule shows both halves, and the parameter reads as one', t => {
+  // Without the `?` prefix `rest_route` reads like a path segment, which is
+  // exactly the confusion that makes someone think the rule is not firing.
+  t.is(
+    rule_subject({ pattern: '^/$', query: 'rest_route', action: 'deny' }),
+    '^/$ + ?rest_route'
+  )
 })

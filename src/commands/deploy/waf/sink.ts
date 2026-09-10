@@ -6,6 +6,7 @@ import { add_rule } from './add_rule'
 interface WafSinkArgs {
   pattern?: string
   userAgent?: string
+  query?: string
   app?: string
   description?: string
   force?: boolean
@@ -27,6 +28,12 @@ export const waf_sink: CommandModule<unknown, WafSinkArgs> = {
         description:
           'RE2 fragment matched against User-Agent, e.g. YisouSpider. With a path, BOTH must match.'
       })
+      .option('query', {
+        alias: 'q',
+        type: 'string',
+        description:
+          'Literal query parameter name, e.g. rest_route (not a regex). With a path, BOTH must match.'
+      })
       .option('app', {
         alias: 'a',
         type: 'string',
@@ -41,14 +48,20 @@ export const waf_sink: CommandModule<unknown, WafSinkArgs> = {
         type: 'boolean',
         default: false,
         description:
-          'Accept a user-agent that also matches a known search/AI crawler or uptime monitor'
+          'Accept a user-agent that also matches a known search/AI crawler or uptime monitor, or a query parameter that carries an auth flow'
       })
-      .check(({ pattern, userAgent }: any) => {
-        if (!pattern && !userAgent) {
+      .check(({ pattern, userAgent, query }: any) => {
+        if (userAgent && query) {
           throw new Error(
-            'Give a path pattern, --user-agent, or both.\n' +
+            'A rule can combine a path with --user-agent OR with --query, not both.'
+          )
+        }
+        if (!pattern && !userAgent && !query) {
+          throw new Error(
+            'Give a path pattern, --user-agent, --query, or a path with one of them.\n' +
               "  e.g. faable deploy waf sink '^/wp-admin'\n" +
-              '       faable deploy waf sink --user-agent YisouSpider'
+              '       faable deploy waf sink --user-agent YisouSpider\n' +
+              '       faable deploy waf sink --query rest_route'
           )
         }
         return true
@@ -79,6 +92,7 @@ export const waf_sink: CommandModule<unknown, WafSinkArgs> = {
       app_url: app.url,
       pattern: args.pattern,
       user_agent: args.userAgent,
+      query: args.query,
       action: 'sink',
       description: args.description,
       force: args.force

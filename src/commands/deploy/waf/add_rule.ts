@@ -4,6 +4,7 @@ import { log } from '../../../log'
 export type RuleSelector = {
   pattern?: string
   user_agent?: string
+  query?: string
 }
 
 /** How a rule reads in a sentence, for the confirmation the user gets back. */
@@ -11,7 +12,11 @@ export const describe_selector = (s: RuleSelector): string => {
   if (s.pattern && s.user_agent) {
     return `requests for ${s.pattern} from user-agents matching ${s.user_agent}`
   }
+  if (s.pattern && s.query) {
+    return `requests for ${s.pattern} carrying ?${s.query}`
+  }
   if (s.user_agent) return `requests from user-agents matching ${s.user_agent}`
+  if (s.query) return `requests carrying ?${s.query}`
   return `requests for ${s.pattern}`
 }
 
@@ -23,7 +28,8 @@ export const rule_matches_request = (
 ): boolean =>
   rule.action === action &&
   (rule.pattern ?? '') === (want.pattern ?? '') &&
-  (rule.user_agent ?? '') === (want.user_agent ?? '')
+  (rule.user_agent ?? '') === (want.user_agent ?? '') &&
+  (rule.query ?? '') === (want.query ?? '')
 
 /**
  * Shared handler for `block` and `sink` — the two differ only in the action
@@ -37,6 +43,7 @@ export const add_rule = async (opts: {
   app_url: string
   pattern?: string
   user_agent?: string
+  query?: string
   action: 'deny' | 'sink'
   description?: string
   force?: boolean
@@ -48,15 +55,17 @@ export const add_rule = async (opts: {
     app_url,
     pattern,
     user_agent,
+    query,
     action,
     description,
     force
   } = opts
 
-  const want: RuleSelector = { pattern, user_agent }
+  const want: RuleSelector = { pattern, user_agent, query }
   const waf = await api.addAppWafRule(app_id, {
     pattern,
     user_agent,
+    query,
     action,
     description,
     force
@@ -64,23 +73,30 @@ export const add_rule = async (opts: {
 
   // Read the rule back before telling the user it worked.
   //
-  // An older Faable server has no `user_agent` on this endpoint and drops it
-  // silently, storing the path half on its own — which turns "block /login for
-  // this bot" into "block /login for everyone". No server-side schema can
-  // prevent that (the old server is the old code), so the client checks that
-  // what came back is what it asked for, and undoes the write if it is not.
+  // An older Faable server has no `user_agent` (or no `query`) on this endpoint
+  // and drops it silently, storing the path half on its own — which turns
+  // "block /login for this bot" into "block /login for everyone", or "block /
+  // when it carries ?rest_route" into "block /", which is the entire app. No
+  // server-side schema can prevent that (the old server is the old code), so
+  // the client checks that what came back is what it asked for, and undoes the
+  // write if it is not.
+  //
+  // The query half is the more dangerous of the two, because the api LIFTS the
+  // site-root guard for a path that is ANDed with a parameter: `^/$` is a legal
+  // pattern to send, and an old server that drops the parameter stores exactly
+  // the rule the guard exists to refuse.
   if (
-    user_agent &&
+    (user_agent || query) &&
     !waf.rules.some(r => rule_matches_request(r, want, action))
   ) {
     await api
-      .removeAppWafRule(app_id, { pattern, user_agent, action })
+      .removeAppWafRule(app_id, { pattern, user_agent, query, action })
       // If the rollback itself is unsupported, fall back to the path-only
       // shape the old server actually stored.
       .catch(() => api.removeAppWafRule(app_id, { pattern, action }))
       .catch(() => undefined)
     throw new Error(
-      `This Faable server does not support user-agent rules yet, so the rule was not created.\n` +
+      `This Faable server does not support ${query ? 'query-parameter' : 'user-agent'} rules yet, so the rule was not created.\n` +
         `  Update the CLI and try again, or ask support to upgrade the platform.`
     )
   }
@@ -124,7 +140,8 @@ export const add_rule = async (opts: {
 export const undo_args = (s: RuleSelector): string =>
   [
     s.pattern ? `'${s.pattern}'` : '',
-    s.user_agent ? `--user-agent '${s.user_agent}'` : ''
+    s.user_agent ? `--user-agent '${s.user_agent}'` : '',
+    s.query ? `--query '${s.query}'` : ''
   ]
     .filter(Boolean)
     .join(' ')

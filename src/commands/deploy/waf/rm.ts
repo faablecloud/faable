@@ -7,6 +7,7 @@ import { describe_selector } from './add_rule'
 interface WafRmArgs {
   pattern?: string
   userAgent?: string
+  query?: string
   action?: 'deny' | 'sink'
   app?: string
 }
@@ -29,6 +30,11 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
         type: 'string',
         description: 'The user-agent of the rule to remove'
       })
+      .option('query', {
+        alias: 'q',
+        type: 'string',
+        description: 'The query parameter of the rule to remove'
+      })
       .option('action', {
         type: 'string',
         choices: ['deny', 'sink'] as const,
@@ -39,9 +45,11 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
         type: 'string',
         description: 'App Identifier (defaults to the linked app)'
       })
-      .check(({ pattern, userAgent }: any) => {
-        if (!pattern && !userAgent) {
-          throw new Error('Give the path pattern, --user-agent, or both.')
+      .check(({ pattern, userAgent, query }: any) => {
+        if (!pattern && !userAgent && !query) {
+          throw new Error(
+            'Give the path pattern, --user-agent, --query, or a path with one of them.'
+          )
         }
         return true
       })
@@ -62,13 +70,15 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
     await ctx.api.removeAppWafRule(app_id, {
       pattern: args.pattern,
       user_agent: args.userAgent,
+      query: args.query,
       action: args.action
     })
 
     log.info(
       `🗑️  Removed ${describe_selector({
         pattern: args.pattern,
-        user_agent: args.userAgent
+        user_agent: args.userAgent,
+        query: args.query
       })} from ${app.name} (${app_id}).`
     )
     log.info(
