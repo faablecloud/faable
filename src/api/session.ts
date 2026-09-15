@@ -1,4 +1,3 @@
-import { AxiosError } from "axios";
 import { CredentialsStore, FaableConfig } from "../lib/CredentialsStore";
 import { refreshToken } from "./auth";
 import { log } from "../log";
@@ -50,7 +49,10 @@ export const loadLiveCredentials = async (
       // token endpoint's RFC 6749 error body. "Run `faable login` again"
       // would be a lie here — login is denied too — so say what actually
       // happened and stop instead of letting a generic 401 mislead.
-      const body = (e as AxiosError<{ error_code?: string }>)?.response?.data;
+      // The SDK's error keeps the HTTP body under `response.data`, like the
+      // axios error it replaced.
+      const body = (e as { response?: { data?: { error_code?: string } } })
+        ?.response?.data;
       if (body?.error_code === "user_suspended") {
         log.error(
           "❌ Your account has been suspended. Contact support@faable.com."

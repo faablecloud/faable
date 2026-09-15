@@ -1,6 +1,7 @@
-import { FaableAuthApi } from '@faable/auth-sdk'
+import type { FaableAuthApi } from '@faable/auth-sdk'
 import { CredentialsStore } from '../lib/CredentialsStore'
 import { log } from '../log'
+import { createBearerAuthApi } from './auth'
 import { loadLiveCredentials } from './session'
 
 // Default tenant host. `faable auth` is customer-facing: a customer targets
@@ -43,13 +44,10 @@ export const requireAuthAdmin = async (
   const domain = opts.authUrl || process.env.FAABLE_AUTH_URL || DEFAULT_AUTH_URL
   const account = opts.account || process.env.FAABLE_AUTH_ACCOUNT
 
-  return new FaableAuthApi({
-    domain,
-    ...(account ? { headers: { account_id: account } } : {}),
-    // Static bearer: passing no `auth` keeps sdk-base from attaching any token
-    // strategy, so this header is used verbatim on every request.
-    fetcher: { headers: { Authorization: `Bearer ${token}` } }
-  })
+  // The session's bearer as a strategy — with the CLI's own identity on the
+  // wire instead of `auth-sdk` — scoped to the target tenant when one was
+  // named. The server decides whether this token may manage that tenant.
+  return createBearerAuthApi(token, { domain, account })
 }
 
 // Translate raw management-API failures into actionable CLI errors. Everything
