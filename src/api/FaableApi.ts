@@ -17,6 +17,14 @@ const is_connection_reset = (e: AxiosError) =>
   e.isAxiosError &&
   !e.response &&
   (RESET_CODES.has(e.code ?? '') || e.message.includes('socket hang up'))
+
+// The api's tenant header is `x-faable-project: project_<hex>`; the old
+// `x-faable-team` is deprecated. A project and a team share the hex suffix,
+// so the app's `team` (`team_<hex>`) maps 1:1. Never send both: the api
+// rejects a pair that disagrees.
+export const projectHeader = (team: string) => ({
+  'x-faable-project': team.replace(/^team_/, 'project_')
+})
 export interface FaableApp {
   id: string
   name: string
@@ -450,7 +458,7 @@ export class FaableApi<T = any> {
   // app; the per-secret upsert/delete endpoints are not used by the CLI.
   // The endpoint stamps the created secrets with the team from the request
   // context, which a CLI user token does not carry — pass the app's team
-  // (from getApp) so it travels as the `x-faable-team` header.
+  // (from getApp) so it travels as the `x-faable-project` header.
   async createSecretsBatch(
     context_id: string,
     team: string,
@@ -460,7 +468,7 @@ export class FaableApi<T = any> {
       this.client.post<Secret[]>(
         `/secret/createbatch`,
         { context_id, secrets },
-        { headers: { 'x-faable-team': team } }
+        { headers: projectHeader(team) }
       )
     )
   }
@@ -522,7 +530,7 @@ export class FaableApi<T = any> {
       data(
         this.client.get<Page<FaableDeployment>>(`/deployment`, {
           params: { app_id },
-          headers: { 'x-faable-team': team }
+          headers: projectHeader(team)
         })
       )
     )
@@ -546,7 +554,7 @@ export class FaableApi<T = any> {
       this.client.post<FaableDeployment>(
         `/deployment/${deployment_id}/redeploy`,
         undefined,
-        { headers: { 'x-faable-team': team } }
+        { headers: projectHeader(team) }
       )
     )
   }
@@ -560,20 +568,20 @@ export class FaableApi<T = any> {
       this.client.post<FaableDeployment>(
         `/deployment/${deployment_id}/cancel`,
         undefined,
-        { headers: { 'x-faable-team': team } }
+        { headers: projectHeader(team) }
       )
     )
   }
 
   // Domains are team-scoped rows; a CLI user token carries no default team,
-  // so every call pins the app's team via `x-faable-team` (same pattern as
-  // createSecretsBatch).
+  // so every call pins the app's project via `x-faable-project` (same pattern
+  // as createSecretsBatch).
   async listDomains(app_id: string, team: string) {
     return firstPage(
       data(
         this.client.get<Page<FaableDomain>>(`/domain`, {
           params: { app_id },
-          headers: { 'x-faable-team': team }
+          headers: projectHeader(team)
         })
       )
     )
@@ -585,7 +593,7 @@ export class FaableApi<T = any> {
   ) {
     return data(
       this.client.post<FaableDomain>(`/domain`, params, {
-        headers: { 'x-faable-team': team }
+        headers: projectHeader(team)
       })
     )
   }
@@ -593,7 +601,7 @@ export class FaableApi<T = any> {
   async getDomain(domain_id: string, team: string) {
     return data(
       this.client.get<FaableDomain>(`/domain/${domain_id}`, {
-        headers: { 'x-faable-team': team }
+        headers: projectHeader(team)
       })
     )
   }
@@ -601,16 +609,16 @@ export class FaableApi<T = any> {
   async deleteDomain(domain_id: string, team: string) {
     return data(
       this.client.delete(`/domain/${domain_id}`, {
-        headers: { 'x-faable-team': team }
+        headers: projectHeader(team)
       })
     )
   }
 
   // ── per-app WAF ───────────────────────────────────────────────────────────
   //
-  // No `x-faable-team` header on any of these: the routes are scoped by the
-  // app in the path (the server reads the team off the App row), and sending
-  // a team override would only narrow the lookup.
+  // No `x-faable-project` header on any of these: the routes are scoped by the
+  // app in the path (the server reads the project off the App row), and sending
+  // a project override would only narrow the lookup.
 
   async getAppWaf(app_id: string) {
     return data(this.client.get<FaableAppWaf>(`/app/${app_id}/waf`))
