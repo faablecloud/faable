@@ -39,6 +39,9 @@ export type RowResult = {
   email?: string
   status: 'created' | 'updated' | 'skipped' | 'error'
   user_id?: string
+  // Identities whose connection this tenant does not have (Apple from a
+  // Firebase export): the user was imported without them.
+  skipped_identities?: string[]
   error?: { code: string; message: string }
 }
 
@@ -208,6 +211,8 @@ export const users_import: CommandModule<unknown, ImportArgs> = {
           email: r.email,
           status: r.status,
           user_id: r.user_id,
+          skipped_identities: (r as { skipped_identities?: string[] })
+            .skipped_identities,
           error: r.error
         })
       }
@@ -231,6 +236,13 @@ export const users_import: CommandModule<unknown, ImportArgs> = {
     if (args.json) {
       print_json({ dry_run, summary, results })
     } else {
+      const without = results.filter(r => r.skipped_identities?.length)
+      if (without.length) {
+        const names = [...new Set(without.flatMap(r => r.skipped_identities!))]
+        log.warn(
+          `⚠️  ${without.length} user(s) imported without their ${names.join(', ')} identity: this tenant has no connection by that name. Create it and re-run with --update-existing, or map it with --map-connection.`
+        )
+      }
       for (const r of results.filter(r => r.status === 'error')) {
         log.error(
           `❌ record ${r.record}${r.email ? ` (${r.email})` : ''}: ${r.error?.code} — ${r.error?.message}`
