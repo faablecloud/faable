@@ -24,8 +24,11 @@ yg.scriptName('faable')
     if (banner_shown) return
     banner_shown = true
     // --json mode is for piping: keep stdout machine-clean (no banner, no
-    // update-check notice).
-    if (argv.json) return
+    // update-check notice). Same for `auth users export` without a file,
+    // whose stdout IS the export.
+    const exports_to_stdout =
+      argv._.slice(0, 3).join(' ') === 'auth users export' && !argv.file
+    if (argv.json || exports_to_stdout) return
     log.info(`Faable CLI ${version}`)
     // `upgrade` does its own (forced) check
     if (argv._[0] !== 'upgrade') {
