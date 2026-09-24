@@ -328,6 +328,19 @@ export class FaableApi<T = any> {
     return new FaableApi(config)
   }
 
+  // A short-lived Management API token for ONE Faable Auth tenant, issued by
+  // the deploy api after checking the caller belongs to the project that owns
+  // it (phase 2 of arch/auth/management-api-tenant-isolation.md). `faable auth`
+  // manages tenants with it instead of the `faable login` token, which stops
+  // being platform-superadmin in phase 3.
+  async issueAuthAccountToken(account_id: string) {
+    return data(
+      this.client.post<{ access_token: string; expires_in: number }>(
+        `/auth-accounts/${account_id}/token`
+      )
+    )
+  }
+
   async list() {
     return allPages<FaableApp>(next =>
       data(
