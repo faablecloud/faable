@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { as_list, json_option, print, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { managed_name, managed_warning } from './managed_names'
@@ -8,13 +9,14 @@ import { mask_value } from './mask'
 interface SecretsListArgs {
   app?: string
   show?: boolean
+  json?: boolean
 }
 
 export const secrets_list: CommandModule<unknown, SecretsListArgs> = {
   command: 'list',
   describe: 'List app secrets (values masked by default)',
   builder: yargs =>
-    yargs
+    json_option(yargs)
       .option('app', {
         alias: 'a',
         type: 'string',
@@ -35,6 +37,18 @@ export const secrets_list: CommandModule<unknown, SecretsListArgs> = {
     const ctx = await requireApi()
     const app_id = await resolve_app_id(args.app, ctx.appId, ctx.api)
     const secrets = await ctx.api.getAppSecrets(app_id)
+    // The whole set in one response (the api doesn't page secrets). Values
+    // stay masked unless --show, in JSON as on screen.
+    if (args.json) {
+      return print_json(
+        as_list(
+          secrets.map(s => ({
+            ...s,
+            value: args.show ? s.value : mask_value(s.value)
+          }))
+        )
+      )
+    }
 
     if (secrets.length === 0) {
       log.info(`🔐 No secrets set for ${app_id}.`)
@@ -58,7 +72,7 @@ export const secrets_list: CommandModule<unknown, SecretsListArgs> = {
         : managed.kind === 'reserved'
           ? '  ⚠️ reserved, ignored at deploy'
           : '  ⚠️ overrides a platform default'
-      log.info(`  ${secret.name.padEnd(width)}  ${value}${origin}${note}`)
+      print(`  ${secret.name.padEnd(width)}  ${value}${origin}${note}`)
     }
     if (!args.show) {
       log.info(`Use --show to reveal full values.`)

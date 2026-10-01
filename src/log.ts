@@ -6,6 +6,10 @@ import { buildLog } from "./lib/log_buffer";
 // transport: the worker's MessagePort can stay referenced after the last log
 // (thread-stream race) and intermittently keep the CLI from exiting.
 //
+// Messages go to STDERR. stdout is for data only — a listing, a JSON
+// document, logs being streamed — so `faable … --json | jq` and the MCP
+// server reading this CLI never get a progress line mixed into it.
+//
 // Tee: terminal stream (colorized) + a plain-text copy into the build-log
 // buffer so CLI messages land in the logs attached to the deployment.
 // What the terminal shows: just the message. pino's envelope
@@ -40,7 +44,14 @@ const toPlainText = prettyFactory({ colorize: false, sync: true });
 export const log = pino(
   {},
   pino.multistream([
-    { stream: pretty({ colorize: true, sync: true, ...TERMINAL_FORMAT }) },
+    {
+      stream: pretty({
+        colorize: process.stderr.isTTY ?? false,
+        sync: true,
+        destination: 2,
+        ...TERMINAL_FORMAT,
+      }),
+    },
     {
       stream: {
         write(line: string) {

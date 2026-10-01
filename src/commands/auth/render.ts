@@ -1,25 +1,7 @@
 // Pure rendering helpers for the `faable auth` read commands.
 
-export const print_json = (data: unknown): void => {
-  process.stdout.write(JSON.stringify(data, null, 2) + '\n')
-}
-
-// Left-padded fixed-width table lines. Cells are stringified as-is; column
-// width = max(header, cells).
-export const table_lines = (
-  headers: string[],
-  rows: string[][]
-): string[] => {
-  const widths = headers.map((h, i) =>
-    Math.max(h.length, ...rows.map(r => (r[i] ?? '').length))
-  )
-  const render = (cells: string[]) =>
-    cells
-      .map((c, i) => (i === cells.length - 1 ? c : (c ?? '').padEnd(widths[i])))
-      .join('  ')
-      .trimEnd()
-  return [render(headers), ...rows.map(render)]
-}
+// JSON output and tables are the listing contract's (src/lib/listing.ts).
+export { print_json, table_lines } from '../../lib/listing'
 
 export const yes_no = (v?: boolean): string => (v ? '✓' : '-')
 

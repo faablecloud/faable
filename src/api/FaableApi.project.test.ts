@@ -56,3 +56,31 @@ for (const [name, call] of calls) {
     t.is(header(seen[0], "x-faable-team"), undefined);
   });
 }
+
+// Project-wide listings follow the active project; the repo→app match
+// (`list()`) does not, or a repo whose app lives in another project would
+// stop resolving.
+test("listApps is scoped to the active project", async (t) => {
+  const api = FaableApi.create();
+  api.project = PROJECT;
+  const seen = capture(api);
+  await api.listApps({ pageSize: 100 });
+  t.is(header(seen[0], "x-faable-project"), PROJECT);
+  t.deepEqual(seen[0].params, { pageSize: 100 });
+});
+
+test("list() is never scoped, active project or not", async (t) => {
+  const api = FaableApi.create();
+  api.project = PROJECT;
+  const seen = capture(api);
+  await api.list();
+  t.is(header(seen[0], "x-faable-project"), undefined);
+});
+
+test("listApps without an active project sends no project", async (t) => {
+  const api = FaableApi.create();
+  const seen = capture(api);
+  await api.listApps({ pageSize: 100, next: "cur" });
+  t.is(header(seen[0], "x-faable-project"), undefined);
+  t.deepEqual(seen[0].params, { pageSize: 100, next: "cur" });
+});

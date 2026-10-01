@@ -2,7 +2,7 @@ import { CommandModule } from 'yargs'
 import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
 import { TenantArgs, json_option, tenant_options } from '../options'
-import { fetch_items } from '../paging'
+import { fetch_page, from_paginator } from '../../../lib/listing'
 import { print_json, when, yes_no } from '../render'
 
 interface UsersGetArgs extends TenantArgs {
@@ -50,11 +50,11 @@ export const users_get: CommandModule<unknown, UsersGetArgs> = {
     // rarely matches the GitHub handle that owns the deployed repos).
     // Best-effort: a tenant where the session can't read /identity still
     // renders the user card.
-    const identities = await fetch_items(
-      api.identityList({ query: `user:${args.user_id}` }),
-      true
+    const identities = await fetch_page(
+      from_paginator(api.identityList({ query: `user:${args.user_id}` })),
+      { limit: 200, all: true }
     )
-      .then(r => r.items.map(i => sanitize_identity(i as never)))
+      .then(r => r.data.map(i => sanitize_identity(i as never)))
       .catch(() => [] as Record<string, unknown>[])
 
     // Resolve connection ids to names ("github") once per distinct id.

@@ -1,16 +1,16 @@
 import { CommandModule } from 'yargs'
 import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
-import { ListArgs, json_option, list_options, tenant_options } from '../options'
-import { fetch_items } from '../paging'
+import { fetch_page, from_paginator, more_hint, print } from '../../../lib/listing'
+import { AuthListArgs, list_options, tenant_options } from '../options'
 import { print_json, table_lines, when, yes_no } from '../render'
 import { formatTriggers } from './triggers'
 
-export const actions_list: CommandModule<unknown, ListArgs> = {
+export const actions_list: CommandModule<unknown, AuthListArgs> = {
   command: 'list',
   describe: 'List actions',
   builder: yargs =>
-    json_option(list_options(tenant_options(yargs)))
+    list_options(tenant_options(yargs))
       .option('query', {
         type: 'string',
         description: 'FaableQL filter, e.g. "enabled:true"'
@@ -18,19 +18,19 @@ export const actions_list: CommandModule<unknown, ListArgs> = {
       .showHelpOnFail(false) as any,
   handler: withAuthHints(async args => {
     const api = await requireAuthAdmin(args)
-    const { items, more } = await fetch_items(
-      api.actionList({ query: args.query, pageSize: args.limit }),
-      args.all
+    const page = await fetch_page(
+      from_paginator(api.actionList({ query: args.query })),
+      args
     )
 
-    if (args.json) return print_json(items)
+    if (args.json) return print_json(page)
 
-    if (items.length === 0) {
+    if (page.data.length === 0) {
       log.info('📭 No actions.')
       return
     }
-    log.info(`⚙️ ${items.length} action(s):`)
-    const rows = items.map(a => [
+    log.info(`⚙️ ${page.data.length} action(s):`)
+    const rows = page.data.map(a => [
       a.id ?? '-',
       a.name ?? '-',
       formatTriggers(a as any),
@@ -42,10 +42,9 @@ export const actions_list: CommandModule<unknown, ListArgs> = {
       ['ID', 'NAME', 'TRIGGER', 'ENABLED', 'ORDER', 'CREATED'],
       rows
     )) {
-      log.info(`  ${line}`)
+      print(line)
     }
-    if (more) {
-      log.info('… more results available: raise --limit or use --all.')
-    }
+    const hint = more_hint(page)
+    if (hint) log.info(hint)
   })
 }

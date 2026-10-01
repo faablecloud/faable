@@ -1,12 +1,12 @@
 import { CommandModule } from 'yargs'
 import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
-import { ListArgs, json_option, list_options, tenant_options } from '../options'
+import { fetch_page, from_paginator, more_hint, print } from '../../../lib/listing'
+import { AuthListArgs, list_options, tenant_options } from '../options'
 import { compose_query } from '../query'
-import { fetch_items } from '../paging'
 import { print_json, table_lines, truncate, when, yes_no } from '../render'
 
-interface UsersListArgs extends ListArgs {
+interface UsersListArgs extends AuthListArgs {
   q?: string
   suspended?: boolean
 }
@@ -15,7 +15,7 @@ export const users_list: CommandModule<unknown, UsersListArgs> = {
   command: 'list',
   describe: 'List and filter users',
   builder: yargs =>
-    json_option(list_options(tenant_options(yargs)))
+    list_options(tenant_options(yargs))
       .option('query', {
         type: 'string',
         description:
@@ -41,19 +41,19 @@ export const users_list: CommandModule<unknown, UsersListArgs> = {
       [args.suspended !== undefined && `suspended:${args.suspended}`],
       args.query
     )
-    const { items, more } = await fetch_items(
-      api.userList({ query, q: args.q, pageSize: args.limit }),
-      args.all
+    const page = await fetch_page(
+      from_paginator(api.userList({ query, q: args.q })),
+      args
     )
 
-    if (args.json) return print_json(items)
+    if (args.json) return print_json(page)
 
-    if (items.length === 0) {
+    if (page.data.length === 0) {
       log.info('📭 No users match.')
       return
     }
-    log.info(`👥 ${items.length} user(s):`)
-    const rows = items.map(u => [
+    log.info(`👥 ${page.data.length} user(s):`)
+    const rows = page.data.map(u => [
       u.id ?? '-',
       truncate(u.email, 32),
       truncate(u.name, 24),
@@ -65,10 +65,9 @@ export const users_list: CommandModule<unknown, UsersListArgs> = {
       ['ID', 'EMAIL', 'NAME', 'VERIFIED', 'SUSPENDED', 'LAST LOGIN'],
       rows
     )) {
-      log.info(`  ${line}`)
+      print(line)
     }
-    if (more) {
-      log.info('… more results available: raise --limit, use --all, or refine the filter.')
-    }
+    const hint = more_hint(page)
+    if (hint) log.info(hint)
   })
 }

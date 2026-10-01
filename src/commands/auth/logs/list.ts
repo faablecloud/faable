@@ -1,12 +1,12 @@
 import { CommandModule } from 'yargs'
 import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
-import { ListArgs, json_option, list_options, tenant_options } from '../options'
-import { fetch_items } from '../paging'
+import { fetch_page, from_paginator, more_hint, print } from '../../../lib/listing'
+import { AuthListArgs, list_options, tenant_options } from '../options'
 import { compose_query, term, time_term } from '../query'
 import { log_status_badge, print_json, table_lines, truncate } from '../render'
 
-interface LogsListArgs extends ListArgs {
+interface LogsListArgs extends AuthListArgs {
   q?: string
   type?: string
   status?: string
@@ -21,7 +21,7 @@ export const logs_list: CommandModule<unknown, LogsListArgs> = {
   command: 'list',
   describe: 'List and filter audit logs',
   builder: yargs =>
-    json_option(list_options(tenant_options(yargs)))
+    list_options(tenant_options(yargs))
       .option('query', {
         type: 'string',
         description: 'Raw FaableQL filter (combined with the flags below)'
@@ -83,19 +83,19 @@ export const logs_list: CommandModule<unknown, LogsListArgs> = {
     )
 
     const api = await requireAuthAdmin(args)
-    const { items, more } = await fetch_items(
-      api.logList({ query, q: args.q, pageSize: args.limit }),
-      args.all
+    const page = await fetch_page(
+      from_paginator(api.logList({ query, q: args.q })),
+      args
     )
 
-    if (args.json) return print_json(items)
+    if (args.json) return print_json(page)
 
-    if (items.length === 0) {
+    if (page.data.length === 0) {
       log.info('📭 No audit log entries match.')
       return
     }
-    log.info(`📜 ${items.length} entr${items.length === 1 ? 'y' : 'ies'}:`)
-    const rows = items.map(entry => [
+    log.info(`📜 ${page.data.length} entr${page.data.length === 1 ? 'y' : 'ies'}:`)
+    const rows = page.data.map(entry => [
       entry.createdAt ?? '-',
       entry.type ?? '-',
       log_status_badge(entry.status),
@@ -109,10 +109,9 @@ export const logs_list: CommandModule<unknown, LogsListArgs> = {
       ['DATE', 'TYPE', 'STATUS', 'USER', 'MESSAGE', 'ID'],
       rows
     )) {
-      log.info(`  ${line}`)
+      print(line)
     }
-    if (more) {
-      log.info('… more results available: raise --limit, use --all, or narrow with --since/--type.')
-    }
+    const hint = more_hint(page)
+    if (hint) log.info(hint)
   })
 }

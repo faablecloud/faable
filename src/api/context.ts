@@ -6,6 +6,7 @@ import { bearer_strategy } from "./strategies/bearer.strategy";
 import { CredentialsStore } from "../lib/CredentialsStore";
 import { loadLiveCredentials } from "./session";
 import { log } from "../log";
+import { configuredProject, resolveProjectRef } from "./project";
 
 export const context = async (targetAppId?: string) => {
   let api: FaableApi | undefined;
@@ -48,6 +49,14 @@ export const context = async (targetAppId?: string) => {
         });
       }
     }
+  }
+
+  // The active project scopes project-wide listings (`deploy list`). Only
+  // when one is configured: picking a default here would cost a request on
+  // every command, including a deploy.
+  if (api) {
+    const configured = await configuredProject();
+    if (configured) api.project = await resolveProjectRef(api, configured.ref);
   }
 
   const appId = await api?.strategy?.app_id?.();

@@ -25,6 +25,31 @@ const is_connection_reset = (e: AxiosError) =>
 export const projectHeader = (team: string) => ({
   'x-faable-project': team.replace(/^team_/, 'project_')
 })
+export interface FaableProject {
+  id: string
+  name: string
+  slug?: string
+  team: string
+  description?: string
+  owner_email?: string
+  createdAt?: string
+}
+
+// A Faable Auth tenant ("account") owned by a project, as
+// GET /project/:id/auth-accounts serves it.
+export interface FaableAuthAccount {
+  id: string
+  name: string
+  domain: string
+  slug?: string
+  team?: string
+}
+
+export interface PageParams {
+  pageSize?: number
+  next?: string
+}
+
 export interface FaableApp {
   id: string
   name: string
@@ -200,7 +225,7 @@ export interface Secret {
   value: string
 }
 
-type Page<Q> = { results: Q[]; next?: string | null }
+export type Page<Q> = { results: Q[]; next?: string | null }
 
 const firstPage = async <T, Q extends Promise<Page<T>>>(
   res: Q
@@ -226,6 +251,12 @@ const allPages = async <T>(
   return items
 }
 
+// Only what's set: the list endpoints answer 400 to an unknown or empty param.
+const page_params = ({ pageSize, next }: PageParams) => ({
+  ...(pageSize ? { pageSize } : {}),
+  ...(next ? { next } : {})
+})
+
 const data = async <T, Q extends Promise<AxiosResponse<T>>>(
   res: Q
 ): Promise<Awaited<Q>['data']> => {
@@ -243,6 +274,10 @@ type FaableApiConfig<T> = {} & FaableClientConfig<T>
 export class FaableApi<T = any> {
   client: AxiosInstance
   strategy?: AuthStrategy
+  // The active project (`--project`, FAABLE_PROJECT, `faable project use`),
+  // when there is one. Project-wide listings are scoped to it; calls about
+  // one app keep using that app's own project.
+  project?: string
 
   constructor(config: FaableApiConfig<T>) {
     const { authStrategy, auth } = config
@@ -341,12 +376,46 @@ export class FaableApi<T = any> {
     )
   }
 
+  // Every app the caller can see, across projects. Used to match the working
+  // directory's repository to its app: the link is global, so a repo whose
+  // app lives outside the active project must still resolve.
   async list() {
-    return allPages<FaableApp>(next =>
-      data(
-        this.client.get<Page<FaableApp>>(`/app`, {
-          params: { pageSize: 200, ...(next ? { next } : {}) }
-        })
+    return allPages<FaableApp>(next => this.listApps({ pageSize: 200, next }, null))
+  }
+
+  // One page of apps, scoped to `project` (default: the active project).
+  // `null` = unscoped. The api filters by the header, so an admin session
+  // doesn't page through the whole platform.
+  async listApps(params: PageParams, project: string | null = this.project ?? null) {
+    return data(
+      this.client.get<Page<FaableApp>>(`/app`, {
+        params: page_params(params),
+        ...(project ? { headers: projectHeader(project) } : {})
+      })
+    )
+  }
+
+  // Projects the caller belongs to (an admin session sees all of them).
+  // `q` searches name/description/slug; `user_id` keeps the ones they own.
+  async listProjects(params: PageParams & { q?: string; user_id?: string }) {
+    const { q, user_id, ...page } = params
+    return data(
+      this.client.get<Page<FaableProject>>(`/project`, {
+        params: { ...page_params(page), ...(q ? { q } : {}), ...(user_id ? { user_id } : {}) }
+      })
+    )
+  }
+
+  async getProject(project_id: string) {
+    return data(this.client.get<FaableProject>(`/project/${project_id}`))
+  }
+
+  // The Faable Auth tenants of a project. Membership-checked by the api.
+  async listProjectAuthAccounts(project_id: string, params: PageParams = {}) {
+    return data(
+      this.client.get<Page<FaableAuthAccount>>(
+        `/project/${project_id}/auth-accounts`,
+        { params: page_params(params) }
       )
     )
   }
@@ -539,13 +608,15 @@ export class FaableApi<T = any> {
   // Deployments of an app, newest first (the API's list index sorts
   // createdAt desc). Team pinned via header — same reason as domains.
   async listDeployments(app_id: string, team: string) {
-    return firstPage(
-      data(
-        this.client.get<Page<FaableDeployment>>(`/deployment`, {
-          params: { app_id },
-          headers: projectHeader(team)
-        })
-      )
+    return firstPage(this.listDeploymentsPage(app_id, team))
+  }
+
+  async listDeploymentsPage(app_id: string, team: string, params: PageParams = {}) {
+    return data(
+      this.client.get<Page<FaableDeployment>>(`/deployment`, {
+        params: { app_id, ...page_params(params) },
+        headers: projectHeader(team)
+      })
     )
   }
 
@@ -590,13 +661,15 @@ export class FaableApi<T = any> {
   // so every call pins the app's project via `x-faable-project` (same pattern
   // as createSecretsBatch).
   async listDomains(app_id: string, team: string) {
-    return firstPage(
-      data(
-        this.client.get<Page<FaableDomain>>(`/domain`, {
-          params: { app_id },
-          headers: projectHeader(team)
-        })
-      )
+    return firstPage(this.listDomainsPage(app_id, team))
+  }
+
+  async listDomainsPage(app_id: string, team: string, params: PageParams = {}) {
+    return data(
+      this.client.get<Page<FaableDomain>>(`/domain`, {
+        params: { app_id, ...page_params(params) },
+        headers: projectHeader(team)
+      })
     )
   }
 

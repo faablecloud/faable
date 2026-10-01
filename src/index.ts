@@ -5,12 +5,16 @@ import { deploy } from './commands/deploy'
 import { link_deprecated } from './commands/link'
 import { login } from './commands/login'
 import { logout } from './commands/logout'
+import { project } from './commands/project'
 import { upgrade } from './commands/upgrade'
 import { whoami } from './commands/whoami'
 import { version } from './config'
 import { Configuration } from './lib/Configuration'
+import { setProjectFlag } from './api/project'
 import { notifyIfUpdateAvailable } from './lib/UpdateChecker'
 import { log } from './log'
+
+const wants_json = () => process.argv.includes('--json')
 
 // yargs re-runs before-validation middlewares once per nested command level
 // (`deploy secrets` = 2 runs), so keep the banner and update check to one.
@@ -28,7 +32,8 @@ yg.scriptName('faable')
     // whose stdout IS the export.
     const exports_to_stdout =
       argv._.slice(0, 3).join(' ') === 'auth users export' && !argv.file
-    if (argv.json || exports_to_stdout) return
+    // Nor when nobody is watching stderr (a script, the MCP server).
+    if (argv.json || exports_to_stdout || !process.stderr.isTTY) return
     log.info(`Faable CLI ${version}`)
     // `upgrade` does its own (forced) check
     if (argv._[0] !== 'upgrade') {
@@ -40,7 +45,15 @@ yg.scriptName('faable')
     description: 'Path to the local `faable.json` file',
     string: true
   })
+  .option('p', {
+    alias: 'project',
+    description:
+      'Project to act on, id or name (env FAABLE_PROJECT; default: `faable project use`)',
+    string: true,
+    global: true
+  })
   .middleware(function (argv) {
+    setProjectFlag(argv.project as string | undefined)
     if (argv.config) {
       Configuration.instance().setConfigFile(argv.config as any, {
         ignoreWarnings: false
@@ -51,6 +64,7 @@ yg.scriptName('faable')
   }, true)
   .command(deploy)
   .command(auth)
+  .command(project)
   .command(login)
   .command(logout)
   .command(whoami)
@@ -64,7 +78,22 @@ yg.scriptName('faable')
   .help()
   .fail(function (msg, err) {
     if (err) {
-      log.error(`❌ ${err.message}`)
+      // With --json the caller is a program: the error as JSON too, on
+      // stderr, so it can tell a 404 from a 403 without parsing prose.
+      if (wants_json()) {
+        const e = err as Error & { status?: number; code?: string }
+        process.stderr.write(
+          JSON.stringify({
+            error: {
+              message: e.message,
+              ...(e.code ? { code: e.code } : {}),
+              ...(e.status ? { status: e.status } : {})
+            }
+          }) + '\n'
+        )
+      } else {
+        log.error(`❌ ${err.message}`)
+      }
       process.exit(1)
       return
     }
