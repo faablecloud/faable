@@ -386,11 +386,23 @@ export class FaableApi<T = any> {
     )
   }
 
-  // Every app the caller can see, across projects. Used to match the working
-  // directory's repository to its app: the link is global, so a repo whose
-  // app lives outside the active project must still resolve.
+  // Every app the caller can see, across projects (`faable link` offers them
+  // to pick from).
   async list() {
     return allPages<FaableApp>(next => this.listApps({ pageSize: 200, next }, null))
+  }
+
+  // The apps linked to `repository` (the `org/repo` slug), across projects —
+  // filtered (and indexed) server side, so a staff session doesn't page
+  // through the whole platform to match one repository.
+  async appsByRepository(repository: string) {
+    return allPages<FaableApp>(next =>
+      data(
+        this.client.get<Page<FaableApp>>(`/app`, {
+          params: { repository, ...page_params({ pageSize: 200, next }) }
+        })
+      )
+    )
   }
 
   // One page of apps, scoped to `project` (default: the active project).

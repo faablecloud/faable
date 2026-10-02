@@ -32,12 +32,12 @@ export const upgrade: CommandModule = {
 
     const spinner = ora(`Upgrading ${CLI_PACKAGE} ${version} → ${latest}`).start();
     try {
-      await cmd(`npm install -g ${CLI_PACKAGE}@latest`, { timeout: 180_000 });
+      await cmd(`npm install -g --prefer-online ${CLI_PACKAGE}@latest`, { timeout: 180_000 });
       spinner.succeed(`Upgraded to ${latest}`);
     } catch {
       spinner.fail("Upgrade failed");
       log.error(
-        `❌ Could not upgrade automatically. Try manually: npm install -g ${CLI_PACKAGE}@latest`
+        `❌ Could not upgrade automatically. Try manually: npm install -g --prefer-online ${CLI_PACKAGE}@latest`
       );
       process.exit(1);
     }

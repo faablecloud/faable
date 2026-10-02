@@ -71,8 +71,7 @@ export const find_app_id = async (
 
   const repository = await getGitRemoteUrl(workdir)
   if (repository) {
-    const apps = await api.list()
-    const matches = apps.filter(app => app.repository === repository)
+    const matches = await api.appsByRepository(repository)
     if (matches.length === 1) {
       const app = matches[0]
       log.info(`🔎 Detected app "${app.name}" (${app.id}) from repository ${repository}`)
