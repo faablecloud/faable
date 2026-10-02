@@ -48,6 +48,8 @@ const NEXT_STEP: Record<string, string> = {
   forbidden:
     'This session has no access there — check the project (list_projects).',
   app_required: 'Pass `app` (id, name or slug).',
+  project_required:
+    'This account sees several projects: call list_projects and pass `project` (on the hosted server, connecting to /mcp/<project> pins it).',
   timeout: 'Faable did not answer in time; retry once, then tell the user.'
 }
 
@@ -117,10 +119,24 @@ const build_log_text = (b: BuildLog) => {
   return head.concat(b.content).join('\n')
 }
 
-export const tools_for = (opts: { writes?: boolean }) =>
-  TOOLS.filter(t => !t.write || opts.writes)
+export interface ServerOptions {
+  // Also the reversible writes (`--writes`, `?mode=write`).
+  writes?: boolean
+  // Only the read-only tools — not even deploy_app (`?readonly=1`).
+  readonly?: boolean
+  // Every call is pinned to this project (`/mcp/<project>`).
+  project?: string
+  // How a tool runs the CLI — per request on the hosted server, with the
+  // caller's own key.
+  run?: (argv: string[], opts: RunOptions) => Promise<CliResult>
+}
 
-export const create_server = (opts: { writes?: boolean } = {}) => {
+export const tools_for = (opts: Pick<ServerOptions, 'writes' | 'readonly'>) =>
+  TOOLS.filter(t =>
+    opts.readonly ? t.annotations.readOnlyHint : !t.write || opts.writes
+  )
+
+export const create_server = (opts: ServerOptions = {}) => {
   const server = new McpServer(
     { name: 'faable', title: 'Faable', version },
     { instructions: INSTRUCTIONS }
@@ -134,7 +150,15 @@ export const create_server = (opts: { writes?: boolean } = {}) => {
         inputSchema: tool.input,
         annotations: { title: tool.title, ...tool.annotations }
       },
-      ((args: Record<string, unknown>) => call_tool(tool, args ?? {})) as never
+      ((args: Record<string, unknown>) =>
+        call_tool(
+          tool,
+          // A pinned project wins over whatever the agent passes.
+          opts.project
+            ? { ...(args ?? {}), project: opts.project }
+            : (args ?? {}),
+          opts.run
+        )) as never
     )
   }
   return server

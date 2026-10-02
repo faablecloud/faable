@@ -24,7 +24,22 @@ export const NEW_APP = {
 export const start_api = async () => {
   const writes: string[] = []
   const bodies: string[] = []
+  // Who called, on every request: the credential, the project and the client.
+  const requests: {
+    method?: string
+    path: string
+    authorization?: string
+    project?: string
+    client?: string
+  }[] = []
   const server = http.createServer((req, res) => {
+    requests.push({
+      method: req.method,
+      path: (req.url ?? '/').split('?')[0],
+      authorization: req.headers.authorization,
+      project: req.headers['x-faable-project'] as string | undefined,
+      client: req.headers['x-faable-client'] as string | undefined
+    })
     const url = new URL(req.url ?? '/', 'http://stub')
     const json = (body: unknown) => {
       res.setHeader('content-type', 'application/json')
@@ -118,6 +133,7 @@ export const start_api = async () => {
     url: `http://127.0.0.1:${port}`,
     writes,
     bodies,
+    requests,
     close: () => server.close()
   }
 }

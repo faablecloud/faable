@@ -14,6 +14,7 @@ export type CliErrorCode =
   | 'not_found' // 404
   | 'confirmation_required' // a prompt nobody can answer (no TTY, no --yes)
   | 'app_required' // the command needs --app and could not infer one
+  | 'project_required' // several projects and none chosen: --project
   | 'usage' // bad invocation: unknown command, missing argument…
 
 export interface CliErrorFields {

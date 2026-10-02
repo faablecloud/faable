@@ -1,4 +1,5 @@
 import { ContextStore } from '../lib/ContextStore'
+import { CliError } from '../lib/errors'
 import type { FaableApi, FaableProject } from './FaableApi'
 
 // Which project a command acts on, in precedence order:
@@ -86,7 +87,8 @@ export const requireProject = async (
   if (page.results.length === 1 && !page.next) {
     return { id: page.results[0].id, source: 'only' }
   }
-  throw new Error(
+  throw new CliError(
+    'project_required',
     'No project selected. Pick one with: faable project use <id|name> (list them with: faable project list), or pass --project <id|name>.'
   )
 }

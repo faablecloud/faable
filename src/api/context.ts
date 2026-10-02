@@ -11,11 +11,17 @@ import { CliError, NOT_LOGGED_IN } from "../lib/errors";
 export const context = async (targetAppId?: string) => {
   let api: FaableApi | undefined;
 
-  // Auth resolution: FAABLE_TOKEN → OIDC (CI) → local `faable login` credentials.
+  // Auth resolution: FAABLE_TOKEN → FAABLE_API_KEY → OIDC (CI) → local
+  // `faable login` credentials.
   if (process.env.FAABLE_TOKEN) {
     // Token in environment
     const token = process.env.FAABLE_TOKEN;
     api = FaableApi.create({ authStrategy: bearer_strategy, auth: { token } });
+  } else if (process.env.FAABLE_API_KEY) {
+    // A dashboard API key, scoped to its project — how the hosted MCP server
+    // (`faable mcp --http`) runs each call with the caller's own key.
+    const apikey = process.env.FAABLE_API_KEY;
+    api = FaableApi.create({ authStrategy: apikey_strategy, auth: { apikey } });
   } else if (process.env.GITHUB_ACTIONS === "true") {
     // Github actions environment
     try {

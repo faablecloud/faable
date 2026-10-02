@@ -3,6 +3,7 @@ import { CommandModule } from "yargs";
 import { getMe } from "../../api/auth";
 import { resolveTenant, type Tenant } from "../../api/auth_admin";
 import { FaableApi } from "../../api/FaableApi";
+import { requireApi } from "../../api/context";
 import { SOURCE_LABEL, requireProject } from "../../api/project";
 import { loadLiveCredentials } from "../../api/session";
 import { bearer_strategy } from "../../api/strategies/bearer.strategy";
@@ -43,6 +44,27 @@ export const whoami: CommandModule<unknown, { json?: boolean }> = {
 
     // Bearer token from the environment (CI) or a local `faable login`.
     const token = process.env.FAABLE_TOKEN || config?.token;
+
+    // An API key from the environment (the hosted MCP server). It cannot be
+    // introspected at /me, and it acts with its owner's access — not only on
+    // the project it was created in — so the project is whatever this call
+    // pinned, if anything.
+    if (!token && process.env.FAABLE_API_KEY) {
+      const { api } = await requireApi();
+      const project = await requireProject(api)
+        .then(async ({ id, source }) => ({
+          id,
+          name: (await api.getProject(id).catch(() => undefined))?.name,
+          source,
+        }))
+        .catch(() => null);
+      if (args.json) return print_json({ credential: "apikey", project });
+      print("Logged in with: an API key");
+      print(
+        `Project:      ${project ? `${project.name ?? ""} (${project.id})` : "none — pass --project"}`
+      );
+      return;
+    }
 
     if (!token) {
       // API-key sessions can't be introspected at the auth server's /me; fall

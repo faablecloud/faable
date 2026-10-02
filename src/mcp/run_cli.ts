@@ -1,5 +1,8 @@
 import { spawn } from 'node:child_process'
+import { createRequire } from 'node:module'
 import os from 'node:os'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 // Every MCP tool is one run of this same CLI (arch/deploy/mcp-server-faable.md,
 // Fase 1 — the contract in arch/deploy/mcp-cli-gaps.md):
@@ -33,12 +36,27 @@ export interface RunOptions {
 
 const DEFAULT_TIMEOUT_MS = 120_000
 
+// import.meta.resolve where the runtime has it; where a transpiler shims
+// import.meta (tsx under a test runner), the CommonJS resolver from the
+// current directory finds the same file.
+const resolve_loader = (spec: string): string => {
+  try {
+    if (typeof import.meta.resolve === 'function')
+      return import.meta.resolve(spec)
+  } catch {
+    // fall through
+  }
+  return pathToFileURL(
+    createRequire(path.join(process.cwd(), 'noop.js')).resolve(spec)
+  ).href
+}
+
 // The child runs from the temp dir (M3), where a bare `--import tsx` (how the
 // tests and `npm run cli` start this CLI) would no longer resolve. Resolve
 // such loaders here, from the CLI's own location, before handing them on.
 export const portable_exec_argv = (
   exec_argv: string[] = process.execArgv,
-  resolve: (spec: string) => string = spec => import.meta.resolve(spec)
+  resolve: (spec: string) => string = resolve_loader
 ): string[] => {
   const bare = (spec: string) => !/^(\.|\/|file:|node:|data:)/.test(spec)
   return exec_argv.map((arg, i) => {
