@@ -29,7 +29,7 @@
     "@actions/core": "^3.0.0",
     "@faable/auth-sdk": "^2.7.29",
     "@modelcontextprotocol/sdk": "^1.31.0",
-    "axios": "^1.18.1",
+    "axios": "^1.20.0",
     "fs-extra": "^11.3.2",
     "open": "^11.0.0",
     "ora": "^9.4.0",
