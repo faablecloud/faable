@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { json_option, print_json, print_noop } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 
@@ -11,13 +12,14 @@ const IN_FLIGHT_PHASES = new Set(['UNKNOWN', 'QUEUED', 'BUILDING'])
 interface CancelArgs {
   deployment?: string
   app?: string
+  json?: boolean
 }
 
 export const cancel: CommandModule<unknown, CancelArgs> = {
   command: 'cancel [deployment]',
   describe: 'Stop a deployment that is still queued or building',
   builder: yargs =>
-    yargs
+    json_option(yargs)
       .positional('deployment', {
         type: 'string',
         description:
@@ -42,6 +44,9 @@ export const cancel: CommandModule<unknown, CancelArgs> = {
         IN_FLIGHT_PHASES.has(d.status?.phase ?? '')
       )
       if (!inFlight) {
+        if (args.json) {
+          return print_noop(`nothing is building for ${app.name}`)
+        }
         log.info(`✅ Nothing building for ${app.name} — nothing to cancel.`)
         return
       }
@@ -52,6 +57,7 @@ export const cancel: CommandModule<unknown, CancelArgs> = {
     // deployment, and answers a repeated cancel with the same 200 so a retry
     // is never an error the user has to read.
     const canceled = await ctx.api.cancelDeployment(deployment_id, app.team)
+    if (args.json) return print_json(canceled)
     log.info(`🛑 Canceled ${canceled.id} (${app.name}).`)
     log.info(
       `Production keeps serving the last promoted deployment. Deploy again with: faable deploy`

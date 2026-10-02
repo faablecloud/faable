@@ -39,6 +39,7 @@ const APP = {
 
 const start_api = async () => {
   const writes: string[] = []
+  const bodies: string[] = []
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://stub')
     const json = (body: unknown) => {
@@ -47,7 +48,26 @@ const start_api = async () => {
     }
     if (req.method !== 'GET') {
       writes.push(`${req.method} ${req.url}`)
-      return json({})
+      let body = ''
+      req.on('data', chunk => (body += chunk))
+      req.on('end', () => {
+        bodies.push(body)
+        if (url.pathname === `/app/${APP.id}/deploy`) {
+          return json({
+            status: 'created',
+            commit: 'abc1234def',
+            branch: 'main'
+          })
+        }
+        if (url.pathname === '/deployment/deployment_1/redeploy') {
+          return json({ id: 'deployment_2', redeploy_of: 'deployment_1' })
+        }
+        if (url.pathname === '/domain') {
+          return json({ id: 'domain_2', fqdn: 'www.new.example.com' })
+        }
+        json({})
+      })
+      return
     }
     if (url.pathname === `/app/${APP.id}`) return json(APP)
     if (url.pathname === `/app/${APP.id}/logs`) {
@@ -85,11 +105,16 @@ const start_api = async () => {
   return {
     url: `http://127.0.0.1:${port}`,
     writes,
+    bodies,
     close: () => server.close()
   }
 }
 
-const run = async (args: string[], env: Record<string, string> = {}) => {
+const run = async (
+  args: string[],
+  env: Record<string, string> = {},
+  input = ''
+) => {
   const home = mkdtempSync(path.join(os.tmpdir(), 'faable-home-'))
   // The caller's own session and CI context must not leak into the run.
   const base = { ...process.env }
@@ -102,7 +127,7 @@ const run = async (args: string[], env: Record<string, string> = {}) => {
     delete base[name]
   }
   try {
-    const { stdout, stderr } = await exec_file(
+    const running = exec_file(
       process.execPath,
       ['--import', 'tsx', path.join(src, 'index.ts'), ...args],
       {
@@ -110,6 +135,8 @@ const run = async (args: string[], env: Record<string, string> = {}) => {
         env: { ...base, HOME: home, NO_COLOR: '1', ...env }
       }
     )
+    running.child.stdin?.end(input)
+    const { stdout, stderr } = await running
     return { code: 0, stdout, stderr }
   } catch (error) {
     const failed = error as { code?: number; stdout?: string; stderr?: string }
@@ -220,6 +247,65 @@ test('the reads an agent needs come out as data', async t => {
       ...app
     ])
     t.is(domain.expected_cname, 'domain_1.faable.link')
+  } finally {
+    api.close()
+  }
+})
+
+test('the writes say what they did, and a no-op says so', async t => {
+  const api = await start_api()
+  try {
+    const env = {
+      ...NONINTERACTIVE,
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: api.url
+    }
+    const write = async (args: string[], input = '') => {
+      const { code, stdout, stderr } = await run(
+        [...args, '--json'],
+        env,
+        input
+      )
+      t.is(code, 0, `${args.join(' ')}: ${stderr}`)
+      return { data: JSON.parse(stdout), stdout }
+    }
+    const app = ['--app', APP.id]
+
+    t.deepEqual((await write(['deploy', 'trigger', ...app])).data, {
+      app_id: APP.id,
+      status: 'created',
+      commit: 'abc1234def',
+      branch: 'main'
+    })
+    t.is((await write(['deploy', 'redeploy', ...app])).data.id, 'deployment_2')
+    // The only deployment is a failed one: nothing in flight to cancel.
+    t.is((await write(['deploy', 'cancel', ...app])).data.result, 'noop')
+
+    const added = await write(
+      ['deploy', 'domains', 'add', 'www.new.example.com', ...app],
+      ''
+    )
+    t.is(added.data.expected_cname, 'domain_2.faable.link')
+
+    // Values come in on stdin and only names come back out.
+    const secret = 'sk_live_never_echoed'
+    const set = await write(
+      // `-f`, not `--env-file`: node ≥ 22 claims the long one (see set.ts).
+      ['deploy', 'secrets', 'set', '-f', '-', ...app],
+      `API_KEY=secret\nNEW_KEY=${secret}\n`
+    )
+    t.deepEqual(set.data, {
+      app_id: APP.id,
+      added: ['NEW_KEY'],
+      updated: [],
+      unchanged: ['API_KEY'],
+      restarting: true
+    })
+    t.false(set.stdout.includes(secret))
+    t.true(
+      api.bodies.some(b => b.includes(secret)),
+      'the value did reach the api'
+    )
   } finally {
     api.close()
   }

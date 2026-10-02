@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { describe_selector } from './add_rule'
@@ -10,13 +11,14 @@ interface WafRmArgs {
   query?: string
   action?: 'deny' | 'sink'
   app?: string
+  json?: boolean
 }
 
 export const waf_rm: CommandModule<unknown, WafRmArgs> = {
   command: 'rm [pattern]',
   describe: 'Remove one of your WAF rules',
   builder: yargs =>
-    yargs
+    json_option(yargs)
       .positional('pattern', {
         type: 'string',
         description:
@@ -67,12 +69,13 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
     const app_id = await resolve_app_id(args.app, ctx.appId, ctx.api)
     const app = await ctx.api.getApp(app_id)
 
-    await ctx.api.removeAppWafRule(app_id, {
+    const waf = await ctx.api.removeAppWafRule(app_id, {
       pattern: args.pattern,
       user_agent: args.userAgent,
       query: args.query,
       action: args.action
     })
+    if (args.json) return print_json(waf)
 
     log.info(
       `🗑️  Removed ${describe_selector({

@@ -1,4 +1,8 @@
-import { FaableApi, FaableWafRule } from '../../../api/FaableApi'
+import {
+  FaableApi,
+  FaableAppWaf,
+  FaableWafRule
+} from '../../../api/FaableApi'
 import { log } from '../../../log'
 
 export type RuleSelector = {
@@ -47,7 +51,9 @@ export const add_rule = async (opts: {
   action: 'deny' | 'sink'
   description?: string
   force?: boolean
-}) => {
+  // --json: the WAF as it is after the write, and no prose.
+  json?: boolean
+}): Promise<FaableAppWaf> => {
   const {
     api,
     app_id,
@@ -58,7 +64,8 @@ export const add_rule = async (opts: {
     query,
     action,
     description,
-    force
+    force,
+    json
   } = opts
 
   const want: RuleSelector = { pattern, user_agent, query }
@@ -101,6 +108,8 @@ export const add_rule = async (opts: {
     )
   }
 
+  if (json) return waf
+
   const answer = action === 'deny' ? '403' : '404'
   log.info(`🛡️  ${describe_selector(want)} → ${answer} at the edge`)
   log.info(`   for ${app_name} (${app_id}).`)
@@ -134,6 +143,7 @@ export const add_rule = async (opts: {
   )
   log.info(``)
   log.info(`Undo: faable deploy waf rm ${undo_args(want)} -a ${app_id}`)
+  return waf
 }
 
 /** The exact arguments that reverse this rule. */

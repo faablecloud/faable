@@ -1,20 +1,22 @@
 import { CommandModule } from 'yargs'
 import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
-import { TenantArgs, tenant_options } from '../options'
+import { print_json } from '../render'
+import { TenantArgs, json_option, tenant_options } from '../options'
 import { resolve_client } from './resolve'
 import { confirm } from '../../../lib/interactive'
 
 interface ClientsRmArgs extends TenantArgs {
   client_id: string
   yes?: boolean
+  json?: boolean
 }
 
 export const clients_rm: CommandModule<unknown, ClientsRmArgs> = {
   command: 'rm <client_id>',
   describe: 'Delete an OAuth client',
   builder: yargs =>
-    tenant_options(yargs)
+    json_option(tenant_options(yargs))
       .positional('client_id', {
         type: 'string',
         demandOption: true,
@@ -42,6 +44,13 @@ export const clients_rm: CommandModule<unknown, ClientsRmArgs> = {
     }
 
     await api.clientDelete(client.id)
+    if (args.json) {
+      return print_json({
+        deleted: true,
+        id: client.id,
+        client_id: client.client_id
+      })
+    }
     log.info(`🗑️ Deleted client ${client.client_id} (${client.id}).`)
   })
 }

@@ -123,6 +123,12 @@ export const print_json = (data: unknown): void => {
   print(JSON.stringify(data, null, 2))
 }
 
+// A write that had nothing to do (no failed deployment to retry, nothing in
+// flight to cancel). Exit 0 — it is not an error — but said in the data, so a
+// caller never mistakes it for the thing having happened.
+export const print_noop = (reason: string): void =>
+  print_json({ result: 'noop', reason })
+
 // The rerun hint for the next page, on stderr (the logger's): shown to a
 // person, invisible to a pipe.
 export const more_hint = (page: ListPage<unknown>) =>

@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { find_by_fqdn } from './format'
@@ -9,13 +10,14 @@ interface DomainsRmArgs {
   fqdn: string
   app?: string
   yes?: boolean
+  json?: boolean
 }
 
 export const domains_rm: CommandModule<unknown, DomainsRmArgs> = {
   command: 'rm <fqdn>',
   describe: 'Remove a custom domain from the app',
   builder: yargs =>
-    yargs
+    json_option(yargs)
       .positional('fqdn', {
         type: 'string',
         demandOption: true,
@@ -57,6 +59,9 @@ export const domains_rm: CommandModule<unknown, DomainsRmArgs> = {
     }
 
     await ctx.api.deleteDomain(domain.id, app.team)
+    if (args.json) {
+      return print_json({ deleted: true, id: domain.id, fqdn: domain.fqdn })
+    }
     log.info(`🗑️ Removed domain ${domain.fqdn} from ${app_id}.`)
     log.info(
       `The app stays live at https://${app.url}. Remember to delete the CNAME at your DNS provider.`

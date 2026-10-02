@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { json_option, print_json } from '../../../lib/listing'
 import { resolve_app_id } from '../resolve_app_id'
 import { add_rule } from './add_rule'
 
@@ -10,13 +11,14 @@ interface WafSinkArgs {
   app?: string
   description?: string
   force?: boolean
+  json?: boolean
 }
 
 export const waf_sink: CommandModule<unknown, WafSinkArgs> = {
   command: 'sink [pattern]',
   describe: 'Answer requests with a 404 from Faable, without waking your app',
   builder: yargs =>
-    yargs
+    json_option(yargs)
       .positional('pattern', {
         type: 'string',
         description:
@@ -85,7 +87,7 @@ export const waf_sink: CommandModule<unknown, WafSinkArgs> = {
     const app_id = await resolve_app_id(args.app, ctx.appId, ctx.api)
     const app = await ctx.api.getApp(app_id)
 
-    await add_rule({
+    const waf = await add_rule({
       api: ctx.api,
       app_id,
       app_name: app.name,
@@ -95,7 +97,9 @@ export const waf_sink: CommandModule<unknown, WafSinkArgs> = {
       query: args.query,
       action: 'sink',
       description: args.description,
-      force: args.force
+      force: args.force,
+      json: args.json
     })
+    if (args.json) print_json(waf)
   }
 }

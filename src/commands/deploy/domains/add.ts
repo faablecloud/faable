@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { cname_target } from './format'
@@ -8,13 +9,14 @@ interface DomainsAddArgs {
   fqdn: string
   app?: string
   tls?: boolean
+  json?: boolean
 }
 
 export const domains_add: CommandModule<unknown, DomainsAddArgs> = {
   command: 'add <fqdn>',
   describe: 'Add a custom domain to the app',
   builder: yargs =>
-    yargs
+    json_option(yargs)
       .positional('fqdn', {
         type: 'string',
         demandOption: true,
@@ -45,6 +47,12 @@ export const domains_add: CommandModule<unknown, DomainsAddArgs> = {
       app_id,
       tls: args.tls
     })
+
+    // Same shape as `domains check --json`: the record plus the CNAME to
+    // create, which is the whole next step.
+    if (args.json) {
+      return print_json({ ...domain, expected_cname: cname_target(domain) })
+    }
 
     log.info(`🌐 Domain ${domain.fqdn} added to ${app.name} (${app_id}).`)
     log.info(``)

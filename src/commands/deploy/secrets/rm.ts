@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { remove_app_secret } from './merge'
@@ -9,13 +10,14 @@ interface SecretsRmArgs {
   name: string
   app?: string
   yes?: boolean
+  json?: boolean
 }
 
 export const secrets_rm: CommandModule<unknown, SecretsRmArgs> = {
   command: 'rm <name>',
   describe: 'Remove a secret by name',
   builder: yargs =>
-    yargs
+    json_option(yargs)
       .positional('name', {
         type: 'string',
         demandOption: true,
@@ -55,6 +57,9 @@ export const secrets_rm: CommandModule<unknown, SecretsRmArgs> = {
     }
 
     await ctx.api.createSecretsBatch(app.id, app.team, remaining)
+    if (args.json) {
+      return print_json({ deleted: true, name: args.name, restarting: true })
+    }
     log.info(`🗑️ Removed secret ${args.name} from ${app_id}.`)
     log.info(`ℹ️ The app is restarting to apply the changes.`)
   }

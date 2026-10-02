@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { managed_warning } from './managed_names'
@@ -13,13 +14,24 @@ interface SecretsSetArgs {
   pairs?: string[]
   app?: string
   'env-file'?: string
+  json?: boolean
 }
 
 // `--env-file` with no value means "the .env in this directory", the case
 // people actually have.
 const DEFAULT_ENV_FILE = '.env'
 
+// `-` reads the .env from stdin: the way to pass values without putting them
+// in argv, where `ps` and any process log can read them (the MCP server
+// always sets secrets this way).
+//
+// Spell it `-f -`. Node ≥ 22 scans the WHOLE argv for its own `--env-file`,
+// even after the script, and dies with "node: -: not found" before the CLI
+// runs; the short alias is invisible to it.
+const STDIN = '-'
+
 const read_env_file = (raw_path: string): SecretPair[] => {
+  if (raw_path === STDIN) return parse_env(readFileSync(0, 'utf8'), 'stdin')
   const path = raw_path || DEFAULT_ENV_FILE
   let content: string
   try {
@@ -55,7 +67,7 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
   command: 'set [pairs...]',
   describe: 'Set secrets as KEY=VALUE pairs or from a .env file',
   builder: yargs =>
-    yargs
+    json_option(yargs)
       .positional('pairs', {
         type: 'string',
         array: true,
@@ -69,7 +81,8 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
       .option('env-file', {
         alias: 'f',
         type: 'string',
-        description: 'Load variables from a .env file (defaults to ./.env)'
+        description:
+          'Load variables from a .env file (defaults to ./.env; `-f -` reads stdin)'
       })
       .example('$0 deploy secrets set API_KEY=abc123', 'Set a single secret')
       .example(
@@ -83,6 +96,10 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
       .example(
         '$0 deploy secrets set -f .env.production',
         'Upload another env file'
+      )
+      .example(
+        'op read op://vault/api/env | $0 deploy secrets set -f -',
+        'Read the variables from stdin, never from the command line'
       )
       .showHelpOnFail(false) as any,
   handler: async args => {
@@ -100,7 +117,8 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
     const parsed = combine(from_file, parse_pairs(pairs))
 
     if (env_file !== undefined) {
-      const path = env_file || DEFAULT_ENV_FILE
+      const path =
+        env_file === STDIN ? 'stdin' : env_file || DEFAULT_ENV_FILE
       if (from_file.length === 0) {
         throw new Error(`${path} has no variables to set.`)
       }
@@ -131,6 +149,28 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
         .map(s => [s.name, s.value] as const)
     )
     const updated = parsed.filter(({ name }) => current.has(name)).length
+    // Only claim the restart when something actually changed. Setting a name
+    // to the value it already has is a no-op end to end — the API compares
+    // before writing and never emits the event, so the pod keeps running —
+    // and this line used to promise a restart that was not coming.
+    const changed = parsed.some(
+      ({ name, value }) => current.get(name) !== value
+    )
+
+    // Names only: a value never goes back out.
+    if (args.json) {
+      return print_json({
+        app_id,
+        added: parsed.filter(p => !current.has(p.name)).map(p => p.name),
+        updated: parsed
+          .filter(p => current.has(p.name) && current.get(p.name) !== p.value)
+          .map(p => p.name),
+        unchanged: parsed
+          .filter(p => current.get(p.name) === p.value)
+          .map(p => p.name),
+        restarting: changed
+      })
+    }
     if (parsed.length <= MAX_DETAILED) {
       for (const { name } of parsed) {
         log.info(
@@ -143,14 +183,6 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
       log.info(`🔑 ${parsed.length - updated} added, ${updated} updated`)
     }
     log.info(`✅ ${parsed.length} secret(s) saved to ${app_id}.`)
-
-    // Only claim the restart when something actually changed. Setting a name
-    // to the value it already has is a no-op end to end — the API compares
-    // before writing and never emits the event, so the pod keeps running —
-    // and this line used to promise a restart that was not coming.
-    const changed = parsed.some(
-      ({ name, value }) => current.get(name) !== value
-    )
     log.info(
       changed
         ? `ℹ️ The app is restarting to apply the changes.`
