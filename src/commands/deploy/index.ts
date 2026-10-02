@@ -1,11 +1,11 @@
 import { CommandModule } from 'yargs'
 import { link } from '../link'
+import { apps, apps_list_legacy } from './apps'
 import { domains } from './domains'
 import { capture_deploy_help } from './help'
 import { cancel } from './inspect/cancel'
 import { deployments } from './inspect/deployments'
 import { inspect } from './inspect/inspect'
-import { apps_list } from './inspect/list'
 import { logs } from './inspect/logs'
 import { open_app } from './inspect/open'
 import { redeploy } from './inspect/redeploy'
@@ -39,12 +39,13 @@ export const deploy: CommandModule = {
     capture_deploy_help(
       yargs
         .command(launch)
+        .command(apps)
         .command(secrets)
         .command(domains)
         .command(waf)
         .command(logs)
         .command(status)
-        .command(apps_list)
+        .command(apps_list_legacy)
         .command(deployments)
         .command(inspect)
         .command(open_app)

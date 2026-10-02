@@ -83,3 +83,16 @@ test('--app is the documented way to target another app', async t => {
   t.is(code, 0)
   t.regex(output, /-a, --app/)
 })
+
+test('apps are listed as `deploy apps list`, like every other resource', async t => {
+  const help = await run(['deploy', '--help'])
+  t.regex(help.output, /faable deploy apps/)
+  // The old `deploy list` still works, but isn't advertised next to it.
+  t.notRegex(help.output, /faable deploy list/)
+
+  for (const argv of [['deploy', 'apps', 'list', '--help'], ['deploy', 'list', '--help']]) {
+    const { code, output } = await run(argv)
+    t.is(code, 0, argv.join(' '))
+    t.regex(output, /--starting-after/, argv.join(' '))
+  }
+})
