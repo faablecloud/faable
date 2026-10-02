@@ -1,5 +1,7 @@
 import { FaableApi } from '../../api/FaableApi'
 import { Configuration } from '../../lib/Configuration'
+import { CliError } from '../../lib/errors'
+import { is_non_interactive } from '../../lib/interactive'
 import { getGitRemoteUrl } from '../../lib/git_remote'
 import { log } from '../../log'
 
@@ -12,6 +14,10 @@ import { log } from '../../log'
 //     of the working directory (repos are connected in the dashboard when the
 //     app is created, or via `faable deploy link`)
 //
+// Non-interactive mode stops at 2: the working directory of a process a
+// program spawned (the MCP server) says nothing about which app the user
+// meant, and guessing from it is how a deploy lands on the wrong app.
+//
 // "No app here" is an answer, not an error — a bare `faable deploy` in an
 // unlinked directory lists the subcommands instead of failing, and only the
 // caller knows which of the two it wants. An AMBIGUOUS repository does throw:
@@ -22,6 +28,7 @@ export const find_app_id = async (
   api: FaableApi,
   workdir = process.cwd()
 ): Promise<string | null> => {
+  if (is_non_interactive()) return explicit || ctxAppId || null
   const app_id = explicit || ctxAppId || Configuration.instance().app_id
   if (app_id) return app_id
 
@@ -55,7 +62,10 @@ export const resolve_app_id = async (
   const app_id = await find_app_id(explicit, ctxAppId, api, workdir)
   if (app_id) return app_id
 
-  throw new Error(
-    'No app linked to this repository. Link it from the dashboard (or run "faable deploy link"), or pass one with --app <app_id>.'
+  throw new CliError(
+    'app_required',
+    is_non_interactive()
+      ? 'Pass the app with --app <app_id> (non-interactive mode never infers it from the working directory).'
+      : 'No app linked to this repository. Link it from the dashboard (or run "faable deploy link"), or pass one with --app <app_id>.'
   )
 }

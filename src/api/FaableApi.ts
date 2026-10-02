@@ -336,6 +336,7 @@ export class FaableApi<T = any> {
                 { cause: error }
               )
               ;(expired as any).status = 401
+              ;(expired as any).code = 'session_expired'
               throw expired
             }
             const serverMessage =
@@ -347,7 +348,10 @@ export class FaableApi<T = any> {
             // Surface the structured error contract (e.g. the repository-link
             // flow returns { code, action }) so callers can branch on it.
             ;(wrapped as any).status = res.status
+            // The api's own code wins; a bare 403/404 still gets a stable one.
             if (res.data?.code) (wrapped as any).code = res.data.code
+            else if (res.status === 403) (wrapped as any).code = 'forbidden'
+            else if (res.status === 404) (wrapped as any).code = 'not_found'
             if (res.data?.action) (wrapped as any).action = res.data.action
             throw wrapped
           } else {

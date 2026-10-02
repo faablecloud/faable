@@ -1,5 +1,4 @@
 import { readFile } from 'node:fs/promises'
-import prompts from 'prompts'
 import { CommandModule } from 'yargs'
 import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
@@ -14,6 +13,7 @@ import {
   Source
 } from './import/adapters'
 import { parse_records } from './import/records'
+import { confirm } from '../../../lib/interactive'
 
 // The server takes at most this many rows per request (POST /user/import).
 export const BATCH_SIZE = 500
@@ -180,16 +180,12 @@ export const users_import: CommandModule<unknown, ImportArgs> = {
     }
 
     const dry_run = !!args['dry-run']
-    if (!args.yes && !dry_run) {
-      const { confirm } = await prompts({
-        type: 'toggle',
-        name: 'confirm',
+    if (!dry_run) {
+      const go = await confirm({
         message: `Import ${rows.length} user(s) from ${args.from}?`,
-        initial: false,
-        active: 'yes',
-        inactive: 'no'
+        yes: args.yes
       })
-      if (!confirm) {
+      if (!go) {
         log.info('Cancelled.')
         return
       }

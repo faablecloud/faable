@@ -1,5 +1,4 @@
 import { CommandModule } from "yargs";
-import { log } from "../../log";
 
 import { getMe } from "../../api/auth";
 import { resolveTenant, type Tenant } from "../../api/auth_admin";
@@ -9,6 +8,7 @@ import { loadLiveCredentials } from "../../api/session";
 import { bearer_strategy } from "../../api/strategies/bearer.strategy";
 import { CredentialsStore } from "../../lib/CredentialsStore";
 import { json_option, print, print_json } from "../../lib/listing";
+import { CliError, NOT_LOGGED_IN } from "../../lib/errors";
 
 // Who you are, and what the CLI acts on: the active project and the Auth
 // tenant `faable auth` would manage. The context is best-effort — a missing
@@ -52,8 +52,7 @@ export const whoami: CommandModule<unknown, { json?: boolean }> = {
         print(`Logged in as: ${config.email} (API key)`);
         return;
       }
-      log.error("❌ Not logged in. Run 'faable login' first.");
-      process.exit(1);
+      throw new CliError("not_logged_in", NOT_LOGGED_IN);
     }
 
     let me: { email: string };
@@ -61,9 +60,12 @@ export const whoami: CommandModule<unknown, { json?: boolean }> = {
       // Validate against the Auth server (it issued the token); the deploy API
       // has no /me route.
       me = await getMe(token);
-    } catch {
-      log.error("❌ Not logged in or session expired");
-      process.exit(1);
+    } catch (e) {
+      throw new CliError(
+        "session_expired",
+        "Your Faable session has expired or is invalid. Run `faable login` to sign in again.",
+        { status: 401, cause: e }
+      );
     }
 
     const { project, tenant } = await describeContext(token);

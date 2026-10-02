@@ -1,10 +1,10 @@
-import prompts from 'prompts'
 import { CommandModule } from 'yargs'
 import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
 import { TenantArgs, json_option, tenant_options } from '../options'
 import { print_json } from '../render'
 import { parse_user_ids, read_stdin, wants_stdin } from './ids'
+import { confirm } from '../../../lib/interactive'
 
 interface SuspendArgs extends TenantArgs {
   user_ids?: string[]
@@ -53,21 +53,14 @@ export const users_suspend: CommandModule<unknown, SuspendArgs> = {
       : null
     const ids = parse_user_ids(argv_ids, stdin)
 
-    if (!args.yes) {
-      const preview = ids.slice(0, 5).join(', ') + (ids.length > 5 ? ', …' : '')
-      // In a non-TTY run without --yes, prompts resolves undefined → cancel.
-      const { confirm } = await prompts({
-        type: 'toggle',
-        name: 'confirm',
-        message: `Suspend ${ids.length} user(s) (${preview})?`,
-        initial: false,
-        active: 'yes',
-        inactive: 'no'
-      })
-      if (!confirm) {
-        log.info('Cancelled.')
-        return
-      }
+    const preview = ids.slice(0, 5).join(', ') + (ids.length > 5 ? ', …' : '')
+    const go = await confirm({
+      message: `Suspend ${ids.length} user(s) (${preview})?`,
+      yes: args.yes
+    })
+    if (!go) {
+      log.info('Cancelled.')
+      return
     }
 
     const api = await requireAuthAdmin(args)

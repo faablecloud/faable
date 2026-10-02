@@ -1,7 +1,8 @@
-import prompts from 'prompts'
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../api/context'
 import { Configuration } from '../../lib/Configuration'
+import { CliError } from '../../lib/errors'
+import { confirm, is_non_interactive } from '../../lib/interactive'
 import { log } from '../../log'
 import { git_context } from './git_context'
 import { show_deploy_help } from './help'
@@ -58,6 +59,23 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
       .showHelpOnFail(false) as any,
 
   handler: async args => {
+    // Driven by a program: nothing about the target is left to the process'
+    // working directory, and the go-ahead is explicit (see lib/interactive).
+    if (is_non_interactive()) {
+      const missing = [
+        !args.app && '--app',
+        !args.workdir && '--workdir',
+        !args.yes && '--yes'
+      ].filter(Boolean)
+      if (missing.length) {
+        throw new CliError(
+          missing.includes('--yes') && missing.length === 1
+            ? 'confirmation_required'
+            : 'usage',
+          `In non-interactive mode a deploy needs ${missing.join(', ')}: the app, the directory to upload and the go-ahead are never inferred.`
+        )
+      }
+    }
     const workdir = args.workdir || process.cwd()
 
     // Pass the explicit app target to the OIDC exchange so a monorepo (several
@@ -74,29 +92,25 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
     // answering a bare `faable deploy` with an error and nothing else.
     if (!app_id) {
       show_deploy_help()
-      log.error(
-        `❌ No app linked to ${workdir}. Connect a repository from the dashboard (or run "faable deploy link"), or target one with --app <app_id>.`
+      throw new CliError(
+        'app_required',
+        `No app linked to ${workdir}. Connect a repository from the dashboard (or run "faable deploy link"), or target one with --app <app_id>.`
       )
-      process.exit(1)
     }
 
     const app = await api.getApp(app_id)
 
     // Confirm which app/dir is about to go out. Only in a real terminal — CI
     // (non-TTY) deploys unattended, so pipelines need no changes.
-    if (!args.yes && process.stdout.isTTY) {
-      const { confirm } = await prompts({
-        type: 'toggle',
-        name: 'confirm',
+    if (
+      process.stdout.isTTY &&
+      !(await confirm({
         message: `Deploy "${app.name}" (${app.id}) from ${workdir}?`,
-        initial: false,
-        active: 'yes',
-        inactive: 'no'
-      })
-      if (!confirm) {
-        log.info('Cancelled.')
-        return
-      }
+        yes: args.yes
+      }))
+    ) {
+      log.info('Cancelled.')
+      return
     }
 
     // Monorepo Root Directory — single precedence rule everywhere

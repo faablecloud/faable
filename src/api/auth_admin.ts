@@ -4,7 +4,7 @@ import os from 'os'
 import path from 'path'
 import { ContextStore } from '../lib/ContextStore'
 import { CredentialsStore } from '../lib/CredentialsStore'
-import { log } from '../log'
+import { CliError, NOT_LOGGED_IN } from '../lib/errors'
 import { FaableApi, FaableAuthAccount } from './FaableApi'
 import { AUTH_DOMAIN, createAnonymousAuthApi, createBearerAuthApi } from './auth'
 import { requireProject } from './project'
@@ -33,15 +33,12 @@ export const requireSessionToken = async (): Promise<string> => {
   const config = await loadLiveCredentials(new CredentialsStore())
   if (config?.apikey && !config.token) {
     // Deploy API keys are not Auth management credentials.
-    log.error(
-      "❌ You are logged in with an API key, but `faable auth` needs a browser session. Run 'faable login' (without --apikey) first."
+    throw new CliError(
+      'apikey_session',
+      "You are logged in with an API key, but `faable auth` needs a browser session. Run 'faable login' (without --apikey) first."
     )
-    process.exit(1)
   }
-  if (!config?.token) {
-    log.error("❌ Not logged in. Run 'faable login' first.")
-    process.exit(1)
-  }
+  if (!config?.token) throw new CliError('not_logged_in', NOT_LOGGED_IN)
   return config.token
 }
 
@@ -249,13 +246,17 @@ export const issueTenantToken = async (
 export const hintAuthError = (e: unknown): never => {
   const status = (e as { response?: { status?: number } })?.response?.status
   if (status === 401) {
-    throw new Error(
-      "Unauthorized (401) by the Auth management API. Your session may have expired — run 'faable login' and retry."
+    throw new CliError(
+      'session_expired',
+      "Unauthorized (401) by the Auth management API. Your session may have expired — run 'faable login' and retry.",
+      { status, cause: e }
     )
   }
   if (status === 403) {
-    throw new Error(
-      'Forbidden (403): your session is not allowed to manage this tenant. Check the tenant (`faable whoami`, --account, --project), or use credentials with management access for it.'
+    throw new CliError(
+      'forbidden',
+      'Forbidden (403): your session is not allowed to manage this tenant. Check the tenant (`faable whoami`, --account, --project), or use credentials with management access for it.',
+      { status, cause: e }
     )
   }
   throw e

@@ -5,8 +5,8 @@ import { oidc_strategy } from "./strategies/oidc.strategy";
 import { bearer_strategy } from "./strategies/bearer.strategy";
 import { CredentialsStore } from "../lib/CredentialsStore";
 import { loadLiveCredentials } from "./session";
-import { log } from "../log";
 import { configuredProject, resolveProjectRef } from "./project";
+import { CliError, NOT_LOGGED_IN } from "../lib/errors";
 
 export const context = async (targetAppId?: string) => {
   let api: FaableApi | undefined;
@@ -73,9 +73,6 @@ export const context = async (targetAppId?: string) => {
 // whose first call returns 401 — FaableApi maps that to the same re-login hint.
 export const requireApi = async (targetAppId?: string) => {
   const ctx = await context(targetAppId);
-  if (!ctx.api) {
-    log.error("❌ Not logged in. Run 'faable login' first.");
-    process.exit(1);
-  }
+  if (!ctx.api) throw new CliError("not_logged_in", NOT_LOGGED_IN);
   return ctx as { api: FaableApi; appId?: string };
 };

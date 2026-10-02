@@ -1,9 +1,9 @@
 import { closeSync, fchmodSync, openSync, writeSync } from 'node:fs'
-import prompts from 'prompts'
 import { CommandModule } from 'yargs'
 import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
 import { TenantArgs, tenant_options } from '../options'
+import { confirm } from '../../../lib/interactive'
 
 // GET /user/export pages at most this many users.
 const PAGE_SIZE = 500
@@ -66,22 +66,13 @@ export const users_export: CommandModule<unknown, ExportArgs> = {
       )
     }
 
-    if (hashes && !args.yes) {
-      // The prompt goes to stderr so a piped stdout stays pure NDJSON.
-      const { confirm } = await prompts(
-        {
-          type: 'toggle',
-          name: 'confirm',
-          message:
-            'Export password hashes? Anyone holding the file can attack every password offline. The export is audited and notifies the tenant subscribers.',
-          initial: false,
-          active: 'yes',
-          inactive: 'no',
-          stdout: process.stderr
-        },
-        { onCancel: () => false }
-      )
-      if (!confirm) {
+    if (hashes) {
+      const go = await confirm({
+        message:
+          'Export password hashes? Anyone holding the file can attack every password offline. The export is audited and notifies the tenant subscribers.',
+        yes: args.yes
+      })
+      if (!go) {
         process.stderr.write('Cancelled.\n')
         return
       }

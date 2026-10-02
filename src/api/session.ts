@@ -1,6 +1,7 @@
 import { CredentialsStore, FaableConfig } from "../lib/CredentialsStore";
 import { refreshToken } from "./auth";
 import { log } from "../log";
+import { CliError } from "../lib/errors";
 
 // True when a stored JWT access token is still valid (has a future `exp`).
 // Anything we can't decode, or without `exp`, counts as NOT live — callers then
@@ -54,10 +55,10 @@ export const loadLiveCredentials = async (
       const body = (e as { response?: { data?: { error_code?: string } } })
         ?.response?.data;
       if (body?.error_code === "user_suspended") {
-        log.error(
-          "❌ Your account has been suspended. Contact support@faable.com."
+        throw new CliError(
+          "account_suspended",
+          "Your account has been suspended. Contact support@faable.com."
         );
-        process.exit(1);
       }
       // Refresh failed — keep the stale config; the API call's 401 (or
       // requireApi) will tell the user to run `faable login` again.

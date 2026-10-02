@@ -1,9 +1,9 @@
-import prompts from 'prompts'
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { find_by_fqdn } from './format'
+import { confirm } from '../../../lib/interactive'
 
 interface DomainsRmArgs {
   fqdn: string
@@ -46,20 +46,14 @@ export const domains_rm: CommandModule<unknown, DomainsRmArgs> = {
       )
     }
 
-    if (!args.yes) {
-      // In a non-TTY run without --yes, prompts resolves undefined → cancel.
-      const { confirm } = await prompts({
-        type: 'toggle',
-        name: 'confirm',
-        message: `Remove domain "${domain.fqdn}" from ${app.name} (${app_id})? Traffic to it will stop being served.`,
-        initial: false,
-        active: 'yes',
-        inactive: 'no'
-      })
-      if (!confirm) {
-        log.info('Cancelled.')
-        return
-      }
+    const go = await confirm({
+      message:
+        `Remove domain "${domain.fqdn}" from ${app.name} (${app_id})? Traffic to it will stop being served.`,
+      yes: args.yes
+    })
+    if (!go) {
+      log.info('Cancelled.')
+      return
     }
 
     await ctx.api.deleteDomain(domain.id, app.team)

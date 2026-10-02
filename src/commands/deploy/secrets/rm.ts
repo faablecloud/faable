@@ -1,9 +1,9 @@
-import prompts from 'prompts'
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { remove_app_secret } from './merge'
+import { confirm } from '../../../lib/interactive'
 
 interface SecretsRmArgs {
   name: string
@@ -45,20 +45,13 @@ export const secrets_rm: CommandModule<unknown, SecretsRmArgs> = {
     const secrets = await ctx.api.getAppSecrets(app_id)
     const remaining = remove_app_secret(secrets, args.name)
 
-    if (!args.yes) {
-      // In a non-TTY run without --yes, prompts resolves undefined → cancel.
-      const { confirm } = await prompts({
-        type: 'toggle',
-        name: 'confirm',
-        message: `Remove secret "${args.name}" from ${app_id}?`,
-        initial: false,
-        active: 'yes',
-        inactive: 'no'
-      })
-      if (!confirm) {
-        log.info('Cancelled.')
-        return
-      }
+    const go = await confirm({
+      message: `Remove secret "${args.name}" from ${app_id}?`,
+      yes: args.yes
+    })
+    if (!go) {
+      log.info('Cancelled.')
+      return
     }
 
     await ctx.api.createSecretsBatch(app.id, app.team, remaining)

@@ -12,6 +12,8 @@ import { version } from './config'
 import { Configuration } from './lib/Configuration'
 import { configuredProject, setProjectFlag } from './api/project'
 import { ContextStore } from './lib/ContextStore'
+import { CliError, error_json } from './lib/errors'
+import { is_non_interactive } from './lib/interactive'
 import { notifyIfUpdateAvailable } from './lib/UpdateChecker'
 import { log } from './log'
 
@@ -26,7 +28,13 @@ const project_badge = async () => {
   return ` · project ${project_name ?? configured.ref}`
 }
 
-const wants_json = () => process.argv.includes('--json')
+// A program is reading: errors go out as JSON on stderr.
+const wants_json = () =>
+  process.argv.includes('--json') || is_non_interactive()
+
+const fail_json = (err: unknown) => {
+  process.stderr.write(JSON.stringify(error_json(err)) + '\n')
+}
 
 // yargs re-runs before-validation middlewares once per nested command level
 // (`deploy secrets` = 2 runs), so keep the banner and update check to one.
@@ -47,7 +55,13 @@ yg.scriptName('faable')
     const exports_to_stdout =
       argv._.slice(0, 3).join(' ') === 'auth users export' && !argv.file
     // Nor when nobody is watching stderr (a script, the MCP server).
-    if (argv.json || exports_to_stdout || !process.stderr.isTTY) return
+    if (
+      argv.json ||
+      exports_to_stdout ||
+      !process.stderr.isTTY ||
+      is_non_interactive()
+    )
+      return
     log.info(`Faable CLI ${version}${await project_badge()}`)
     // `upgrade` does its own (forced) check
     if (argv._[0] !== 'upgrade') {
@@ -58,6 +72,12 @@ yg.scriptName('faable')
     alias: 'config',
     description: 'Path to the local `faable.json` file',
     string: true
+  })
+  .option('non-interactive', {
+    description:
+      'Never prompt nor infer the app from the working directory; errors as JSON (env FAABLE_NONINTERACTIVE=1)',
+    boolean: true,
+    global: true
   })
   .option('p', {
     alias: 'project',
@@ -93,18 +113,10 @@ yg.scriptName('faable')
   .fail(function (msg, err) {
     if (err) {
       // With --json the caller is a program: the error as JSON too, on
-      // stderr, so it can tell a 404 from a 403 without parsing prose.
+      // stderr, so it can tell a 404 from a 403 without parsing prose
+      // (codes in lib/errors.ts).
       if (wants_json()) {
-        const e = err as Error & { status?: number; code?: string }
-        process.stderr.write(
-          JSON.stringify({
-            error: {
-              message: e.message,
-              ...(e.code ? { code: e.code } : {}),
-              ...(e.status ? { status: e.status } : {})
-            }
-          }) + '\n'
-        )
+        fail_json(err)
       } else {
         log.error(`❌ ${err.message}`)
       }
@@ -112,20 +124,24 @@ yg.scriptName('faable')
       return
     }
     if (msg) {
-      // Validation failure (unknown command, missing subcommand…): show the
-      // help, then fail red — a bad invocation must not exit 0.
-      yg.showHelp()
-      log.error(`❌ ${msg}`)
       // The one unknown command worth naming: an app id passed positionally.
       // `faable deploy <app_id> secrets list` used to deploy the working
       // directory instead of listing secrets, so the id now lives in a flag —
       // say so, or the migration reads as the CLI having lost a feature.
       const stray = /Unknown commands?: (app_[A-Za-z0-9_-]+)/.exec(msg)
-      if (stray) {
-        log.error(
-          `The app id goes in a flag, not as an argument: faable deploy --app ${stray[1]} [subcommand]`
-        )
+      const hint = stray
+        ? `The app id goes in a flag, not as an argument: faable deploy --app ${stray[1]} [subcommand]`
+        : undefined
+      if (wants_json()) {
+        // A program built a bad argv: no help screen, just the reason.
+        fail_json(new CliError('usage', hint ? `${msg}. ${hint}` : msg))
+        process.exit(1)
       }
+      // Validation failure (unknown command, missing subcommand…): show the
+      // help, then fail red — a bad invocation must not exit 0.
+      yg.showHelp()
+      log.error(`❌ ${msg}`)
+      if (hint) log.error(hint)
       process.exit(1)
     }
   })

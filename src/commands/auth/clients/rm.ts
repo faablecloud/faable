@@ -1,9 +1,9 @@
-import prompts from 'prompts'
 import { CommandModule } from 'yargs'
 import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
 import { TenantArgs, tenant_options } from '../options'
 import { resolve_client } from './resolve'
+import { confirm } from '../../../lib/interactive'
 
 interface ClientsRmArgs extends TenantArgs {
   client_id: string
@@ -31,19 +31,14 @@ export const clients_rm: CommandModule<unknown, ClientsRmArgs> = {
     const api = await requireAuthAdmin(args)
     const client = await resolve_client(api, args.client_id)
 
-    if (!args.yes) {
-      const { confirm } = await prompts({
-        type: 'toggle',
-        name: 'confirm',
-        message: `Delete client "${client.name}" (${client.client_id})? Apps using it will stop authenticating.`,
-        initial: false,
-        active: 'yes',
-        inactive: 'no'
-      })
-      if (!confirm) {
-        log.info('Cancelled.')
-        return
-      }
+    const go = await confirm({
+      message:
+        `Delete client "${client.name}" (${client.client_id})? Apps using it will stop authenticating.`,
+      yes: args.yes
+    })
+    if (!go) {
+      log.info('Cancelled.')
+      return
     }
 
     await api.clientDelete(client.id)
