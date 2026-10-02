@@ -10,9 +10,21 @@ import { upgrade } from './commands/upgrade'
 import { whoami } from './commands/whoami'
 import { version } from './config'
 import { Configuration } from './lib/Configuration'
-import { setProjectFlag } from './api/project'
+import { configuredProject, setProjectFlag } from './api/project'
+import { ContextStore } from './lib/ContextStore'
 import { notifyIfUpdateAvailable } from './lib/UpdateChecker'
 import { log } from './log'
+
+// Where the command acts, on the banner — read locally, never a request.
+// The flag and the env show as typed; the stored one by the name it had when
+// it was chosen.
+const project_badge = async () => {
+  const configured = await configuredProject().catch(() => undefined)
+  if (!configured) return ''
+  if (configured.source !== 'config') return ` · project ${configured.ref}`
+  const { project_name } = await new ContextStore().load()
+  return ` · project ${project_name ?? configured.ref}`
+}
 
 const wants_json = () => process.argv.includes('--json')
 
@@ -27,6 +39,8 @@ yg.scriptName('faable')
   .middleware(async function (argv) {
     if (banner_shown) return
     banner_shown = true
+    // This middleware runs before the one below that records --project.
+    setProjectFlag(argv.project as string | undefined)
     // --json mode is for piping: keep stdout machine-clean (no banner, no
     // update-check notice). Same for `auth users export` without a file,
     // whose stdout IS the export.
@@ -34,7 +48,7 @@ yg.scriptName('faable')
       argv._.slice(0, 3).join(' ') === 'auth users export' && !argv.file
     // Nor when nobody is watching stderr (a script, the MCP server).
     if (argv.json || exports_to_stdout || !process.stderr.isTTY) return
-    log.info(`Faable CLI ${version}`)
+    log.info(`Faable CLI ${version}${await project_badge()}`)
     // `upgrade` does its own (forced) check
     if (argv._[0] !== 'upgrade') {
       await notifyIfUpdateAvailable(version)

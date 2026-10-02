@@ -10,10 +10,15 @@ import path from 'path'
 //    (`--project`) or FAABLE_PROJECT overrides it per call — that's what a
 //    script or the MCP server uses, so concurrent callers never race on this
 //    file.
+//  - `project_name`: its name when it was chosen, so the banner can say where
+//    you are without a request.
+//  - `previous`: the one before, for `faable project use -`.
 //  - `auth_accounts`: the Auth tenant chosen per project (`faable auth use`),
 //    for projects with more than one.
 export interface FaableContext {
   project?: string
+  project_name?: string
+  previous?: { id: string; name?: string }
   auth_accounts?: Record<string, string>
 }
 
