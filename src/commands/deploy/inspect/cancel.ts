@@ -60,7 +60,7 @@ export const cancel: CommandModule<unknown, CancelArgs> = {
     if (args.json) return print_json(canceled)
     log.info(`🛑 Canceled ${canceled.id} (${app.name}).`)
     log.info(
-      `Production keeps serving the last promoted deployment. Deploy again with: faable deploy`
+      `Production keeps serving the last promoted deployment. Deploy again with: faable deploy trigger -a ${app.id}`
     )
   }
 }

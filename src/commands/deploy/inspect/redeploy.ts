@@ -55,8 +55,10 @@ export const redeploy: CommandModule<unknown, RedeployArgs> = {
     const clone = await ctx.api.redeployDeployment(deployment_id, app.team)
     if (args.json) return print_json(clone)
     log.info(`🔁 Rebuilding ${deployment_id} as ${clone.id}.`)
+    // With -a: these lines get copied, and outside the app's checkout a
+    // bare command resolves no app (see next_steps in detail.ts).
     log.info(
-      `Track it with: faable deploy status  ·  build output: faable deploy logs --build`
+      `Track it with: faable deploy status -a ${app.id}  ·  build output: faable deploy logs --build -d ${clone.id} -a ${app.id}`
     )
   }
 }

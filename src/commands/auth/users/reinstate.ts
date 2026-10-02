@@ -29,7 +29,7 @@ export const users_reinstate: CommandModule<unknown, ReinstateArgs> = {
       })
       .example('$0 auth users reinstate user_abc123', 'Reinstate one user')
       .example(
-        'faable auth users list --suspended --json | jq -r ".[].id" | $0 auth users reinstate -y',
+        'faable auth users list --suspended --json | jq -r ".data[].id" | $0 auth users reinstate -y',
         'Bulk-reinstate ids piped from a filtered listing'
       )
       .showHelpOnFail(false) as any,

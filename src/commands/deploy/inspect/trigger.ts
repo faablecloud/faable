@@ -37,7 +37,7 @@ export const trigger: CommandModule<unknown, TriggerArgs> = {
       `🚀 Building ${result.commit.slice(0, 7)} (${result.branch}) of ${app.name} server-side.`
     )
     log.info(
-      `Track it with: faable deploy status  ·  or in the dashboard: https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
+      `Track it with: faable deploy status -a ${app.id}  ·  or in the dashboard: https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
     )
   }
 }

@@ -54,7 +54,9 @@ export const status: CommandModule<unknown, StatusArgs> = {
       )
       if (latest.status?.reason) {
         log.info(`  Reason:     ${latest.status.reason.split('\n')[0]}`)
-        log.info(`  Full error: faable deploy logs --build`)
+        log.info(
+          `  Full error: faable deploy logs --build -d ${latest.id} -a ${app.id}`
+        )
       }
     }
     if (deployments.length === 0) {

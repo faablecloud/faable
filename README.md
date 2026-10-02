@@ -65,7 +65,7 @@ faable auth users get user_abc123                   # includes GitHub/… identi
 faable auth users suspend user_abc123 -r "abuse: crypto miner"
 
 # Bulk: pipe ids from a filtered listing
-faable auth users list --suspended --json | jq -r '.[].id' | faable auth users reinstate -y
+faable auth users list --suspended --json | jq -r '.data[].id' | faable auth users reinstate -y
 
 faable auth actions create -n add-claims -t post-login -f ./claims.js
 faable auth clients create -n my-app --callback https://app.example.com/callback

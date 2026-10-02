@@ -42,7 +42,7 @@ export const users_suspend: CommandModule<unknown, SuspendArgs> = {
         'Suspend several users without prompting'
       )
       .example(
-        'faable auth users list --query email_verified:false --json | jq -r ".[].id" | $0 auth users suspend -y',
+        'faable auth users list --query email_verified:false --json | jq -r ".data[].id" | $0 auth users suspend -y',
         'Bulk-suspend ids piped from a filtered listing'
       )
       .showHelpOnFail(false) as any,
