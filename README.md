@@ -43,6 +43,23 @@ Every command has `--help` and `--json`. `--app` takes an app id, name or slug.
 The complete table is in the
 [command reference](https://faable.com/docs/cli#command-reference).
 
+### MCP server
+
+`faable mcp` runs the CLI as an [MCP](https://modelcontextprotocol.io) server over
+stdio, so Claude Code, Cursor or any MCP client can read your apps, deployments
+and logs — "why did my last deploy fail?" — and deploy, with your `faable login`
+session:
+
+```bash
+claude mcp add faable -- npx -y @faable/faable mcp
+```
+
+By default it exposes reads plus `deploy_app` (build the latest commit server-side).
+`faable mcp --writes` adds the reversible writes: create an app from a repository,
+set environment variables, add a domain, retry or cancel a build, change deploy
+settings. Nothing destructive is exposed. Secret values are never returned, and
+logs come back marked as data, not instructions.
+
 ### Scripting and agents
 
 Data goes to stdout, messages to stderr. With `--json`:

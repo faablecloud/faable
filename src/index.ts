@@ -5,6 +5,7 @@ import { deploy } from './commands/deploy'
 import { link_deprecated } from './commands/link'
 import { login } from './commands/login'
 import { logout } from './commands/logout'
+import { mcp } from './commands/mcp'
 import { project } from './commands/project'
 import { upgrade } from './commands/upgrade'
 import { whoami } from './commands/whoami'
@@ -102,6 +103,7 @@ yg.scriptName('faable')
   .command(login)
   .command(logout)
   .command(whoami)
+  .command(mcp)
   .command(upgrade)
   .command(link_deprecated)
   .demandCommand(1)
