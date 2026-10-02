@@ -684,10 +684,15 @@ export class FaableApi<T = any> {
     return firstPage(this.listDomainsPage(app_id, team))
   }
 
-  async listDomainsPage(app_id: string, team: string, params: PageParams = {}) {
+  // Without `app_id`, every domain of the project.
+  async listDomainsPage(
+    app_id: string | undefined,
+    team: string,
+    params: PageParams = {}
+  ) {
     return data(
       this.client.get<Page<FaableDomain>>(`/domain`, {
-        params: { app_id, ...page_params(params) },
+        params: { ...(app_id ? { app_id } : {}), ...page_params(params) },
         headers: projectHeader(team)
       })
     )

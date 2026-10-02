@@ -34,7 +34,6 @@ export class CredentialsStore {
     await fs.ensureDir(this.faable_home)
     await fs.writeJSON(this.credentials_path, config, { spaces: 2 })
     await fs.chmod(this.credentials_path, 0o600)
-    this.log.info(`Stored credentials`)
   }
 
   async loadCredentials(): Promise<FaableConfig | undefined> {
