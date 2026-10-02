@@ -15,14 +15,14 @@ import { TOOLS } from './tools'
 // Streamable HTTP, stateless: every POST /mcp builds a server and a transport
 // for that one request, so any instance can answer anything. The caller
 // authenticates with a Faable API key (dashboard → project settings → API
-// keys). ⚠️ A key acts with its OWNER's access, not only on the project it was
-// created in (arch/deploy/mcp-cli-gaps.md) — /mcp/<project> is how a caller
-// narrows it. Each tool call runs the CLI as a child
+// keys). A key belongs to the project it was created in, and the api holds it
+// there (api 2.199.2, backlog §302): it never acts as its owner nor reaches
+// another project. Each tool call runs the CLI as a child
 // with THAT key in its environment and an empty HOME of its own — two
 // callers' credentials never meet in one process, and the key is never
 // logged.
 //
-//   POST /mcp              everything the key's owner can see
+//   POST /mcp              the key's project
 //   POST /mcp/<project>    pinned to one project (id, name or slug)
 //   ?mode=write            also the reversible writes
 //   ?readonly=1            reads only — not even deploy_app
@@ -180,7 +180,7 @@ export const llms_txt = (base = PUBLIC_URL) =>
     '',
     '> Connects Claude, Cursor and any MCP client to Faable Deploy: read apps, deployments, build and runtime logs, traffic and domains, and deploy — without leaving the editor.',
     '',
-    `Endpoint: ${base}/mcp (Streamable HTTP). Authenticate with a Faable API key: \`Authorization: Bearer <key>\` (create one in the dashboard, project settings → API keys). The key acts with its owner's access; connect to \`${base}/mcp/<project>\` to keep every call in one project.`,
+    `Endpoint: ${base}/mcp (Streamable HTTP). Authenticate with a Faable API key: \`Authorization: Bearer <key>\` (create one in the dashboard, project settings → API keys). The key belongs to one project and only acts there.`,
     '',
     `- \`${base}/mcp/<project>\` pins every call to one project.`,
     '- `?mode=write` adds the reversible writes (create apps, set secrets, add domains, retry or cancel builds, change deploy settings). Nothing destructive is exposed.',

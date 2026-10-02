@@ -10,6 +10,7 @@ export type CliErrorCode =
   | 'session_expired' // 401: the session is dead → `faable login`
   | 'account_suspended' // the auth server refuses this account
   | 'apikey_session' // logged in with an API key where a session is needed
+  | 'apikey_invalid' // 401 with FAABLE_API_KEY: wrong or revoked key
   | 'forbidden' // 403
   | 'not_found' // 404
   | 'confirmation_required' // a prompt nobody can answer (no TTY, no --yes)

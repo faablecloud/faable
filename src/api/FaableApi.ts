@@ -332,12 +332,17 @@ export class FaableApi<T = any> {
             // Uniform handling for an expired/invalid session across every
             // command, regardless of which endpoint returned the 401.
             if (res.status === 401) {
+              // With an API key there is no session to renew: the key itself
+              // is wrong or was revoked (the hosted MCP server runs on keys).
+              const by_key = !!process.env.FAABLE_API_KEY && !process.env.FAABLE_TOKEN
               const expired = new Error(
-                'Your Faable session has expired or is invalid. Run `faable login` to sign in again.',
+                by_key
+                  ? 'This Faable API key is invalid or was revoked. Create a new one in the dashboard (project settings → API Keys).'
+                  : 'Your Faable session has expired or is invalid. Run `faable login` to sign in again.',
                 { cause: error }
               )
               ;(expired as any).status = 401
-              ;(expired as any).code = 'session_expired'
+              ;(expired as any).code = by_key ? 'apikey_invalid' : 'session_expired'
               throw expired
             }
             const serverMessage =

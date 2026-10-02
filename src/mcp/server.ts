@@ -43,6 +43,8 @@ const NEXT_STEP: Record<string, string> = {
     'This Faable account is suspended; the user should contact support@faable.com.',
   apikey_session:
     'The user is logged in with an API key; this needs `faable login` without --apikey.',
+  apikey_invalid:
+    'The API key this server was given is invalid or was revoked. The user needs a new one from the dashboard (project settings → API Keys).',
   not_found:
     'Check the id or name — list_apps / list_deployments show what exists.',
   forbidden:

@@ -7,6 +7,8 @@ import {
   statSync,
   writeFileSync
 } from 'node:fs'
+import http from 'node:http'
+import { AddressInfo } from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -39,6 +41,7 @@ const run = async (
   const base = { ...process.env }
   for (const name of [
     'FAABLE_TOKEN',
+    'FAABLE_API_KEY',
     'FAABLE_PROJECT',
     'FAABLE_NONINTERACTIVE',
     'GITHUB_ACTIONS'
@@ -385,4 +388,30 @@ test('every confirmation goes through lib/interactive', t => {
     .map(p => path.relative(src, p))
     .filter(p => !allowed.has(p))
   t.deepEqual(offenders, [])
+})
+
+test('a 401 with an API key says the key is bad, not "run faable login"', async t => {
+  const server = http.createServer((_req, res) => {
+    res.statusCode = 401
+    res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify({ message: 'Unauthorized' }))
+  })
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  try {
+    const by_key = await run(['deploy', 'apps', 'list', '--json'], {
+      FAABLE_API_KEY: 'faable_revoked0000',
+      FAABLE_API_URL: url
+    })
+    t.is(error_of(by_key.stderr).code, 'apikey_invalid')
+    t.notRegex(error_of(by_key.stderr).message, /faable login/)
+
+    const by_session = await run(['deploy', 'apps', 'list', '--json'], {
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: url
+    })
+    t.is(error_of(by_session.stderr).code, 'session_expired')
+  } finally {
+    server.close()
+  }
 })
