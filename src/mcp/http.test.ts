@@ -115,17 +115,24 @@ test.serial("each call goes to the api with the caller's own key", async t => {
   ])
   try {
     // Concurrent, interleaved: each child carries its own caller's key.
-    await Promise.all([
+    const results = await Promise.all([
       a.callTool({ name: 'list_apps', arguments: {} }),
       b.callTool({ name: 'list_apps', arguments: {} }),
       a.callTool({ name: 'get_app', arguments: { app: APP.id } })
     ])
+    for (const r of results) t.falsy(r.isError, text_of(r))
+    // Per call, not per run: each result was fetched with ITS caller's key.
+    const [alice_list, bob_list, alice_get] = results.map(text_of)
+    t.regex(alice_list, /seen-by:fk_live_alice001/)
+    t.regex(bob_list, /seen-by:fk_live_bob00002/)
+    t.regex(alice_get, /seen-by:fk_live_alice001/)
     const basic = (key: string) =>
       `Basic ${Buffer.from(`${key}:`).toString('base64')}`
-    const seen = new Set(api.requests.map(r => r.authorization))
+    // Sorted: the calls run concurrently, so arrival order varies.
+    const seen = [...new Set(api.requests.map(r => r.authorization))].sort()
     t.deepEqual(
       seen,
-      new Set([basic('fk_live_alice001'), basic('fk_live_bob00002')])
+      [basic('fk_live_alice001'), basic('fk_live_bob00002')].sort()
     )
     t.is(
       api.requests.filter(r => r.authorization === basic('fk_live_bob00002'))

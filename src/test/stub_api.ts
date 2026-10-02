@@ -95,8 +95,23 @@ export const start_api = async () => {
       })
       return
     }
-    if (url.pathname === `/app/${APP.id}`) return json(APP)
-    if (url.pathname === '/app') return json({ results: [APP], next: null })
+    // The app says which API key fetched it (`slug`), so a test can
+    // tell, per call, whose credential the call carried.
+    const seen_by = () => {
+      const basic = /^Basic (.+)$/.exec(req.headers.authorization ?? '')
+      return basic
+        ? Buffer.from(basic[1], 'base64').toString().split(':')[0]
+        : 'no-key'
+    }
+    if (url.pathname === `/app/${APP.id}`) {
+      return json({ ...APP, slug: `seen-by:${seen_by()}` })
+    }
+    if (url.pathname === '/app') {
+      return json({
+        results: [{ ...APP, slug: `seen-by:${seen_by()}` }],
+        next: null
+      })
+    }
     if (url.pathname === `/app/${APP.id}/logs`) {
       return json([
         ['1700000001000000000', 'second'],
