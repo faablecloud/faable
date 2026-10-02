@@ -1,4 +1,5 @@
 import { Secret } from '../../../api/FaableApi'
+import { CliError } from '../../../lib/errors'
 import { SecretPair } from './parse_pairs'
 
 // The mutation endpoint (`/secret/createbatch`) replaces the app's whole
@@ -36,12 +37,16 @@ export const remove_app_secret = (
   const app_secrets = app_scoped(existing)
   if (!app_secrets.some(p => p.name === name)) {
     if (existing.some(s => s.related_model === 'profile' && s.name === name)) {
-      throw new Error(
+      throw new CliError(
+        'usage',
         `"${name}" is inherited from the team profile and cannot be removed from the app. Manage team secrets from the dashboard.`
       )
     }
     const names = app_secrets.map(p => p.name).sort().join(', ') || '(none)'
-    throw new Error(`Secret "${name}" not found. Existing secrets: ${names}`)
+    throw new CliError(
+      'not_found',
+      `Secret "${name}" not found. Existing secrets: ${names}`
+    )
   }
   return app_secrets.filter(p => p.name !== name)
 }
