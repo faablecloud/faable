@@ -1,6 +1,6 @@
 import { FaableAuthApi, authBearer, type ApiParams } from "@faable/auth-sdk";
 import os from "os";
-import { version } from "../config";
+import { CLI_CLIENT } from "./client_id";
 
 // The CLI talks to the Faable tenant's auth server through the same SDK the
 // rest of the platform uses. It used to be a bare axios instance, which meant
@@ -19,10 +19,8 @@ import { version } from "../config";
 export const AUTH_DOMAIN = "https://faable.auth.faable.link";
 export const CLIENT_ID = "c879023b-e34f-4b0c-a262-210e556bc2e4";
 
-// `<name>/<version>`. No commit: the CLI has no release SHA constant, and a
-// dev build (`0.0.0-development`) is identifiable as such by the version
-// alone. auth caps this segment at 32 chars.
-export const CLI_CLIENT = `faable-cli/${version}`;
+// `faable-cli/<version>` (see client_id.ts).
+export { CLI_CLIENT };
 
 // No `x-faable-instance`: the SDK's default is `${HOSTNAME}:${pid}`, which on
 // a laptop is the user's machine name in our audit log. An empty string
