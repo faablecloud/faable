@@ -24,7 +24,7 @@ export const domains_list: CommandModule<unknown, DomainsListArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App Identifier (defaults to the linked app)'
+        description: 'App id, name or slug (defaults to the linked app)'
       })
       .example('$0 deploy domains list', 'Domains of the linked app')
       .showHelpOnFail(false) as any,

@@ -28,7 +28,7 @@ export const cancel: CommandModule<unknown, CancelArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App Identifier (defaults to the linked app)'
+        description: 'App id, name or slug (defaults to the linked app)'
       })
       .example('$0 deploy cancel', 'Stop the build that is running right now')
       .showHelpOnFail(false) as any,

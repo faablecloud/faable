@@ -53,6 +53,7 @@ export interface PageParams {
 export interface FaableApp {
   id: string
   name: string
+  slug?: string
   url: string
   team: string
   repository: string

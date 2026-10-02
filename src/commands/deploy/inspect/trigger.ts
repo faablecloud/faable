@@ -17,7 +17,7 @@ export const trigger: CommandModule<unknown, TriggerArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App Identifier (defaults to the linked app)'
+        description: 'App id, name or slug (defaults to the linked app)'
       })
       .example(
         '$0 deploy trigger',

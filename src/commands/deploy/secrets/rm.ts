@@ -26,7 +26,7 @@ export const secrets_rm: CommandModule<unknown, SecretsRmArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App Identifier (defaults to the linked app)'
+        description: 'App id, name or slug (defaults to the linked app)'
       })
       .option('yes', {
         alias: 'y',

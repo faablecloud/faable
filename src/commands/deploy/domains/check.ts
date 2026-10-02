@@ -24,7 +24,7 @@ export const domains_check: CommandModule<unknown, DomainsCheckArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App Identifier (defaults to the linked app)'
+        description: 'App id, name or slug (defaults to the linked app)'
       })
       .showHelpOnFail(false) as any,
   handler: async args => {

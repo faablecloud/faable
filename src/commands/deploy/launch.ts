@@ -32,7 +32,7 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
         alias: 'a',
         type: 'string',
         description:
-          'App Identifier (defaults to the app linked to this repository)'
+          'App id, name or slug (defaults to the app linked to this repository)'
       })
       .option('workdir', {
         alias: 'w',
@@ -80,7 +80,10 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
 
     // Pass the explicit app target to the OIDC exchange so a monorepo (several
     // apps, one repo) can be disambiguated in CI.
-    const ctx = await requireApi(args.app)
+    // Only an id: the OIDC exchange in CI takes an app id, not a name.
+    const ctx = await requireApi(
+      args.app?.startsWith('app_') ? args.app : undefined
+    )
     const { api } = ctx
 
     const config = Configuration.instance().deployConfig()

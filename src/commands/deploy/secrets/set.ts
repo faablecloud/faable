@@ -76,7 +76,7 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App Identifier (defaults to the linked app)'
+        description: 'App id, name or slug (defaults to the linked app)'
       })
       .option('env-file', {
         alias: 'f',

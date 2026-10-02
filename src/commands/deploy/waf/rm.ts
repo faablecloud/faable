@@ -45,7 +45,7 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App Identifier (defaults to the linked app)'
+        description: 'App id, name or slug (defaults to the linked app)'
       })
       .check(({ pattern, userAgent, query }: any) => {
         if (!pattern && !userAgent && !query) {

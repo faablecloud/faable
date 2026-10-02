@@ -17,7 +17,7 @@ export const open_app: CommandModule<unknown, OpenArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App Identifier (defaults to the linked app)'
+        description: 'App id, name or slug (defaults to the linked app)'
       })
       .option('dashboard', {
         type: 'boolean',

@@ -25,7 +25,7 @@ export const domains_add: CommandModule<unknown, DomainsAddArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App Identifier (defaults to the linked app)'
+        description: 'App id, name or slug (defaults to the linked app)'
       })
       .option('tls', {
         type: 'boolean',

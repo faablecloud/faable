@@ -18,7 +18,7 @@ export const waf_list: CommandModule<unknown, WafListArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App Identifier (defaults to the linked app)'
+        description: 'App id, name or slug (defaults to the linked app)'
       })
       .example('$0 deploy waf list', 'Show the rules protecting the linked app')
       .showHelpOnFail(false) as any,

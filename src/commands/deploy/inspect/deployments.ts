@@ -24,7 +24,7 @@ export const deployments: CommandModule<unknown, DeploymentsArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App Identifier (defaults to the linked app)'
+        description: 'App id, name or slug (defaults to the linked app)'
       })
       .showHelpOnFail(false) as any,
   handler: async args => {

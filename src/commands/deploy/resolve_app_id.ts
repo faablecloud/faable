@@ -1,12 +1,48 @@
 import { FaableApi } from '../../api/FaableApi'
+import { requireProject } from '../../api/project'
 import { Configuration } from '../../lib/Configuration'
 import { CliError } from '../../lib/errors'
 import { is_non_interactive } from '../../lib/interactive'
+import { fetch_page } from '../../lib/listing'
 import { getGitRemoteUrl } from '../../lib/git_remote'
 import { log } from '../../log'
 
+// --app takes an id, a name or a slug. An id (`app_…`) is used as-is — the
+// api checks access on use. A name or slug is looked up among the apps of ONE
+// project (--project, FAABLE_PROJECT, `faable project use`, or your only
+// one) and must match exactly one: never across projects, where a staff
+// session would see every customer's "dashboard" too.
+export const resolve_app_ref = async (
+  api: Pick<FaableApi, 'listApps' | 'listProjects'>,
+  ref: string,
+  // The project to search; by default the configured one (see above).
+  in_project?: string
+): Promise<string> => {
+  if (ref.startsWith('app_')) return ref
+  const project = in_project ?? (await requireProject(api)).id
+  const apps = await fetch_page(p => api.listApps(p, project), {
+    limit: 200,
+    all: true
+  })
+  const wanted = ref.toLowerCase()
+  const matches = apps.data.filter(
+    a => a.name.toLowerCase() === wanted || a.slug?.toLowerCase() === wanted
+  )
+  if (matches.length === 1) return matches[0].id
+  if (matches.length === 0) {
+    throw new CliError(
+      'not_found',
+      `No app named "${ref}" in ${project}. See them with: faable deploy apps list`
+    )
+  }
+  throw new CliError(
+    'usage',
+    `Several apps are named "${ref}": ${matches.map(a => a.id).join(', ')}. Use its id.`
+  )
+}
+
 // app_id resolution (the user never has to look one up):
-//  1. explicit (--app, on `deploy` and on every subcommand)
+//  1. explicit (--app, on `deploy` and on every subcommand; id, name or slug)
 //  2. OIDC in CI — the backend resolves the app from the linked repository
 //  3. locally — a legacy app_id in faable.json (older CLIs wrote it on
 //     `faable deploy link`; the current link only persists in the API)
@@ -28,8 +64,9 @@ export const find_app_id = async (
   api: FaableApi,
   workdir = process.cwd()
 ): Promise<string | null> => {
-  if (is_non_interactive()) return explicit || ctxAppId || null
-  const app_id = explicit || ctxAppId || Configuration.instance().app_id
+  if (explicit) return resolve_app_ref(api, explicit)
+  if (is_non_interactive()) return ctxAppId || null
+  const app_id = ctxAppId || Configuration.instance().app_id
   if (app_id) return app_id
 
   const repository = await getGitRemoteUrl(workdir)
