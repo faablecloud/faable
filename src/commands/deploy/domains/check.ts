@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { cname_target, dns_badge, find_by_fqdn } from './format'
@@ -7,13 +8,14 @@ import { cname_target, dns_badge, find_by_fqdn } from './format'
 interface DomainsCheckArgs {
   fqdn: string
   app?: string
+  json?: boolean
 }
 
 export const domains_check: CommandModule<unknown, DomainsCheckArgs> = {
   command: 'check <fqdn>',
   describe: 'Show the DNS verification status of a domain',
   builder: yargs =>
-    yargs
+    json_option(yargs)
       .positional('fqdn', {
         type: 'string',
         demandOption: true,
@@ -35,6 +37,11 @@ export const domains_check: CommandModule<unknown, DomainsCheckArgs> = {
       throw new Error(
         `Domain ${args.fqdn} is not attached to ${app_id}. List them with "faable deploy domains list".`
       )
+    }
+
+    // The record plus the one thing it does not carry: the CNAME to create.
+    if (args.json) {
+      return print_json({ ...domain, expected_cname: cname_target(domain) })
     }
 
     const status = domain.status

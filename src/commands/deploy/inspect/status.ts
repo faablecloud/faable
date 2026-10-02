@@ -1,18 +1,20 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { detected_summary, phase_badge, short_commit, when } from './format'
 
 interface StatusArgs {
   app?: string
+  json?: boolean
 }
 
 export const status: CommandModule<unknown, StatusArgs> = {
   command: 'status',
   describe: 'Show what is live for the app',
   builder: yargs =>
-    yargs
+    json_option(yargs)
       .option('app', {
         alias: 'a',
         type: 'string',
@@ -25,6 +27,12 @@ export const status: CommandModule<unknown, StatusArgs> = {
     const app = await ctx.api.getApp(app_id)
     const deployments = await ctx.api.listDeployments(app_id, app.team)
     const latest = deployments[0]
+
+    // The app record plus its newest deployment — which may not be the live
+    // one (status.deployment): a failed build leaves production as it was.
+    if (args.json) {
+      return print_json({ ...app, latest_deployment: latest ?? null })
+    }
 
     log.info(`${phase_badge(app.status?.phase)}  ${app.name} (${app.id})`)
     log.info(`  URL:        https://${app.url}`)

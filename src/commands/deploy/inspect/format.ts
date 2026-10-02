@@ -44,6 +44,35 @@ export const format_log_lines = (lines: AppLogLine[]): string[] =>
       return `${iso}  ${text.replace(/\n+$/, '')}`
     })
 
+// The same lines as data, for --json: oldest first, ISO time, the stream
+// when the api says which.
+export const log_entries = (
+  lines: AppLogLine[]
+): { time: string; message: string; stream?: string }[] =>
+  [...lines]
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([ts, text, stream]) => ({
+      time: new Date(Number(ts) / 1e6).toISOString(),
+      message: text.replace(/\n+$/, ''),
+      ...(stream ? { stream } : {})
+    }))
+
+// The last `n` lines of a build output. A failed build's cause is at the end,
+// and the head of a long `npm install` is context nobody — least of all an
+// agent with a context window — needs to read.
+export const tail_lines = (
+  content: string,
+  n?: number
+): { content: string; omitted_lines: number } => {
+  if (!n || n < 1) return { content, omitted_lines: 0 }
+  const lines = content.replace(/\n$/, '').split('\n')
+  if (lines.length <= n) return { content, omitted_lines: 0 }
+  return {
+    content: lines.slice(-n).join('\n') + '\n',
+    omitted_lines: lines.length - n
+  }
+}
+
 export const short_commit = (sha?: string): string =>
   sha ? sha.slice(0, 7) : '-'
 

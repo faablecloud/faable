@@ -50,6 +50,21 @@ const start_api = async () => {
       return json({})
     }
     if (url.pathname === `/app/${APP.id}`) return json(APP)
+    if (url.pathname === `/app/${APP.id}/logs`) {
+      return json([
+        ['1700000001000000000', 'second'],
+        ['1700000000000000000', 'first', 'stdout']
+      ])
+    }
+    if (url.pathname === '/deployment') {
+      return json({
+        results: [{ id: 'deployment_1', status: { phase: 'BUILD_ERROR' } }],
+        next: null
+      })
+    }
+    if (url.pathname === '/deployment/deployment_1/logs') {
+      return json({ content: 'one\ntwo\nthree\n', truncated: false })
+    }
     if (url.pathname === `/secret/${APP.id}`) {
       return json({
         results: [{ name: 'API_KEY', value: 'secret', related_model: 'app' }],
@@ -159,6 +174,52 @@ test('deploy secrets rm / domains rm without --yes: refused, nothing deleted', a
     )
     t.is(code, 0)
     t.deepEqual(api.writes, ['DELETE /domain/domain_1'])
+  } finally {
+    api.close()
+  }
+})
+
+test('the reads an agent needs come out as data', async t => {
+  const api = await start_api()
+  try {
+    const env = {
+      ...NONINTERACTIVE,
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: api.url
+    }
+    const read = async (args: string[]) => {
+      const { code, stdout, stderr } = await run([...args, '--json'], env)
+      t.is(code, 0, `${args.join(' ')}: ${stderr}`)
+      return JSON.parse(stdout)
+    }
+    const app = ['--app', APP.id]
+
+    const got = await read(['deploy', 'apps', 'get', ...app])
+    t.is(got.id, APP.id)
+    t.is(got.latest_deployment.id, 'deployment_1')
+
+    const runtime = await read(['deploy', 'logs', ...app])
+    t.is(runtime.object, 'list')
+    t.deepEqual(
+      runtime.data.map((l: { message: string }) => l.message),
+      ['first', 'second']
+    )
+
+    t.deepEqual(await read(['deploy', 'logs', '--build', '-n', '1', ...app]), {
+      deployment_id: 'deployment_1',
+      content: 'three\n',
+      truncated: false,
+      omitted_lines: 2
+    })
+
+    const domain = await read([
+      'deploy',
+      'domains',
+      'check',
+      'www.example.com',
+      ...app
+    ])
+    t.is(domain.expected_cname, 'domain_1.faable.link')
   } finally {
     api.close()
   }
