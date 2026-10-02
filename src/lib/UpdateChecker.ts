@@ -7,6 +7,7 @@ import { log } from "../log";
 export const CLI_PACKAGE = "@faable/faable";
 
 const REGISTRY_URL = `https://registry.npmjs.org/${CLI_PACKAGE}/latest`;
+const PACKUMENT_URL = `https://registry.npmjs.org/${CLI_PACKAGE.replace("/", "%2f")}`;
 // Hitting the registry at most once a day keeps the background refresh rare.
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const UPGRADE_FETCH_TIMEOUT_MS = 10_000;
@@ -84,15 +85,20 @@ const spawnBackgroundRefresh = () => {
  */
 export const getLatestVersion = async (): Promise<string | undefined> => {
   try {
-    const res = await fetch(REGISTRY_URL, {
+    // The same (abbreviated) packument `npm install` resolves against, not
+    // `/latest`: for a few minutes after a release the two endpoints
+    // disagree, and offering a version npm can't find yet ends in ETARGET.
+    const res = await fetch(PACKUMENT_URL, {
+      headers: { Accept: "application/vnd.npm.install-v1+json" },
       signal: AbortSignal.timeout(UPGRADE_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return;
-    const data = (await res.json()) as { version?: string };
-    if (data.version) {
-      await writeCache({ last_check: new Date().toISOString(), latest: data.version });
+    const data = (await res.json()) as { "dist-tags"?: { latest?: string } };
+    const version = data["dist-tags"]?.latest;
+    if (version) {
+      await writeCache({ last_check: new Date().toISOString(), latest: version });
     }
-    return data.version;
+    return version;
   } catch {
     return;
   }
