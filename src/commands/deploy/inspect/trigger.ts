@@ -34,8 +34,15 @@ export const trigger: CommandModule<unknown, TriggerArgs> = {
     const result = await ctx.api.deployNow(app_id)
     if (args.json) return print_json({ app_id, ...result })
     log.info(
-      `🚀 Building ${result.commit.slice(0, 7)} (${result.branch}) of ${app.name} server-side.`
+      `🚀 Building ${result.commit.slice(0, 7)} (${result.branch}) of ${app.name} server-side${
+        result.deployment_id ? ` as ${result.deployment_id}` : ''
+      }.`
     )
+    if (result.deployment_id) {
+      log.info(
+        `Follow the build: faable deploy logs --build -d ${result.deployment_id} -a ${app.id} --follow`
+      )
+    }
     log.info(
       `Track it with: faable deploy status -a ${app.id}  ·  or in the dashboard: https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
     )

@@ -629,9 +629,14 @@ export class FaableApi<T = any> {
   // the same path a push webhook takes, same-commit dedupe included.
   async deployNow(app_id: string) {
     return data(
-      this.client.post<{ status: 'created'; commit: string; branch: string }>(
-        `/app/${app_id}/deploy`
-      )
+      // deployment_id: the build this call started (api ≥ the release that
+      // added it; absent from older ones).
+      this.client.post<{
+        status: 'created'
+        commit: string
+        branch: string
+        deployment_id?: string
+      }>(`/app/${app_id}/deploy`)
     )
   }
 
