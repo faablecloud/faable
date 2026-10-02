@@ -109,10 +109,14 @@ export const apps_create: CommandModule<unknown, AppsCreateArgs> = {
     let linked: FaableApp = app
     if (repository) {
       try {
-        linked = await api.linkRepository(app.id, {
-          repository,
-          ...(args.branch ? { github_branch: args.branch } : {})
-        })
+        linked = await api.linkRepository(
+          app.id,
+          {
+            repository,
+            ...(args.branch ? { github_branch: args.branch } : {})
+          },
+          app.team
+        )
       } catch (err) {
         await api.deleteApp(app.id, app.team).catch(() => {
           log.warn(
@@ -144,7 +148,7 @@ export const apps_create: CommandModule<unknown, AppsCreateArgs> = {
     let first_deploy: FirstDeploy = null
     if (repository && args.deploy && linked.deploy_trigger === 'webhook') {
       try {
-        const started = await api.deployNow(app.id)
+        const started = await api.deployNow(app.id, app.team)
         first_deploy = {
           commit: started.commit,
           branch: started.branch,

@@ -94,7 +94,11 @@ export const link: CommandModule<object, Options> = {
     // access to the repository before persisting the link.
     let linked;
     try {
-      linked = await api.linkRepository(selectedApp.id, { repository: gitUrl });
+      linked = await api.linkRepository(
+        selectedApp.id,
+        { repository: gitUrl },
+        selectedApp.team
+      );
     } catch (err) {
       const code = (err as any)?.code as string | undefined;
       switch (code) {

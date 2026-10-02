@@ -567,12 +567,17 @@ export class FaableApi<T = any> {
     return data(this.client.post<FaableApp>(`/app/${app_id}`, params))
   }
 
+  // Team pinned via header: the api answers 400 team_required without it
+  // (it needs the project to check the plan and the repository guard).
   async linkRepository(
     app_id: string,
-    params: { repository: string; github_branch?: string }
+    params: { repository: string; github_branch?: string },
+    team: string
   ) {
     return data(
-      this.client.post<FaableApp>(`/app/${app_id}/link-repository`, params)
+      this.client.post<FaableApp>(`/app/${app_id}/link-repository`, params, {
+        headers: projectHeader(team)
+      })
     )
   }
 
@@ -627,7 +632,7 @@ export class FaableApi<T = any> {
 
   // Build and deploy the current head of the deploy branch server-side —
   // the same path a push webhook takes, same-commit dedupe included.
-  async deployNow(app_id: string) {
+  async deployNow(app_id: string, team: string) {
     return data(
       // deployment_id: the build this call started (api ≥ the release that
       // added it; absent from older ones).
@@ -636,7 +641,7 @@ export class FaableApi<T = any> {
         commit: string
         branch: string
         deployment_id?: string
-      }>(`/app/${app_id}/deploy`)
+      }>(`/app/${app_id}/deploy`, undefined, { headers: projectHeader(team) })
     )
   }
 

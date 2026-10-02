@@ -31,7 +31,7 @@ export const trigger: CommandModule<unknown, TriggerArgs> = {
 
     // Takes the exact same path a git push would (same-commit dedupe
     // included) — the API answers with an actionable refusal otherwise.
-    const result = await ctx.api.deployNow(app_id)
+    const result = await ctx.api.deployNow(app_id, app.team)
     if (args.json) return print_json({ app_id, ...result })
     log.info(
       `🚀 Building ${result.commit.slice(0, 7)} (${result.branch}) of ${app.name} server-side${

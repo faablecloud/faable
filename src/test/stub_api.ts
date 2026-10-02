@@ -69,6 +69,15 @@ export const start_api = async () => {
           return json({ ...NEW_APP, name: JSON.parse(body).name })
         }
         if (url.pathname === `/app/${NEW_APP.id}/link-repository`) {
+          // Like the real api (400 team_required): the project travels in
+          // the header, or the link is refused.
+          if (!req.headers['x-faable-project']) {
+            res.statusCode = 400
+            return json({
+              message: 'Team is required context for this operation.',
+              code: 'team_required'
+            })
+          }
           if (JSON.parse(body).repository === 'acme/taken') {
             res.statusCode = 409
             return json({
