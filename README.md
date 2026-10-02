@@ -28,8 +28,10 @@ npm i -g @faable/faable
 | Group | What it does | Docs |
 | --- | --- | --- |
 | `faable login` / `whoami` / `logout` | Session management (device flow; CI uses OIDC, no login needed) | [Authentication](https://faable.com/docs/cli#authentication) |
-| `faable deploy` | `launch` (the default: a bare `faable deploy` deploys the current directory), then `status`, `logs`, `deployments`, `inspect`, `trigger`, `redeploy`, `cancel`, `open`, `list` | [Deployment](https://faable.com/docs/cli#deployment) |
-| `faable deploy secrets` | Environment variables: `list`, `set` (`KEY=VALUE` or `--env-file`), `rm` | [Secrets](https://faable.com/docs/cli#secrets) |
+| `faable project` | The project commands act on: `list`, `use`, `current`, `clear` (or `--project` on any command) | [Projects](https://faable.com/docs/cli#projects) |
+| `faable deploy` | `launch` (the default: a bare `faable deploy` deploys the current directory), then `status`, `logs`, `deployments`, `inspect`, `trigger`, `redeploy`, `cancel`, `traffic`, `usage`, `quota`, `open` | [Deployment](https://faable.com/docs/cli#deployment) |
+| `faable deploy apps` | `list`, `get`, `create` (from a GitHub repository, first deploy included), `set` (branch, root directory, deploy mode) | [Apps](https://faable.com/docs/cli#apps) |
+| `faable deploy secrets` | Environment variables: `list`, `set` (`KEY=VALUE`, `--env-file`, or `-f -` from stdin), `rm` | [Secrets](https://faable.com/docs/cli#secrets) |
 | `faable deploy domains` | Custom domains: `add` (prints the CNAME), `list`, `check`, `rm` | [Domains](https://faable.com/docs/cli#domains) |
 | `faable deploy waf` | Edge rules: `block` (403), `sink` (404 without waking the app), `list`, `rm` | [Edge rules](https://faable.com/docs/cli#edge-rules-waf) |
 | `faable auth users` | `list` (FaableQL filters), `get` (federated identities included), `suspend`, `reinstate` | [Users](https://faable.com/docs/cli#users) |
@@ -37,9 +39,29 @@ npm i -g @faable/faable
 | `faable auth clients` | OAuth clients: `list`, `get --secret`, `create`, `rm` | [OAuth clients](https://faable.com/docs/cli#oauth-clients) |
 | `faable auth logs` | Audit log (read-only): `list` with filters, `get` | [Audit logs](https://faable.com/docs/cli#audit-logs) |
 
-Every command has `--help`; read commands accept `--json` for output you can pipe
-to `jq`. The complete table is in the
+Every command has `--help` and `--json`. `--app` takes an app id, name or slug.
+The complete table is in the
 [command reference](https://faable.com/docs/cli#command-reference).
+
+### Scripting and agents
+
+Data goes to stdout, messages to stderr. With `--json`:
+
+- every listing is `{"object":"list","data":[…],"has_more","next_cursor"}`
+  (`--limit`, `--starting-after`, `--all`);
+- every write returns what it changed, and a write with nothing to do returns
+  `{"result":"noop","reason"}`;
+- a failure exits 1 with `{"error":{"message","code","status","action"}}` on
+  stderr. Codes: `not_logged_in`, `session_expired`, `account_suspended`,
+  `apikey_session`, `forbidden`, `not_found`, `confirmation_required`,
+  `app_required`, `usage`, or the API's own code.
+
+A program driving the CLI should set `FAABLE_NONINTERACTIVE=1` (or pass
+`--non-interactive`): nothing prompts — a confirmation without `--yes` fails
+with `confirmation_required` —, the app is never inferred from the working
+directory, and `faable deploy launch` needs `--app`, `--workdir` and `--yes`.
+Pass secret values on stdin (`faable deploy secrets set -f -`), never as
+arguments.
 
 ### Deploy
 
@@ -47,8 +69,10 @@ to `jq`. The complete table is in the
 faable login
 faable deploy                       # deploy the current directory (= deploy launch)
 faable deploy launch --app app_x    # deploy another app, from anywhere
+faable deploy apps create --repo acme/web   # create, link, first deploy
 faable deploy status                # phase, URL and detected stack
-faable deploy logs --build          # build output (--follow to tail)
+faable deploy logs --build -n 100   # end of the build output (--follow to tail)
+faable deploy traffic --since 7d    # status codes, top and failing paths
 faable deploy secrets set KEY=value
 faable deploy domains add app.example.com
 ```
