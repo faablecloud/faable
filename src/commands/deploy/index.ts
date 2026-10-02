@@ -10,8 +10,10 @@ import { logs } from './inspect/logs'
 import { open_app } from './inspect/open'
 import { redeploy } from './inspect/redeploy'
 import { status } from './inspect/status'
+import { traffic } from './inspect/traffic'
 import { trigger } from './inspect/trigger'
 import { launch } from './launch'
+import { quota, usage } from './project_usage'
 import { secrets } from './secrets'
 import { waf } from './waf'
 
@@ -45,6 +47,9 @@ export const deploy: CommandModule = {
         .command(waf)
         .command(logs)
         .command(status)
+        .command(traffic)
+        .command(usage)
+        .command(quota)
         .command(apps_list_legacy)
         .command(deployments)
         .command(inspect)

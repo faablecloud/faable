@@ -37,6 +37,14 @@ const APP = {
   url: 'test-app.app.faable.com'
 }
 
+const PROJECT = 'project_65a66419863cb24b65b5bd40'
+const NEW_APP = {
+  id: 'app_new',
+  name: 'web',
+  team: PROJECT.replace('project_', 'team_'),
+  url: 'web.app.faable.com'
+}
+
 const start_api = async () => {
   const writes: string[] = []
   const bodies: string[] = []
@@ -64,6 +72,33 @@ const start_api = async () => {
         }
         if (url.pathname === '/domain') {
           return json({ id: 'domain_2', fqdn: 'www.new.example.com' })
+        }
+        // `apps create`: the new app, its link and its first deploy.
+        if (req.method === 'POST' && url.pathname === '/app') {
+          return json({ ...NEW_APP, name: JSON.parse(body).name })
+        }
+        if (url.pathname === `/app/${NEW_APP.id}/link-repository`) {
+          if (JSON.parse(body).repository === 'acme/taken') {
+            res.statusCode = 409
+            return json({
+              message: 'acme/taken is already linked to app_other',
+              code: 'repository_already_linked'
+            })
+          }
+          return json({
+            ...NEW_APP,
+            repository: 'acme/web',
+            github_branch: 'main',
+            deploy_trigger: 'webhook'
+          })
+        }
+        if (url.pathname === `/app/${NEW_APP.id}/deploy`) {
+          return json({
+            status: 'created',
+            commit: 'fff0000aaa',
+            branch: 'main',
+            deployment_id: 'deployment_first'
+          })
         }
         json({})
       })
@@ -306,6 +341,107 @@ test('the writes say what they did, and a no-op says so', async t => {
       api.bodies.some(b => b.includes(secret)),
       'the value did reach the api'
     )
+  } finally {
+    api.close()
+  }
+})
+
+test('apps create: create, link, first deploy — in that order', async t => {
+  const api = await start_api()
+  try {
+    const env = {
+      ...NONINTERACTIVE,
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: api.url,
+      FAABLE_PROJECT: PROJECT
+    }
+    const { code, stdout, stderr } = await run(
+      [
+        'deploy',
+        'apps',
+        'create',
+        '--repo',
+        'https://github.com/acme/web.git',
+        '--json'
+      ],
+      env
+    )
+    t.is(code, 0, stderr)
+    const out = JSON.parse(stdout)
+    t.is(out.app.repository, 'acme/web')
+    t.is(out.first_deploy.deployment_id, 'deployment_first')
+    t.deepEqual(api.writes, [
+      'POST /app',
+      `POST /app/${NEW_APP.id}/link-repository`,
+      `POST /app/${NEW_APP.id}/deploy`
+    ])
+    // Named after the repository when --name is not given.
+    t.is(JSON.parse(api.bodies[0]).name, 'web')
+  } finally {
+    api.close()
+  }
+})
+
+test('apps create: a failed link takes back the app it just created', async t => {
+  const api = await start_api()
+  try {
+    const env = {
+      ...NONINTERACTIVE,
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: api.url,
+      FAABLE_PROJECT: PROJECT
+    }
+    const { code, stderr } = await run(
+      ['deploy', 'apps', 'create', '--repo', 'acme/taken', '--json'],
+      env
+    )
+    t.is(code, 1)
+    // The api's reason, not a generic one: it says what to do.
+    t.is(error_of(stderr).code, 'repository_already_linked')
+    t.deepEqual(api.writes, [
+      'POST /app',
+      `POST /app/${NEW_APP.id}/link-repository`,
+      `DELETE /app/${NEW_APP.id}`
+    ])
+  } finally {
+    api.close()
+  }
+})
+
+test('apps set: one call per setting, then the app as it is now', async t => {
+  const api = await start_api()
+  try {
+    const env = {
+      ...NONINTERACTIVE,
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: api.url
+    }
+    const { code, stdout, stderr } = await run(
+      [
+        'deploy',
+        'apps',
+        'set',
+        '--app',
+        APP.id,
+        '--branch',
+        'release',
+        '--root-dir',
+        '',
+        '--mode',
+        'push',
+        '--json'
+      ],
+      env
+    )
+    t.is(code, 0, stderr)
+    t.is(JSON.parse(stdout).id, APP.id)
+    t.deepEqual(api.writes, [
+      `POST /app/${APP.id}/deploy-branch`,
+      `POST /app/${APP.id}/root-dir`,
+      `POST /app/${APP.id}/deploy-mode`
+    ])
+    // "" clears the platform override.
+    t.deepEqual(JSON.parse(api.bodies[1]), { root_dir: null })
   } finally {
     api.close()
   }

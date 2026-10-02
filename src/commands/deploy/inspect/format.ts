@@ -76,6 +76,15 @@ export const tail_lines = (
 export const short_commit = (sha?: string): string =>
   sha ? sha.slice(0, 7) : '-'
 
+// The future counterpart of `when`: "in 3h 20m".
+export const until = (iso?: string): string => {
+  if (!iso) return '-'
+  const minutes = Math.round((new Date(iso).getTime() - Date.now()) / 60_000)
+  if (minutes <= 0) return 'now'
+  if (minutes < 60) return `in ${minutes}m`
+  return `in ${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
+
 export const when = (iso?: string): string => {
   if (!iso) return '-'
   const ms = Date.now() - new Date(iso).getTime()

@@ -1,5 +1,7 @@
 import { CommandModule } from 'yargs'
 import { apps_list } from '../inspect/list'
+import { apps_create } from './create'
+import { apps_set } from './set'
 import { status } from '../inspect/status'
 
 // `faable deploy apps list` — same shape as `secrets list`, `domains list` and
@@ -11,7 +13,9 @@ export const apps: CommandModule = {
     yargs
       .command(apps_list)
       .command(apps_get)
-      .demandCommand(1, 'Specify an apps command: list or get'),
+      .command(apps_create)
+      .command(apps_set)
+      .demandCommand(1, 'Specify an apps command: list, get, create or set'),
   handler: () => {
     // Unreachable: demandCommand(1) either routes to a subcommand or fails
     // through the global .fail() in src/index.ts.

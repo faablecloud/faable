@@ -710,6 +710,89 @@ export class FaableApi<T = any> {
     )
   }
 
+  // ── apps: create, configure, observe ─────────────────────────────────────
+
+  // A bare app in a project; `linkRepository` gives it something to build.
+  async createApp(
+    project: string,
+    params: { name: string; description?: string }
+  ) {
+    return data(
+      this.client.post<FaableApp>(`/app`, params, {
+        headers: projectHeader(project)
+      })
+    )
+  }
+
+  async deleteApp(app_id: string, team: string) {
+    return data(
+      this.client.delete(`/app/${app_id}`, { headers: projectHeader(team) })
+    )
+  }
+
+  async setDeployBranch(app_id: string, github_branch: string) {
+    return data(
+      this.client.post<{ github_branch: string }>(
+        `/app/${app_id}/deploy-branch`,
+        { github_branch }
+      )
+    )
+  }
+
+  // null clears the platform override (faable.json's rootDir applies again).
+  async setRootDir(app_id: string, root_dir: string | null) {
+    return data(
+      this.client.post<FaableApp>(`/app/${app_id}/root-dir`, { root_dir })
+    )
+  }
+
+  // push: every push deploys · ci: deploys once CI tags a release ·
+  // workflow: the repo's own GitHub workflow runs `faable deploy`.
+  async setDeployMode(app_id: string, mode: 'push' | 'ci' | 'workflow') {
+    return data(
+      this.client.post<FaableApp>(`/app/${app_id}/deploy-mode`, { mode })
+    )
+  }
+
+  // Edge traffic of one app (ClickHouse, trails reality by up to 15 min).
+  // from/to are unix seconds.
+  async getAppTraffic(
+    app_id: string,
+    team: string,
+    params: { from?: number; to?: number; deployment_id?: string } = {}
+  ) {
+    return data(
+      this.client.get<Record<string, unknown>>(`/app/${app_id}/traffic`, {
+        params,
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  // The project's usage this billing period. `traffic: false` keeps it to
+  // the database (the Stripe-backed traffic figures are the slow half).
+  async getUsageSummary(project: string, params: { traffic?: boolean } = {}) {
+    return data(
+      this.client.get<Record<string, unknown>>(`/usage/summary`, {
+        params,
+        headers: projectHeader(project)
+      })
+    )
+  }
+
+  async getDeployQuota(project: string) {
+    return data(
+      this.client.get<{
+        limited: boolean
+        over: boolean
+        used: number
+        limit: number | null
+        resets_at: string
+        held: number
+      }>(`/deploy-quota`, { headers: projectHeader(project) })
+    )
+  }
+
   // ── per-app WAF ───────────────────────────────────────────────────────────
   //
   // No `x-faable-project` header on any of these: the routes are scoped by the
