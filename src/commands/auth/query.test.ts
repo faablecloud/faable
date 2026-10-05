@@ -49,3 +49,27 @@ test('time_term rejects ISO timestamps (FaableQL bans ":" in values)', t => {
     message: /unix-millis or YYYY-MM-DD/
   })
 })
+
+import { range_term, time_value } from './query'
+
+test('time_value: a relative age is that long before now, in unix-millis', t => {
+  const now = 1_800_000_000_000
+  t.is(time_value('since', '24h', now), String(now - 86_400_000))
+  t.is(time_value('since', '30m', now), String(now - 1_800_000))
+  t.is(time_value('since', '7d', now), String(now - 7 * 86_400_000))
+})
+
+test('time_value: unix-millis and dates pass through; anything else is refused', t => {
+  t.is(time_value('since', '1787080301000'), '1787080301000')
+  t.is(time_value('since', '2026-10-04'), '2026-10-04')
+  t.throws(() => time_value('since', 'yesterday'), { message: /--since/ })
+  t.throws(() => time_value('since', '2026-10-04T10:00:00Z'))
+})
+
+test('range_term names the server field, not the flag', t => {
+  t.is(
+    range_term('last_login_since', 'last-login-since', '1h', 3_600_000),
+    'last_login_since:0'
+  )
+  t.is(range_term('created_until', 'created-until', undefined), undefined)
+})

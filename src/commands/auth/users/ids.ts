@@ -34,9 +34,15 @@ export const parse_user_ids = (
   if (ids.length === 0) {
     throw new Error('No user ids given (pass ids, or pipe them via stdin)')
   }
-  const invalid = ids.filter(id => !/^user_[a-zA-Z0-9]+$/.test(id))
+  // An email is resolved to its one user later (resolve_user_refs), before
+  // any mutation runs.
+  const invalid = ids.filter(
+    id => !/^user_[a-zA-Z0-9]+$/.test(id) && !/^[^\s@]+@[^\s@]+$/.test(id)
+  )
   if (invalid.length > 0) {
-    throw new Error(`Invalid user id(s): ${invalid.join(', ')} (expected user_…)`)
+    throw new Error(
+      `Invalid user id(s): ${invalid.join(', ')} (expected user_… or an email)`
+    )
   }
   return ids
 }

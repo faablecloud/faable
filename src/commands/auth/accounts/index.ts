@@ -2,6 +2,7 @@ import { CommandModule } from 'yargs'
 import { requireSessionToken } from '../../../api/auth_admin'
 import { FaableApi } from '../../../api/FaableApi'
 import { requireProject } from '../../../api/project'
+import { apikey_strategy } from '../../../api/strategies/apikey.strategy'
 import { bearer_strategy } from '../../../api/strategies/bearer.strategy'
 import { ContextStore } from '../../../lib/ContextStore'
 import {
@@ -15,11 +16,17 @@ import {
 } from '../../../lib/listing'
 import { log } from '../../../log'
 
+// A deploy API key (the hosted MCP) lists its own project's tenants too.
 const deploy_api = async () =>
-  FaableApi.create({
-    authStrategy: bearer_strategy,
-    auth: { token: await requireSessionToken() }
-  })
+  !process.env.FAABLE_TOKEN && process.env.FAABLE_API_KEY
+    ? FaableApi.create({
+        authStrategy: apikey_strategy,
+        auth: { apikey: process.env.FAABLE_API_KEY }
+      })
+    : FaableApi.create({
+        authStrategy: bearer_strategy,
+        auth: { token: await requireSessionToken() }
+      })
 
 // `faable auth accounts list` — the Auth tenants of the active project, the
 // ones `faable auth` can manage without --account.

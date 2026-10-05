@@ -4,6 +4,7 @@ import { log } from '../../../log'
 import { TenantArgs, json_option, tenant_options } from '../options'
 import { fetch_page, from_paginator } from '../../../lib/listing'
 import { print_json, when, yes_no } from '../render'
+import { resolve_user_ref } from './resolve'
 
 interface UsersGetArgs extends TenantArgs {
   user_id: string
@@ -32,18 +33,19 @@ type ProfileData = {
 
 export const users_get: CommandModule<unknown, UsersGetArgs> = {
   command: 'get <user_id>',
-  describe: 'Show a user, including their federated identities',
+  describe: 'Show a user (by id or email), including their federated identities',
   builder: yargs =>
     json_option(tenant_options(yargs))
       .positional('user_id', {
         type: 'string',
         demandOption: true,
-        description: 'User identifier (user_…)'
+        description: 'User id (user_…) or email'
       })
       .showHelpOnFail(false) as any,
   handler: withAuthHints(async args => {
     const api = await requireAuthAdmin(args)
-    const user = await api.userGet(args.user_id)
+    const user_id = await resolve_user_ref(api, args.user_id)
+    const user = await api.userGet(user_id)
 
     // Federated identities (GitHub, Google…): who this user IS at the
     // provider — the piece the abuse playbook keeps needing (a Faable email
@@ -51,7 +53,7 @@ export const users_get: CommandModule<unknown, UsersGetArgs> = {
     // Best-effort: a tenant where the session can't read /identity still
     // renders the user card.
     const identities = await fetch_page(
-      from_paginator(api.identityList({ query: `user:${args.user_id}` })),
+      from_paginator(api.identityList({ query: `user:${user_id}` })),
       { limit: 200, all: true }
     )
       .then(r => r.data.map(i => sanitize_identity(i as never)))

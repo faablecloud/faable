@@ -4,6 +4,7 @@ import { log } from '../../../log'
 import { TenantArgs, json_option, tenant_options } from '../options'
 import { print_json } from '../render'
 import { parse_user_ids, read_stdin, wants_stdin } from './ids'
+import { resolve_user_refs } from './resolve'
 import { confirm } from '../../../lib/interactive'
 
 interface ReinstateArgs extends TenantArgs {
@@ -19,7 +20,8 @@ export const users_reinstate: CommandModule<unknown, ReinstateArgs> = {
       .positional('user_ids', {
         type: 'string',
         array: true,
-        description: 'User ids (user_…); omit them to read ids from stdin'
+        description:
+          'User ids (user_…) or emails (exactly one user each); omit them to read ids from stdin'
       })
       .option('yes', {
         alias: 'y',
@@ -38,7 +40,11 @@ export const users_reinstate: CommandModule<unknown, ReinstateArgs> = {
     const stdin = wants_stdin(argv_ids, !!process.stdin.isTTY)
       ? await read_stdin()
       : null
-    const ids = parse_user_ids(argv_ids, stdin)
+    const refs = parse_user_ids(argv_ids, stdin)
+    // Emails become ids BEFORE the prompt, so what is confirmed is what runs.
+    const has_email = refs.some(r => r.includes('@'))
+    const early = has_email ? await requireAuthAdmin(args) : undefined
+    const ids = early ? await resolve_user_refs(early, refs) : refs
 
     const preview = ids.slice(0, 5).join(', ') + (ids.length > 5 ? ', …' : '')
     const go = await confirm({
@@ -50,7 +56,7 @@ export const users_reinstate: CommandModule<unknown, ReinstateArgs> = {
       return
     }
 
-    const api = await requireAuthAdmin(args)
+    const api = early ?? (await requireAuthAdmin(args))
     const results: Array<{ id: string; suspended: boolean; error?: string }> = []
     for (const id of ids) {
       try {

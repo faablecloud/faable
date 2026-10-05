@@ -3,7 +3,8 @@ import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
 import { fetch_page, from_paginator, more_hint, print } from '../../../lib/listing'
 import { AuthListArgs, list_options, tenant_options } from '../options'
-import { compose_query, term, time_term } from '../query'
+import { compose_query, range_term, term } from '../query'
+import { resolve_user_ref } from '../users/resolve'
 import { log_status_badge, print_json, table_lines, truncate } from '../render'
 
 interface LogsListArgs extends AuthListArgs {
@@ -12,6 +13,8 @@ interface LogsListArgs extends AuthListArgs {
   status?: string
   origin?: string
   user?: string
+  email?: string
+  expandUser?: boolean
   client?: string
   since?: string
   until?: string
@@ -47,17 +50,25 @@ export const logs_list: CommandModule<unknown, LogsListArgs> = {
         type: 'string',
         description: 'Filter by subject user id'
       })
+      .option('email', {
+        type: 'string',
+        description: "Filter by the subject user's email (exactly one user)"
+      })
+      .option('expand-user', {
+        type: 'boolean',
+        description: 'Embed each entry\'s user (email, name) instead of only its id'
+      })
       .option('client', {
         type: 'string',
         description: 'Filter by subject client id'
       })
       .option('since', {
         type: 'string',
-        description: 'From date: unix-millis or YYYY-MM-DD'
+        description: 'From: a relative age (30m, 24h, 7d), unix-millis or YYYY-MM-DD'
       })
       .option('until', {
         type: 'string',
-        description: 'To date: unix-millis or YYYY-MM-DD'
+        description: 'To: a relative age (30m, 24h, 7d), unix-millis or YYYY-MM-DD'
       })
       .example(
         '$0 auth logs list --user user_abc123 --since 2026-08-01',
@@ -67,24 +78,37 @@ export const logs_list: CommandModule<unknown, LogsListArgs> = {
         '$0 auth logs list --origin oauth --status failed',
         'Failed OAuth events'
       )
+      .example(
+        '$0 auth logs list --type user.login --since 24h --expand-user',
+        'Who logged in in the last 24 hours'
+      )
       .showHelpOnFail(false) as any,
   handler: withAuthHints(async args => {
+    const api = await requireAuthAdmin(args)
+    const user = args.email
+      ? await resolve_user_ref(api, args.email)
+      : args.user
     const query = compose_query(
       [
         term('type', args.type),
         term('status', args.status),
         term('origin', args.origin),
-        term('user', args.user),
+        term('user', user),
         term('client', args.client),
-        time_term('since', args.since),
-        time_term('until', args.until)
+        range_term('since', 'since', args.since),
+        range_term('until', 'until', args.until)
       ],
       args.query
     )
 
-    const api = await requireAuthAdmin(args)
     const page = await fetch_page(
-      from_paginator(api.logList({ query, q: args.q })),
+      from_paginator(
+        api.logList({
+          query,
+          q: args.q,
+          ...(args.expandUser ? { expand: ['user'] } : {})
+        })
+      ),
       args
     )
 
@@ -101,7 +125,9 @@ export const logs_list: CommandModule<unknown, LogsListArgs> = {
       log_status_badge(entry.status),
       typeof entry.user === 'string'
         ? entry.user
-        : ((entry.user as { id?: string } | undefined)?.id ?? '-'),
+        : ((entry.user as { email?: string; id?: string } | undefined)?.email ??
+          (entry.user as { id?: string } | undefined)?.id ??
+          '-'),
       truncate(entry.message, 48),
       entry.id ?? '-'
     ])

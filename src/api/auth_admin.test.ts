@@ -172,3 +172,55 @@ test('an expired cached token is issued again', async t => {
   const api = { issueAuthAccountToken: async () => ({ access_token: fresh, expires_in: 900 }) }
   t.is(await cachedTenantToken(session, 'account_1', api, cache), fresh)
 })
+
+// The hosted MCP runs `faable auth` with the caller's deploy API key: the
+// tenant token comes from the api (narrowed there), and there is no session
+// bearer to fall back on.
+import { requireAuthAdminWithApiKey } from './auth_admin'
+
+const keyApi = (issue: () => Promise<any>) => {
+  const issued: string[] = []
+  return {
+    issued,
+    api: {
+      listProjects: async () => ({ results: [], next: null }),
+      listProjectAuthAccounts: async () => ({ results: [], next: null }),
+      issueAuthAccountToken: async (id: string) => {
+        issued.push(id)
+        return issue()
+      }
+    } as any
+  }
+}
+
+test('API key: the tenant token is asked for that tenant and used', async t => {
+  const k = keyApi(async () => ({ access_token: 'narrow', expires_in: 900 }))
+  const client = await requireAuthAdminWithApiKey(
+    { account: 'account_x' },
+    'key',
+    k.api
+  )
+  t.deepEqual(k.issued, ['account_x'])
+  t.truthy(client)
+})
+
+test('API key: no tenant token is a refusal, never the key as a bearer', async t => {
+  for (const status of [404, 503]) {
+    const k = keyApi(async () => {
+      throw { response: { status } }
+    })
+    const err: any = await t.throwsAsync(
+      requireAuthAdminWithApiKey({ account: 'account_x' }, 'key', k.api)
+    )
+    t.is(err.code, 'forbidden', String(status))
+  }
+})
+
+test("API key: another project's tenant (403) is an error", async t => {
+  const k = keyApi(async () => {
+    throw { response: { status: 403 } }
+  })
+  await t.throwsAsync(
+    requireAuthAdminWithApiKey({ account: 'account_x' }, 'key', k.api)
+  )
+})

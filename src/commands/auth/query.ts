@@ -42,3 +42,36 @@ export const time_term = (
   }
   return `${field}:${value}`
 }
+
+// A point in time for a range flag: a relative age (`30m`, `24h`, `7d` — that
+// long ago), unix-millis, or YYYY-MM-DD. Returned as what FaableQL accepts:
+// unix-millis or the date as given.
+export const time_value = (
+  flag: string,
+  value: string,
+  now: number = Date.now()
+): string => {
+  const rel = /^(\d+)([mhd])$/.exec(value)
+  if (rel) {
+    const unit = { m: 60_000, h: 3_600_000, d: 86_400_000 }[
+      rel[2] as 'm' | 'h' | 'd'
+    ]
+    return String(now - Number(rel[1]) * unit)
+  }
+  if (/^\d+$/.test(value) || /^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  throw new Error(
+    `Invalid --${flag}: "${value}". Use a relative age (30m, 24h, 7d), unix-millis or YYYY-MM-DD`
+  )
+}
+
+// `<field>:<time>` for a range field of the server (`last_login_since`,
+// `since`…), from a flag that takes a time_value.
+export const range_term = (
+  field: string,
+  flag: string,
+  value?: string,
+  now?: number
+): string | undefined =>
+  value === undefined || value === ''
+    ? undefined
+    : `${field}:${time_value(flag, value, now)}`

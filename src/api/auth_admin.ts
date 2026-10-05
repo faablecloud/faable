@@ -9,6 +9,7 @@ import { FaableApi, FaableAuthAccount } from './FaableApi'
 import { AUTH_DOMAIN, createAnonymousAuthApi, createBearerAuthApi } from './auth'
 import { requireProject } from './project'
 import { isTokenLive, loadLiveCredentials } from './session'
+import { apikey_strategy } from './strategies/apikey.strategy'
 import { bearer_strategy } from './strategies/bearer.strategy'
 
 export interface AuthAdminOpts {
@@ -110,6 +111,12 @@ export const chooseAccount = async (
 export const requireAuthAdmin = async (
   opts: AuthAdminOpts = {}
 ): Promise<FaableAuthApi> => {
+  // A deploy API key (the hosted MCP runs each call with the caller's key):
+  // the api issues a narrower tenant token for the tenants of the key's own
+  // project. Same precedence as `context()`: FAABLE_TOKEN wins over it.
+  if (!process.env.FAABLE_TOKEN && process.env.FAABLE_API_KEY) {
+    return requireAuthAdminWithApiKey(opts, process.env.FAABLE_API_KEY)
+  }
   const token = await requireSessionToken()
   const deploy = FaableApi.create({
     authStrategy: bearer_strategy,
@@ -121,6 +128,38 @@ export const requireAuthAdmin = async (
     : undefined
 
   return createBearerAuthApi(tenantToken ?? token, {
+    domain: tenant.domain,
+    account: tenant.account
+  })
+}
+
+// With an API key there is no session bearer to fall back on: no tenant
+// token is a refusal, not "use your own token". Not cached — the hosted
+// server gives each call an empty HOME, and a key's token is narrower than
+// its owner's, so it must never be served to a later session.
+export const requireAuthAdminWithApiKey = async (
+  opts: AuthAdminOpts,
+  apikey: string,
+  deploy: Pick<
+    FaableApi,
+    'listProjects' | 'listProjectAuthAccounts' | 'issueAuthAccountToken'
+  > = FaableApi.create({ authStrategy: apikey_strategy, auth: { apikey } })
+): Promise<FaableAuthApi> => {
+  const tenant = await resolveTenant(opts, deploy)
+  if (!tenant.account) {
+    throw new CliError(
+      'usage',
+      `Could not tell which Auth tenant ${tenant.domain} is. Pass --account <account_id>.`
+    )
+  }
+  const issued = await issueTenantToken('', tenant.account, deploy)
+  if (!issued) {
+    throw new CliError(
+      'forbidden',
+      `No management token for ${tenant.account} with an API key. It only works for the Auth tenants of the key's own project.`
+    )
+  }
+  return createBearerAuthApi(issued, {
     domain: tenant.domain,
     account: tenant.account
   })
