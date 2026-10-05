@@ -5,6 +5,21 @@ import os from 'node:os'
 import path from 'node:path'
 import { z } from 'zod'
 import { version } from '../config'
+import {
+  ALL_SCOPES,
+  AUTH_ISSUER,
+  AccessClaims,
+  delegated_token_for,
+  looks_like_jwt,
+  oauth_enabled,
+  permission_of,
+  permissions_of,
+  prm_url,
+  protected_resource_metadata,
+  resource_of,
+  verify_access_token,
+  www_authenticate
+} from './oauth'
 import { CliResult, RunOptions, run_cli } from './run_cli'
 import { create_server, tools_for } from './server'
 import { TOOLS } from './tools'
@@ -52,8 +67,20 @@ export const api_key_of = (req: IncomingMessage): string | null => {
   if (!key && basic) {
     key = Buffer.from(basic[1], 'base64').toString('utf8').split(':')[0]
   }
-  return key && /^[\w.~+/=-]{8,256}$/.test(key) ? key : null
+  if (!key) return null
+  // An OAuth access token (a JWT) is longer than any API key.
+  if (looks_like_jwt(key)) return key.length <= 8192 ? key : null
+  return /^[\w.~+/=-]{8,256}$/.test(key) ? key : null
 }
+
+// The tools a JSON-RPC body calls (one message or a batch).
+export const calls_in = (body: unknown): string[] =>
+  (Array.isArray(body) ? body : [body])
+    .filter(
+      (m: any) =>
+        m?.method === 'tools/call' && typeof m?.params?.name === 'string'
+    )
+    .map((m: any) => m.params.name)
 
 // /mcp → {}, /mcp/<project> → { project }; anything else → null.
 export const route_of = (pathname: string): { project?: string } | null => {
@@ -66,12 +93,23 @@ export const route_of = (pathname: string): { project?: string } | null => {
 // context it might carry, plus the caller's key and an empty HOME.
 const SCRUBBED =
   /^(FAABLE_(TOKEN|API_KEY|PROJECT|AUTH_ACCOUNT|AUTH_URL|ID_TOKEN)|GITHUB_ACTIONS|ACTIONS_ID_TOKEN_.*)$/
-export const child_env = (key: string, home: string) => {
+// The credential a child runs with: the caller's API key, or the delegated
+// token this server traded the caller's OAuth token for (oauth.ts).
+export type ChildCredential = { api_key: string } | { token: string }
+
+export const child_env = (cred: ChildCredential | string, home: string) => {
   const env: Record<string, string | undefined> = {}
   for (const [k, v] of Object.entries(process.env)) {
     if (!SCRUBBED.test(k)) env[k] = v
   }
-  return { ...env, HOME: home, FAABLE_API_KEY: key }
+  const c = typeof cred === 'string' ? { api_key: cred } : cred
+  return {
+    ...env,
+    HOME: home,
+    ...('api_key' in c
+      ? { FAABLE_API_KEY: c.api_key }
+      : { FAABLE_TOKEN: c.token })
+  }
 }
 
 // At most `max` children at once.
@@ -92,18 +130,21 @@ const limiter = (max: number) => {
 
 const runner_for =
   (
-    key: string,
+    credential: () => Promise<ChildCredential>,
     limit: ReturnType<typeof limiter>,
     entry?: string
   ): ((argv: string[], opts: RunOptions) => Promise<CliResult>) =>
   (argv, opts) =>
     limit(async () => {
+      // Resolved per call, not per request: an OAuth connection trades its
+      // token only when a tool actually runs, never for a tools/list.
+      const cred = await credential()
       const home = await mkdtemp(path.join(os.tmpdir(), 'faable-mcp-'))
       try {
         return await run_cli(argv, {
           ...opts,
           entry,
-          env: child_env(key, home)
+          env: child_env(cred, home)
         })
       } finally {
         await rm(home, { recursive: true, force: true })
@@ -158,11 +199,24 @@ export const catalog = (base = PUBLIC_URL) => ({
   version,
   endpoint: `${base}/mcp`,
   transport: 'streamable-http',
-  auth: {
-    type: 'api-key',
-    header: 'Authorization: Bearer <key>',
-    keys: KEYS_URL
-  },
+  // OAuth first when the server has it on (oauth.ts); an API key always works.
+  auth: oauth_enabled()
+    ? {
+        type: 'oauth',
+        authorization_server: AUTH_ISSUER,
+        protected_resource_metadata: prm_url(base),
+        scopes: ALL_SCOPES,
+        alternative: {
+          type: 'api-key',
+          header: 'Authorization: Bearer <key>',
+          keys: KEYS_URL
+        }
+      }
+    : {
+        type: 'api-key',
+        header: 'Authorization: Bearer <key>',
+        keys: KEYS_URL
+      },
   docs: DOCS_URL,
   tools: TOOLS.map(t => ({
     name: t.name,
@@ -180,7 +234,9 @@ export const llms_txt = (base = PUBLIC_URL) =>
     '',
     '> Connects Claude, Cursor and any MCP client to Faable Deploy: read apps, deployments, build and runtime logs, traffic and domains, and deploy — without leaving the editor.',
     '',
-    `Endpoint: ${base}/mcp (Streamable HTTP). Authenticate with a Faable API key: \`Authorization: Bearer <key>\` (create one in the dashboard, project settings → API keys). The key belongs to one project and only acts there.`,
+    oauth_enabled()
+      ? `Endpoint: ${base}/mcp (Streamable HTTP). Sign in with OAuth: an MCP client discovers it from the 401 (\`resource_metadata\`), opens a Faable sign-in and consent screen where the user picks one project and what the agent may do (\`deploy:read\`, \`deploy:deploy\`; \`deploy:write\` is asked for the first time a write tool is called). Or send a Faable API key: \`Authorization: Bearer <key>\` (project settings → API keys). Either way it acts on one project only.`
+      : `Endpoint: ${base}/mcp (Streamable HTTP). Authenticate with a Faable API key: \`Authorization: Bearer <key>\` (create one in the dashboard, project settings → API keys). The key belongs to one project and only acts there.`,
     '',
     `- \`${base}/mcp/<project>\` pins every call to one project.`,
     '- `?mode=write` adds the reversible writes (create apps, set secrets, add domains, retry or cancel builds, change deploy settings). Nothing destructive is exposed.',
@@ -235,6 +291,17 @@ export const create_http_server = (opts: HttpOptions) => {
       if (req.method === 'GET' && url.pathname === '/llms.txt') {
         return send(res, 200, llms_txt(base), 'text/plain; charset=utf-8')
       }
+      // RFC 9728: at the root and with the resource path inserted (what MCP
+      // clients derive from https://mcp.faable.com/mcp). Only with OAuth on.
+      if (
+        req.method === 'GET' &&
+        /^\/\.well-known\/oauth-protected-resource(\/mcp(\/[^/]+)?)?\/?$/.test(
+          url.pathname
+        )
+      ) {
+        if (!oauth_enabled()) return send(res, 404, { error: 'not found' })
+        return send(res, 200, protected_resource_metadata(base))
+      }
 
       const route = route_of(url.pathname)
       if (!route) return send(res, 404, { error: 'not found', docs: DOCS_URL })
@@ -252,18 +319,42 @@ export const create_http_server = (opts: HttpOptions) => {
       }
 
       const key = api_key_of(req)
-      if (!key) {
-        res.setHeader('www-authenticate', 'Bearer realm="faable"')
+      const unauthorized = (message: string, error?: string) => {
+        res.setHeader(
+          'www-authenticate',
+          oauth_enabled()
+            ? www_authenticate(base, { error })
+            : 'Bearer realm="faable"'
+        )
         status = 401
-        return send(
-          res,
-          401,
-          rpc_error(
-            -32001,
-            `Send a Faable API key: "Authorization: Bearer <key>". Create one in the dashboard (project settings → API keys): ${KEYS_URL}`
-          )
+        return send(res, 401, rpc_error(-32001, message))
+      }
+      if (!key) {
+        return unauthorized(
+          oauth_enabled()
+            ? `Connect with your Faable account (your MCP client opens the sign-in), or send a Faable API key: "Authorization: Bearer <key>" (${KEYS_URL}).`
+            : `Send a Faable API key: "Authorization: Bearer <key>". Create one in the dashboard (project settings → API keys): ${KEYS_URL}`
         )
       }
+
+      // A JWT is an OAuth access token (Fase 3); anything else, an API key.
+      let claims: AccessClaims | undefined
+      if (looks_like_jwt(key)) {
+        if (!oauth_enabled()) {
+          return unauthorized(
+            `This server does not accept OAuth tokens yet. Send a Faable API key: ${KEYS_URL}`
+          )
+        }
+        try {
+          claims = await verify_access_token(key, resource_of(base))
+        } catch (e) {
+          return unauthorized(
+            `Invalid access token: ${(e as Error).message}. Reconnect.`,
+            'invalid_token'
+          )
+        }
+      }
+      const granted = claims ? permissions_of(claims) : undefined
 
       let body: unknown
       try {
@@ -272,13 +363,56 @@ export const create_http_server = (opts: HttpOptions) => {
         return send(res, 400, rpc_error(-32700, (e as Error).message))
       }
 
+      // Step-up (MCP authorization): a tool this connection was not allowed
+      // answers 403 insufficient_scope with the scope it needs, and the
+      // client asks the user for it on the consent screen.
+      if (granted) {
+        const needed = calls_in(body)
+          .map(name => TOOLS.find(t => t.name === name))
+          .filter((t): t is (typeof TOOLS)[number] => !!t)
+          .map(permission_of)
+          .filter(p => !granted.includes(p))
+        if (needed.length) {
+          res.setHeader(
+            'www-authenticate',
+            www_authenticate(base, {
+              error: 'insufficient_scope',
+              scope: [...new Set([...granted, ...needed])]
+            })
+          )
+          status = 403
+          return send(
+            res,
+            403,
+            rpc_error(
+              -32001,
+              `This connection was not allowed to ${needed.join(', ')}. Your MCP client will ask you to allow it.`
+            )
+          )
+        }
+      }
+
+      const writes = url.searchParams.get('mode') === 'write'
       const server = create_server({
-        writes: url.searchParams.get('mode') === 'write',
+        writes,
         readonly: ['1', 'true'].includes(
           url.searchParams.get('readonly') ?? ''
         ),
-        project: route.project,
-        run: runner_for(key, limit, opts.entry)
+        // An OAuth connection acts on the project the user picked on the
+        // consent screen, whatever the path or the agent say.
+        project: claims?.project ?? route.project,
+        // Its tools are the ones its permissions allow — plus, with
+        // ?mode=write, the writes it may ask for by step-up.
+        allow: granted
+          ? t => granted.includes(permission_of(t)) || (writes && !!t.write)
+          : undefined,
+        run: runner_for(
+          claims
+            ? async () => ({ token: await delegated_token_for(key) })
+            : async () => ({ api_key: key }),
+          limit,
+          opts.entry
+        )
       })
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,

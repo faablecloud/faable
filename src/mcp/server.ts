@@ -128,14 +128,21 @@ export interface ServerOptions {
   readonly?: boolean
   // Every call is pinned to this project (`/mcp/<project>`).
   project?: string
+  // On top of the above: only the tools this returns true for (an OAuth
+  // connection shows what its permissions allow — oauth.ts).
+  allow?: (tool: ToolDef) => boolean
   // How a tool runs the CLI — per request on the hosted server, with the
   // caller's own key.
   run?: (argv: string[], opts: RunOptions) => Promise<CliResult>
 }
 
-export const tools_for = (opts: Pick<ServerOptions, 'writes' | 'readonly'>) =>
-  TOOLS.filter(t =>
-    opts.readonly ? t.annotations.readOnlyHint : !t.write || opts.writes
+export const tools_for = (
+  opts: Pick<ServerOptions, 'writes' | 'readonly' | 'allow'>
+) =>
+  TOOLS.filter(
+    t =>
+      (opts.readonly ? t.annotations.readOnlyHint : !t.write || opts.writes) &&
+      (!opts.allow || opts.allow(t))
   )
 
 export const create_server = (opts: ServerOptions = {}) => {
