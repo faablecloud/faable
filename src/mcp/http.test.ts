@@ -194,7 +194,11 @@ test.serial(
         await fetch(`${mcp.url}/tools.json`)
       ).json()) as any
       t.is(catalog.endpoint, 'http://mcp.test/mcp')
-      t.is(catalog.tools.length, TOOLS.length)
+      // Everything but what works on the user's own disk.
+      t.is(catalog.tools.length, TOOLS.filter(x => !x.local_only).length)
+      t.false(catalog.tools.some((x: any) => x.name === 'deploy_directory'))
+      t.is(catalog.tools.find((x: any) => x.name === 'list_auth_logins').product, 'auth')
+      t.is(catalog.tools.find((x: any) => x.name === 'list_apps').product, 'deploy')
       t.is(
         catalog.tools.find((x: any) => x.name === 'set_secrets').requires,
         'mode=write'

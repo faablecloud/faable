@@ -239,3 +239,37 @@ test('loader flags are resolved before the child moves to the temp dir', t => {
     ['--import', './x.mjs', '--max-old-space-size=4096']
   )
 })
+
+// Faable Auth + the local-only deploy (2026-10-05).
+import { permission_of } from './oauth'
+
+test('deploy_directory works on the user disk: stdio with --writes only, never hosted', t => {
+  t.true(tools_for({ writes: true }).some(x => x.name === 'deploy_directory'))
+  t.false(tools_for({ writes: true, hosted: true }).some(x => x.name === 'deploy_directory'))
+  t.false(tools_for({}).some(x => x.name === 'deploy_directory'))
+})
+
+test('Auth reads are on by default; Auth writes need --writes', t => {
+  const reads = tools_for({}).map(x => x.name)
+  for (const name of ['list_auth_logins', 'count_auth_users', 'get_auth_user']) {
+    t.true(reads.includes(name), name)
+  }
+  for (const name of ['suspend_auth_user', 'revoke_auth_sessions', 'send_password_setup']) {
+    t.false(reads.includes(name), name)
+    t.true(tools_for({ writes: true }).some(x => x.name === name), name)
+  }
+})
+
+test('text end users type (names, user agents, log messages) comes back fenced', t => {
+  for (const name of ['list_auth_logins', 'list_auth_logs', 'list_auth_users', 'get_auth_user', 'list_auth_sessions']) {
+    t.true(!!TOOLS.find(x => x.name === name)?.untrusted, name)
+  }
+})
+
+test('Auth tools ask OAuth for auth:* — never a deploy permission', t => {
+  const by = (n: string) => permission_of(TOOLS.find(x => x.name === n)!)
+  t.is(by('list_auth_logins'), 'auth:read')
+  t.is(by('suspend_auth_user'), 'auth:write')
+  t.is(by('list_apps'), 'deploy:read')
+  t.is(by('deploy_app'), 'deploy:deploy')
+})

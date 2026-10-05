@@ -25,7 +25,16 @@ export const AUTH_ISSUER =
 export const oauth_enabled = () =>
   !!process.env.FAABLE_MCP_CLIENT_ID && !!process.env.FAABLE_MCP_CLIENT_SECRET
 
-export type Permission = 'deploy:read' | 'deploy:deploy' | 'deploy:write'
+export type Permission =
+  | 'deploy:read'
+  | 'deploy:deploy'
+  | 'deploy:write'
+  // Faable Auth tools. NOT in ALL_SCOPES yet: Faable Auth has to register
+  // them on the MCP resource (consent screen) first — until then an OAuth
+  // connection is never granted them, so it does not see the Auth tools.
+  // API keys and the local server are unaffected.
+  | 'auth:read'
+  | 'auth:write'
 
 // What the consent screen asks for on a first connection (Marc, 05-10:
 // reads plus deploy, like the hosted server by default). deploy:write comes
@@ -41,9 +50,13 @@ const DEPLOY_TOOLS = new Set(['deploy_app', 'redeploy', 'cancel_deployment'])
 
 /** The permission a tool needs — the same split the api enforces. */
 export const permission_of = (
-  tool: Pick<ToolDef, 'name' | 'write'>
+  tool: Pick<ToolDef, 'name' | 'write' | 'command'>
 ): Permission =>
-  DEPLOY_TOOLS.has(tool.name)
+  tool.command?.[0] === 'auth'
+    ? tool.write
+      ? 'auth:write'
+      : 'auth:read'
+    : DEPLOY_TOOLS.has(tool.name)
     ? 'deploy:deploy'
     : tool.write
       ? 'deploy:write'

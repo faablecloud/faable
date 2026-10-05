@@ -29,8 +29,9 @@ for (const tool of TOOLS) {
     for (const flag of tool
       .flags(tool.example)
       .filter(f => /^-{1,2}[a-z]/.test(f))) {
-      // yargs lists --deploy and takes --no-deploy implicitly.
-      const listed = flag.replace(/^--no-/, '--')
+      // yargs lists --deploy and takes --no-deploy implicitly; `--sort=-x`
+      // is the flag --sort.
+      const listed = flag.replace(/^--no-/, '--').replace(/=.*$/, '')
       t.regex(stdout, new RegExp(`(^|[\\s,])${listed}\\b`), flag)
     }
   })

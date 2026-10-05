@@ -13,7 +13,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { APP, NEW_APP, PROJECT, start_api } from '../test/stub_api'
+import { ANA, APP, NEW_APP, PROJECT, start_api } from '../test/stub_api'
 
 // The contract a program driving the CLI relies on — the Faable MCP server
 // sets FAABLE_NONINTERACTIVE=1 on every call (arch/deploy/mcp-cli-gaps.md):
@@ -347,7 +347,9 @@ test('auth users suspend / reinstate / import / export without --yes: refused be
     ['auth', 'users', 'suspend', 'user_abc'],
     ['auth', 'users', 'reinstate', 'user_abc'],
     ['auth', 'users', 'import', file, '--from', 'auth0'],
-    ['auth', 'users', 'export', '--include-hashes']
+    ['auth', 'users', 'export', '--include-hashes'],
+    ['auth', 'sessions', 'revoke', 'session_1'],
+    ['auth', 'users', 'password-setup', 'user_abc']
   ]) {
     const { code, stderr } = await run(args, NONINTERACTIVE)
     t.is(code, 1, args.join(' '))
@@ -413,5 +415,105 @@ test('a 401 with an API key says the key is bad, not "run faable login"', async 
     t.is(error_of(by_session.stderr).code, 'session_expired')
   } finally {
     server.close()
+  }
+})
+
+// `faable auth` by email, against the stub playing both the Deploy API and
+// the tenant's management API.
+const auth_env = (url: string) => ({
+  ...NONINTERACTIVE,
+  FAABLE_TOKEN: 'stub',
+  FAABLE_API_URL: url,
+  FAABLE_AUTH_URL: url,
+  FAABLE_AUTH_ACCOUNT: 'account_test'
+})
+// The tenant-token mint is a write to the Deploy API too; only the
+// management writes matter here.
+const auth_writes = (writes: string[]) =>
+  writes.filter(w => !w.includes('/auth-accounts/'))
+
+test('auth users suspend <email>: resolves the one user and suspends exactly them', async t => {
+  const api = await start_api()
+  try {
+    const { code, stdout, stderr } = await run(
+      ['auth', 'users', 'suspend', 'ANA@example.com', '-r', 'chargeback', '--yes', '--json'],
+      auth_env(api.url)
+    )
+    t.is(code, 0, stderr)
+    t.deepEqual(JSON.parse(stdout), [{ id: ANA.id, suspended: true }])
+    t.deepEqual(auth_writes(api.writes), [`POST /user/${ANA.id}`])
+    t.like(JSON.parse(api.bodies[api.bodies.length - 1]), {
+      suspended: true,
+      suspended_reason: 'chargeback'
+    })
+  } finally {
+    api.close()
+  }
+})
+
+test('auth users suspend <unknown email>: not_found, and nothing is written', async t => {
+  const api = await start_api()
+  try {
+    const { code, stderr } = await run(
+      ['auth', 'users', 'suspend', 'nobody@example.com', '--yes', '--json'],
+      auth_env(api.url)
+    )
+    t.is(code, 1)
+    t.is(error_of(stderr).code, 'not_found')
+    t.deepEqual(auth_writes(api.writes), [])
+  } finally {
+    api.close()
+  }
+})
+
+test('auth users list --count: the server total, and the filters reach the query', async t => {
+  const api = await start_api()
+  try {
+    const { code, stdout, stderr } = await run(
+      ['auth', 'users', 'list', '--count', '--last-login-since', '2026-10-04', '--json'],
+      auth_env(api.url)
+    )
+    t.is(code, 0, stderr)
+    t.deepEqual(JSON.parse(stdout), {
+      total: 3,
+      query: 'last_login_since:2026-10-04'
+    })
+  } finally {
+    api.close()
+  }
+})
+
+test('auth sessions revoke --user <email>: every active session of that user', async t => {
+  const api = await start_api()
+  try {
+    const { code, stderr } = await run(
+      ['auth', 'sessions', 'revoke', '--user', ANA.email, '--yes', '--json'],
+      auth_env(api.url)
+    )
+    t.is(code, 0, stderr)
+    t.deepEqual(auth_writes(api.writes), ['POST /session/session_1/revoke'])
+    const sessions = api.requests.find(r => r.path === '/session')
+    t.truthy(sessions)
+  } finally {
+    api.close()
+  }
+})
+
+test('apps create --wait: create, link, deploy, then the URL once live', async t => {
+  const api = await start_api()
+  try {
+    const { code, stdout, stderr } = await run(
+      ['deploy', 'apps', 'create', '--repo', 'acme/web', '--wait', '--timeout', '30', '--json'],
+      { ...NONINTERACTIVE, FAABLE_TOKEN: 'stub', FAABLE_API_URL: api.url, FAABLE_PROJECT: PROJECT }
+    )
+    t.is(code, 0, stderr)
+    t.like(JSON.parse(stdout).result, {
+      deployment_id: 'deployment_first',
+      phase: 'READY',
+      ok: true,
+      url: 'https://web.app.faable.com'
+    })
+  } finally {
+    api.close()
   }
 })

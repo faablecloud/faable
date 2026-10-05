@@ -21,6 +21,16 @@ export const NEW_APP = {
   url: 'web.app.faable.com'
 }
 
+// A user of the Auth tenant the stub also plays (FAABLE_AUTH_URL = the stub):
+// `faable auth` resolves emails, counts and suspends against it.
+export const ANA = {
+  id: 'user_aaaaaaaaaaaaaaaaaaaaaaaa',
+  email: 'ana@example.com',
+  name: 'Ana',
+  last_login: '2026-10-05T09:00:00.000Z',
+  logins_count: 7
+}
+
 export const start_api = async () => {
   const writes: string[] = []
   const bodies: string[] = []
@@ -92,6 +102,13 @@ export const start_api = async () => {
             deploy_trigger: 'webhook'
           })
         }
+        // Auth management: suspend/reinstate (update) and session revoke.
+        if (url.pathname === `/user/${ANA.id}`) {
+          return json({ ...ANA, ...JSON.parse(body || '{}') })
+        }
+        if (/^\/session\/[^/]+\/revoke$/.test(url.pathname)) {
+          return json({ revoked: true })
+        }
         if (url.pathname === `/app/${NEW_APP.id}/deploy`) {
           return json({
             status: 'created',
@@ -145,6 +162,27 @@ export const start_api = async () => {
     if (url.pathname === '/domain') {
       return json({
         results: [{ id: 'domain_1', fqdn: 'www.example.com', verified: true }],
+        next: null
+      })
+    }
+    // `apps create --wait`: the first deploy is live on the first look.
+    if (url.pathname === '/deployment/deployment_first') {
+      return json({ id: 'deployment_first', status: { phase: 'READY' } })
+    }
+    // Auth management API (the stub doubles as the tenant host).
+    if (url.pathname === '/user') {
+      if (url.searchParams.get('count') === 'true') {
+        return json({ results: [], next: null, total: 3 })
+      }
+      const email = url.searchParams.get('email')
+      if (email !== null) {
+        return json({ results: email === ANA.email ? [ANA] : [], next: null })
+      }
+      return json({ results: [ANA], next: null })
+    }
+    if (url.pathname === '/session') {
+      return json({
+        results: [{ id: 'session_1', user: ANA.id, status: 'active' }],
         next: null
       })
     }

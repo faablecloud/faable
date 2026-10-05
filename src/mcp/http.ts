@@ -22,7 +22,7 @@ import {
 } from './oauth'
 import { CliResult, RunOptions, run_cli } from './run_cli'
 import { create_server, tools_for } from './server'
-import { TOOLS } from './tools'
+import { TOOLS, product_of } from './tools'
 
 // `faable mcp --http` — the hosted Faable MCP server (Fase 2 of
 // arch/deploy/mcp-server-faable.md), what runs at mcp.faable.com.
@@ -218,10 +218,11 @@ export const catalog = (base = PUBLIC_URL) => ({
         keys: KEYS_URL
       },
   docs: DOCS_URL,
-  tools: TOOLS.map(t => ({
+  tools: TOOLS.filter(t => !t.local_only).map(t => ({
     name: t.name,
     title: t.title,
     description: t.description,
+    product: product_of(t),
     access: t.annotations.readOnlyHint ? 'read' : t.write ? 'write' : 'deploy',
     requires: t.write ? 'mode=write' : undefined,
     input_schema: z.toJSONSchema(z.object(t.input))
@@ -232,7 +233,7 @@ export const llms_txt = (base = PUBLIC_URL) =>
   [
     '# Faable MCP server',
     '',
-    '> Connects Claude, Cursor and any MCP client to Faable Deploy: read apps, deployments, build and runtime logs, traffic and domains, and deploy — without leaving the editor.',
+    '> Connects Claude, Cursor and any MCP client to Faable Deploy and Faable Auth: read apps, deployments, build and runtime logs, traffic and domains, and deploy; see who logs in to your apps, count and find users, and suspend them — without leaving the editor.',
     '',
     oauth_enabled()
       ? `Endpoint: ${base}/mcp (Streamable HTTP). Sign in with OAuth: an MCP client discovers it from the 401 (\`resource_metadata\`), opens a Faable sign-in and consent screen where the user picks one project and what the agent may do (\`deploy:read\`, \`deploy:deploy\`; \`deploy:write\` is asked for the first time a write tool is called). Or send a Faable API key: \`Authorization: Bearer <key>\` (project settings → API keys). Either way it acts on one project only.`
@@ -245,7 +246,7 @@ export const llms_txt = (base = PUBLIC_URL) =>
     '',
     '## Tools',
     '',
-    ...TOOLS.map(
+    ...TOOLS.filter(t => !t.local_only).map(
       t => `- \`${t.name}\`${t.write ? ' (mode=write)' : ''}: ${t.description}`
     ),
     '',
@@ -394,6 +395,7 @@ export const create_http_server = (opts: HttpOptions) => {
 
       const writes = url.searchParams.get('mode') === 'write'
       const server = create_server({
+        hosted: true,
         writes,
         readonly: ['1', 'true'].includes(
           url.searchParams.get('readonly') ?? ''
@@ -444,7 +446,7 @@ export const serve_http = async (opts: HttpOptions) => {
       msg: 'mcp_http_listening',
       port: opts.port,
       version,
-      tools: tools_for({}).length
+      tools: tools_for({ hosted: true }).length
     }) + '\n'
   )
   return server

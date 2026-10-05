@@ -20,6 +20,12 @@ export interface ToolDef {
   stdin?: (a: Args) => string
   // Reversible writes: registered only with `faable mcp --writes`.
   write?: boolean
+  // Works on the user's own disk (uploads a directory): stdio only, never on
+  // the hosted server, which has no disk of the user's.
+  local_only?: boolean
+  // How long the CLI may take (default 120 s): a deploy that waits for its
+  // build needs minutes.
+  timeout_ms?: number
   // The output carries text a third party wrote (build/runtime logs, commit
   // messages, failure reasons): it goes back wrapped as data (riesgo de
   // inyección del plan).
@@ -101,6 +107,61 @@ const app_row = (a: any) => ({
   branch: a.github_branch,
   deploy_mode: a.deploy_trigger
 })
+
+// ── Faable Auth ─────────────────────────────────────────────────────────────
+
+const tenant = z
+  .string()
+  .optional()
+  .describe(
+    "Auth tenant id (account_…). Defaults to the project's tenant (list_auth_tenants when it has several)."
+  )
+const auth_scope = (a: Args) => [...opt('--account', a.tenant), ...scope(a)]
+const user_ref = z
+  .string()
+  .describe('User id (user_…) or exact email')
+const time = z
+  .string()
+  .regex(/^(\d+[mhd]|\d{4}-\d{2}-\d{2}|\d{10,})$/)
+const limit_flag = (a: Args, d = 50) => ['--limit', String(a.limit ?? d)]
+const limit = z
+  .number()
+  .int()
+  .min(1)
+  .max(200)
+  .optional()
+  .describe('How many (default 50)')
+
+const user_row = (u: any) => ({
+  id: u.id,
+  email: u.email,
+  name: u.name,
+  email_verified: u.email_verified,
+  suspended: !!u.suspended,
+  suspended_reason: u.suspended ? u.suspended_reason : undefined,
+  last_login: u.last_login ?? null,
+  logins_count: u.logins_count,
+  created_at: u.createdAt
+})
+
+const log_user = (l: any) =>
+  typeof l.user === 'string'
+    ? { user_id: l.user }
+    : l.user
+      ? { user_id: l.user.id, email: l.user.email, name: l.user.name }
+      : {}
+
+const AUTH_READ = { ...READ } as const
+
+// Which product a tool works on — /tools.json and the landing group by it.
+export const product_of = (tool: Pick<ToolDef, 'command'>): 'auth' | 'deploy' =>
+  tool.command[0] === 'auth' ? 'auth' : 'deploy'
+const AUTH_WRITE = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: true
+} as const
 
 export const TOOLS: ToolDef[] = [
   {
@@ -207,7 +268,7 @@ export const TOOLS: ToolDef[] = [
     name: 'get_deployment',
     title: 'Get a deployment',
     description:
-      'Everything recorded about one deployment: phase, commit, detected stack, the runnable artifact and the FULL failure reason. Without `deployment`, the newest one of the app.',
+      "Everything recorded about one deployment: phase, commit, detected stack, the runnable artifact, the FULL failure reason and, when it failed, `fault` — whether it is the user's to fix (`user`) or Faable's (`platform`). Without `deployment`, the newest one of the app.",
     input: {
       app,
       project,
@@ -223,6 +284,8 @@ export const TOOLS: ToolDef[] = [
       detected: d.detected,
       redeploy_of: d.redeploy_of,
       build_ms: d.build_ms,
+      // user = the code/config/repository; platform = Faable's side.
+      fault: d.fault ?? null,
       artifact: d.artifact?.artifact
         ? {
             profile: d.artifact.artifact.profile,
@@ -402,14 +465,302 @@ export const TOOLS: ToolDef[] = [
     annotations: READ,
     example: { app: 'web' }
   },
+  // ── Faable Auth: the users of the project's Auth tenant ───────────────────
+  {
+    name: 'list_auth_tenants',
+    title: 'List Auth tenants',
+    description:
+      "The Faable Auth tenants (user directories) of a project. Most projects have one and every Auth tool uses it; with several, pass the right one as `tenant`.",
+    input: { project },
+    command: ['auth', 'accounts', 'list'],
+    flags: scope,
+    shape: page((a: any) => ({ id: a.id, name: a.name, domain: a.domain })),
+    annotations: AUTH_READ,
+    example: { project: 'p' }
+  },
+  {
+    name: 'list_auth_logins',
+    title: 'Recent logins',
+    description:
+      "Who logged in to the app's Faable Auth, newest first: one row per login with the user's email, when, from which IP and with which method. Answers 'who logged in recently?' or 'did X log in today?'. For 'how many', use count_auth_users.",
+    input: {
+      since: time
+        .optional()
+        .describe('How far back: 30m, 24h, 7d, a date (default 24h)'),
+      status: z
+        .enum(['success', 'failed'])
+        .optional()
+        .describe('Only successful or only failed attempts (default: both)'),
+      limit,
+      tenant,
+      project
+    },
+    command: ['auth', 'logs', 'list'],
+    flags: a => [
+      '--type',
+      'user.login',
+      '--since',
+      a.since ?? '24h',
+      ...opt('--status', a.status),
+      '--expand-user',
+      ...limit_flag(a),
+      ...auth_scope(a)
+    ],
+    untrusted: true,
+    shape: (d: any) => ({
+      logins: (d?.data ?? []).map((l: any) => ({
+        at: l.createdAt,
+        ...log_user(l),
+        status: l.status,
+        ip: l.data?.ip,
+        connection_type: l.data?.connection_type,
+        client_id: l.data?.client_id
+      })),
+      has_more: !!d?.has_more
+    }),
+    annotations: AUTH_READ,
+    example: { since: '7d', status: 'success', limit: 20, tenant: 'account_1' }
+  },
+  {
+    name: 'count_auth_users',
+    title: 'Count users',
+    description:
+      "How many users of the Auth tenant match: logged in since a time ('how many users logged in today / this week'), signed up since a time ('how many sign-ups this month'), suspended, or all of them. Counts users, not logins.",
+    input: {
+      last_login_since: time
+        .optional()
+        .describe('Logged in at or after: 24h, 7d, a date'),
+      created_since: time.optional().describe('Signed up at or after: 24h, 7d, a date'),
+      created_until: time.optional().describe('Signed up at or before'),
+      suspended: z.boolean().optional(),
+      tenant,
+      project
+    },
+    command: ['auth', 'users', 'list'],
+    flags: a => [
+      '--count',
+      ...opt('--last-login-since', a.last_login_since),
+      ...opt('--created-since', a.created_since),
+      ...opt('--created-until', a.created_until),
+      ...(a.suspended === undefined ? [] : [a.suspended ? '--suspended' : '--no-suspended']),
+      ...auth_scope(a)
+    ],
+    annotations: AUTH_READ,
+    example: { last_login_since: '24h', created_since: '7d', suspended: false }
+  },
+  {
+    name: 'list_auth_users',
+    title: 'List users',
+    description:
+      "Users of the Auth tenant. Find one by email or text, list the suspended ones, or sort: `-last_login` (most recent login first), `last_login` (longest without logging in), `-logins_count` (most active), `-createdAt` (newest sign-ups, the default). Sorting by last_login leaves out users who never logged in.",
+    input: {
+      search: z.string().optional().describe('Text in name, email or phone'),
+      email: z.string().optional().describe('Exact email'),
+      suspended: z.boolean().optional(),
+      sort: z
+        .enum(['-last_login', 'last_login', '-logins_count', '-createdAt', 'createdAt'])
+        .optional(),
+      last_login_since: time.optional().describe('Logged in at or after: 24h, 7d, a date'),
+      created_since: time.optional().describe('Signed up at or after'),
+      limit,
+      cursor,
+      tenant,
+      project
+    },
+    command: ['auth', 'users', 'list'],
+    flags: a => [
+      ...opt('-q', a.search),
+      ...opt('--email', a.email),
+      ...(a.suspended === undefined ? [] : [a.suspended ? '--suspended' : '--no-suspended']),
+      // `--sort=-x`: as two words yargs would read `-last_login` as flags.
+      ...(a.sort ? [`--sort=${a.sort}`] : []),
+      ...opt('--last-login-since', a.last_login_since),
+      ...opt('--created-since', a.created_since),
+      ...limit_flag(a),
+      ...opt('--starting-after', a.cursor),
+      ...auth_scope(a)
+    ],
+    // Names and emails are typed by the end users themselves.
+    untrusted: true,
+    shape: page(user_row),
+    annotations: AUTH_READ,
+    example: {
+      search: 'ana',
+      suspended: false,
+      created_since: '30d',
+      email: 'ana@example.com',
+      sort: '-last_login',
+      last_login_since: '7d',
+      limit: 10,
+      cursor: 'c'
+    }
+  },
+  {
+    name: 'get_auth_user',
+    title: 'Get a user',
+    description:
+      "One user of the Auth tenant by id or email: profile, verification, suspension (and why), last login and login count, and the social identities they sign in with. Use it to confirm who a user is before suspending them, or to see why they can't log in (together with list_auth_logs).",
+    input: { user: user_ref, tenant, project },
+    command: ['auth', 'users', 'get'],
+    flags: a => [a.user, ...auth_scope(a)],
+    untrusted: true,
+    shape: (u: any) => ({
+      ...user_row(u),
+      phone: u.phone,
+      last_ip: u.last_ip,
+      identities: (u.identities ?? []).map((i: any) => ({
+        provider: i.provider ?? i.connection_type,
+        user_id: i.user_id ?? i.provider_user_id
+      }))
+    }),
+    annotations: AUTH_READ,
+    example: { user: 'ana@example.com' }
+  },
+  {
+    name: 'list_auth_logs',
+    title: 'Read the Auth audit log',
+    description:
+      "The Auth tenant's audit log, newest first: logins, failed logins (`status: failed`), sign-ups, password resets, admin changes (`type` prefix `admin.user`). Filter by user to answer 'why can't X log in?' — the failed attempts say why.",
+    input: {
+      email: z.string().optional().describe("Only this user's events (exact email)"),
+      user: z.string().optional().describe('Only this user id (user_…)'),
+      type: z.string().optional().describe('Exact event type, e.g. user.login, user.signup'),
+      origin: z.string().optional().describe('Type prefix, e.g. oauth, admin'),
+      status: z.enum(['success', 'failed', 'skipped', 'info']).optional(),
+      since: time.optional().describe('30m, 24h, 7d or a date (default 7d)'),
+      until: time.optional(),
+      limit,
+      tenant,
+      project
+    },
+    command: ['auth', 'logs', 'list'],
+    flags: a => [
+      ...opt('--email', a.email),
+      ...opt('--user', a.user),
+      ...opt('--type', a.type),
+      ...opt('--origin', a.origin),
+      ...opt('--status', a.status),
+      '--since',
+      a.since ?? '7d',
+      ...opt('--until', a.until),
+      '--expand-user',
+      ...limit_flag(a),
+      ...auth_scope(a)
+    ],
+    untrusted: true,
+    shape: (d: any) => ({
+      events: (d?.data ?? []).map((l: any) => ({
+        at: l.createdAt,
+        type: l.type,
+        status: l.status,
+        ...log_user(l),
+        message: l.message,
+        ip: l.data?.ip
+      })),
+      has_more: !!d?.has_more
+    }),
+    annotations: AUTH_READ,
+    example: {
+      email: 'ana@example.com',
+      type: 'user.login',
+      origin: 'oauth',
+      status: 'failed',
+      since: '24h',
+      until: '2026-10-05',
+      limit: 20
+    }
+  },
+  {
+    name: 'list_auth_sessions',
+    title: "List a user's sessions",
+    description:
+      'The devices a user is signed in on (one row per login session): IP, device, last activity and whether it is still active.',
+    input: {
+      user: user_ref,
+      active: z.boolean().optional().describe('Only active sessions (default true)'),
+      tenant,
+      project
+    },
+    command: ['auth', 'sessions', 'list'],
+    flags: a => [
+      '--user',
+      a.user,
+      ...(a.active === false ? [] : ['--active']),
+      '--limit',
+      '50',
+      ...auth_scope(a)
+    ],
+    untrusted: true,
+    shape: page((s: any) => ({
+      id: s.id,
+      status: s.status,
+      ip: s.ip,
+      device: s.device_name ?? s.user_agent,
+      last_seen_at: s.last_seen_at,
+      created_at: s.createdAt
+    })),
+    annotations: AUTH_READ,
+    example: { user: 'ana@example.com', active: true }
+  },
+  {
+    name: 'list_auth_connections',
+    title: 'List login methods',
+    description:
+      'How users can log in to the Auth tenant: social providers (Google, GitHub…), passwordless (email or SMS codes) and username/password, and which are enabled.',
+    input: { tenant, project },
+    command: ['auth', 'connections', 'list'],
+    flags: a => ['--limit', '100', ...auth_scope(a)],
+    annotations: AUTH_READ,
+    example: { tenant: 'account_1' }
+  },
+  {
+    name: 'list_auth_clients',
+    title: 'List Auth applications',
+    description:
+      'The applications (OAuth clients) of the Auth tenant: web apps, SPAs, native apps and machine-to-machine clients.',
+    input: { search: z.string().optional(), tenant, project },
+    command: ['auth', 'clients', 'list'],
+    flags: a => [...opt('-q', a.search), '--limit', '100', ...auth_scope(a)],
+    shape: page((c: any) => ({
+      id: c.id,
+      client_id: c.client_id,
+      name: c.name,
+      application_type: c.application_type,
+      grant_types: c.grant_types
+    })),
+    annotations: AUTH_READ,
+    example: { search: 'web', tenant: 'account_1' }
+  },
+  {
+    name: 'list_github_repos',
+    title: 'List deployable GitHub repositories',
+    description:
+      'The GitHub repositories Faable can deploy: those the Faable GitHub App is installed on. Use it before create_app to find the repository the user means. When the app is not installed (or the repository is missing), give the user `install_url` — installing it is a step in their browser.',
+    input: {
+      query: z.string().optional().describe('Filter by repository name'),
+      limit: z.number().int().min(1).max(100).optional()
+    },
+    command: ['deploy', 'github', 'repos'],
+    flags: a => [...opt('-q', a.query), ...opt('--limit', a.limit)],
+    annotations: READ,
+    example: { query: 'web', limit: 10 }
+  },
   {
     name: 'deploy_app',
     title: 'Deploy an app',
     description:
-      "Build and deploy the latest commit of the app's deploy branch on Faable's servers — the same as a git push. Nothing is uploaded from this machine. Returns the deployment id; follow it with get_deployment and get_build_logs. Only for apps with push-to-deploy.",
-    input: { app, project },
+      "Build and deploy the latest commit of the app's deploy branch on Faable's servers — the same as a git push. Nothing is uploaded from this machine. With `wait`, returns once it is live (with the URL) or failed (with the reason and whether it is the user's code or Faable's); without it, returns the deployment id at once. Only for apps with push-to-deploy.",
+    input: {
+      app,
+      project,
+      wait: z
+        .boolean()
+        .optional()
+        .describe('Wait until live or failed, up to 5 minutes (default false)')
+    },
     command: ['deploy', 'trigger'],
-    flags: target,
+    flags: a => [...target(a), ...(a.wait ? ['--wait', '--timeout', '300'] : [])],
+    timeout_ms: 330_000,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
@@ -438,6 +789,12 @@ export const TOOLS: ToolDef[] = [
         .boolean()
         .optional()
         .describe('Start the first deploy (default true)'),
+      wait: z
+        .boolean()
+        .optional()
+        .describe(
+          'Wait for the first deploy to be live (returns the URL) or to fail, up to 5 minutes'
+        ),
       project
     },
     command: ['deploy', 'apps', 'create'],
@@ -447,15 +804,17 @@ export const TOOLS: ToolDef[] = [
       ...opt('--name', a.name),
       ...opt('--branch', a.branch),
       ...(a.deploy === false ? ['--no-deploy'] : []),
+      ...(a.wait && a.deploy !== false ? ['--wait', '--timeout', '300'] : []),
       ...scope(a)
     ],
+    timeout_ms: 330_000,
     write: true,
     annotations: {
       readOnlyHint: false,
       destructiveHint: false,
       openWorldHint: true
     },
-    example: { repo: 'acme/web', name: 'web', branch: 'main', deploy: false }
+    example: { repo: 'acme/web', name: 'web', branch: 'main', wait: true }
   },
   {
     name: 'redeploy',
@@ -566,5 +925,99 @@ export const TOOLS: ToolDef[] = [
       root_dir: 'apps/web',
       mode: 'push'
     }
+  },
+  {
+    name: 'deploy_directory',
+    title: 'Deploy a local directory',
+    description:
+      "Upload a directory of this machine and deploy it (`faable deploy`): Faable builds it and serves it. Pass `app` to deploy to an existing app, or `create` to make a new one with that name. Waits until it is live and returns the URL — or why it failed and whether that is the user's code (`user`) or Faable (`platform`). Only on the local server (`npx @faable/faable mcp`). Prefer create_app/deploy_app when the code is on GitHub: a push then deploys on its own.",
+    input: {
+      workdir: z
+        .string()
+        .regex(/^\//, 'an absolute path')
+        .describe('Absolute path of the directory to deploy'),
+      app: z.string().optional().describe('Existing app id, name or slug'),
+      create: z
+        .string()
+        .optional()
+        .describe('Name of a NEW app to create and deploy to (instead of `app`)'),
+      project
+    },
+    command: ['deploy', 'launch'],
+    flags: a => [
+      '--workdir',
+      a.workdir,
+      ...opt('--app', a.app),
+      ...opt('--create', a.create),
+      '--yes',
+      ...scope(a)
+    ],
+    write: true,
+    local_only: true,
+    timeout_ms: 900_000,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: true
+    },
+    example: { workdir: '/home/me/web', app: 'web' }
+  },
+  // ── Faable Auth writes: only with `faable mcp --writes` ───────────────────
+  {
+    name: 'suspend_auth_user',
+    title: 'Suspend a user',
+    description:
+      "Suspend one user of the Auth tenant: they can no longer log in, and their sessions and refresh tokens stop working (access tokens already issued live until they expire). Reversible with reinstate_auth_user. Confirm with get_auth_user that it is the right person first, and say why in `reason` — it is recorded on the user.",
+    input: {
+      user: user_ref,
+      reason: z.string().max(512).describe('Why — recorded on the user'),
+      tenant,
+      project
+    },
+    command: ['auth', 'users', 'suspend'],
+    flags: a => [a.user, '--reason', a.reason, '--yes', ...auth_scope(a)],
+    write: true,
+    annotations: AUTH_WRITE,
+    example: { user: 'ana@example.com', reason: 'chargeback' }
+  },
+  {
+    name: 'reinstate_auth_user',
+    title: 'Reinstate a user',
+    description: 'Lift the suspension of a user: they can log in again.',
+    input: { user: user_ref, tenant, project },
+    command: ['auth', 'users', 'reinstate'],
+    flags: a => [a.user, '--yes', ...auth_scope(a)],
+    write: true,
+    annotations: AUTH_WRITE,
+    example: { user: 'ana@example.com' }
+  },
+  {
+    name: 'revoke_auth_sessions',
+    title: 'Sign a user out everywhere',
+    description:
+      "End every active session of a user (the 'sign out of all devices' button): they have to log in again on each device. Access tokens already issued live until they expire.",
+    input: { user: user_ref, tenant, project },
+    command: ['auth', 'sessions', 'revoke'],
+    flags: a => ['--user', a.user, '--yes', ...auth_scope(a)],
+    write: true,
+    annotations: AUTH_WRITE,
+    example: { user: 'ana@example.com' }
+  },
+  {
+    name: 'send_password_setup',
+    title: 'Send a password setup email',
+    description:
+      'Send a user the email (or code) to set or reset their password — to invite a user created by hand, or to unblock one who forgot it.',
+    input: {
+      user: user_ref,
+      channel: z.enum(['email', 'sms', 'whatsapp']).optional(),
+      tenant,
+      project
+    },
+    command: ['auth', 'users', 'password-setup'],
+    flags: a => [a.user, ...opt('--channel', a.channel), '--yes', ...auth_scope(a)],
+    write: true,
+    annotations: { ...AUTH_WRITE, idempotentHint: false },
+    example: { user: 'ana@example.com', channel: 'email' }
   }
 ]
