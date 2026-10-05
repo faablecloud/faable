@@ -531,6 +531,21 @@ export class FaableApi<T = any> {
     )
   }
 
+  // Whose failure it is (user | platform | unknown) and its stable code —
+  // the api's own fault attribution. Older apis don't have it: callers treat
+  // a 404 as "no verdict".
+  async getDeploymentFault(deployment_id: string) {
+    return data(
+      this.client.get<{
+        deployment_id: string
+        phase: string | null
+        failed: boolean
+        fault_owner: 'user' | 'platform' | 'unknown' | null
+        error_code: string | null
+      }>(`/deployment/${deployment_id}/fault`)
+    )
+  }
+
   // Build payload of a deployment (runnable descriptor: runtime, profile,
   // size, checksum). Authorized by the caller's access to the parent
   // deployment, so no team header is needed — same posture as getDeployment.

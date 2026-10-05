@@ -73,9 +73,32 @@ export const inspect: CommandModule<unknown, InspectArgs> = {
       })
     }
 
+    // Whose failure it is, from the api's attribution (absent on older apis
+    // and on deployments that did not fail).
+    const phase = (deployment as { status?: { phase?: string } }).status?.phase
+    const fault =
+      phase === 'BUILD_ERROR' || phase === 'ERROR'
+        ? await ctx.api.getDeploymentFault(deployment_id).catch(() => null)
+        : null
+
     if (args.json) {
       process.stdout.write(
-        JSON.stringify({ ...deployment, artifact }, null, 2) + '\n'
+        JSON.stringify(
+          {
+            ...deployment,
+            artifact,
+            ...(fault
+              ? {
+                  fault: {
+                    owner: fault.fault_owner,
+                    error_code: fault.error_code
+                  }
+                }
+              : {})
+          },
+          null,
+          2
+        ) + '\n'
       )
       return
     }

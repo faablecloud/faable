@@ -1,3 +1,4 @@
+import { github } from './github'
 import { CommandModule } from 'yargs'
 import { link } from '../link'
 import { apps, apps_list_legacy } from './apps'
@@ -42,6 +43,7 @@ export const deploy: CommandModule = {
       yargs
         .command(launch)
         .command(apps)
+        .command(github)
         .command(secrets)
         .command(domains)
         .command(waf)

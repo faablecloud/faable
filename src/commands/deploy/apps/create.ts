@@ -5,6 +5,7 @@ import { requireProject } from '../../../api/project'
 import { CliError } from '../../../lib/errors'
 import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
+import { WaitResult, app_url, wait_for_deployment } from '../wait'
 
 interface AppsCreateArgs {
   repo?: string
@@ -13,6 +14,8 @@ interface AppsCreateArgs {
   branch?: string
   deploy?: boolean
   json?: boolean
+  wait?: boolean
+  timeout?: number
 }
 
 // "owner/repo" from any of the ways people paste a GitHub repository.
@@ -76,6 +79,17 @@ export const apps_create: CommandModule<unknown, AppsCreateArgs> = {
         type: 'boolean',
         default: true,
         description: 'Start the first deploy (--no-deploy to only link)'
+      })
+      .option('wait', {
+        type: 'boolean',
+        default: false,
+        description:
+          'Wait until the deploy is live or fails, and print the URL (or why it failed)'
+      })
+      .option('timeout', {
+        type: 'number',
+        default: 900,
+        description: 'With --wait: give up waiting after this many seconds (the build goes on)'
       })
       .check(({ repo, name }: any) => {
         if (!repo && !name) {
@@ -173,7 +187,35 @@ export const apps_create: CommandModule<unknown, AppsCreateArgs> = {
       }
     }
 
-    if (args.json) return print_json({ app: linked, first_deploy })
+    let waited: WaitResult | undefined
+    if (
+      args.wait &&
+      first_deploy &&
+      'deployment_id' in first_deploy &&
+      first_deploy.deployment_id
+    ) {
+      waited = await wait_for_deployment(api, first_deploy.deployment_id, {
+        timeout_s: args.timeout ?? 900,
+        app_url: app_url(linked.url)
+      })
+      if (!args.json) {
+        log.info(
+          waited.ok
+            ? `✅ Live: ${waited.url}`
+            : waited.done
+              ? `❌ ${waited.phase}${waited.fault_owner ? ` (${waited.fault_owner})` : ''}: ${waited.reason ?? ''}`
+              : `⏳ Still ${waited.phase} after ${args.timeout}s`
+        )
+      }
+    }
+
+    if (args.json) {
+      return print_json({
+        app: linked,
+        first_deploy,
+        ...(waited ? { result: waited } : {})
+      })
+    }
     log.info(
       `🌍 https://${linked.url}  ·  follow it with: faable deploy status -a ${app.id}`
     )

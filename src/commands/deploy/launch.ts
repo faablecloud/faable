@@ -3,7 +3,9 @@ import { requireApi } from '../../api/context'
 import { Configuration } from '../../lib/Configuration'
 import { CliError } from '../../lib/errors'
 import { confirm, is_non_interactive } from '../../lib/interactive'
+import { print_json } from '../../lib/listing'
 import { log } from '../../log'
+import { requireProject } from '../../api/project'
 import { git_context } from './git_context'
 import { show_deploy_help } from './help'
 import { propose_release } from './release_version'
@@ -16,6 +18,8 @@ export interface DeployCommandArgs {
   workdir?: string
   release?: string
   yes?: boolean
+  create?: string
+  json?: boolean
 }
 
 // `faable deploy launch` — the deploy itself, and the default command of the
@@ -51,6 +55,18 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
         description:
           'Skip the confirmation prompt (only asked in interactive terminals — CI is unaffected)'
       })
+      .option('create', {
+        type: 'string',
+        description:
+          'No app yet: create one with this name in the active project (or --project) and deploy the directory to it'
+      })
+      .option('json', {
+        type: 'boolean',
+        default: false,
+        description:
+          'Print the outcome as JSON on stdout: app, deployment, phase and the URL once live'
+      })
+      .conflicts('create', 'app')
       .example('$0 deploy', 'Deploy the app linked to the current directory')
       .example(
         '$0 deploy --app app_a1b2c3',
@@ -63,7 +79,7 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
     // working directory, and the go-ahead is explicit (see lib/interactive).
     if (is_non_interactive()) {
       const missing = [
-        !args.app && '--app',
+        !args.app && !args.create && '--app (or --create <name>)',
         !args.workdir && '--workdir',
         !args.yes && '--yes'
       ].filter(Boolean)
@@ -88,7 +104,18 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
 
     const config = Configuration.instance().deployConfig()
 
-    const app_id = await find_app_id(args.app, ctx.appId, api, workdir)
+    // --create: a directory with no app yet (the agent's «deploy this folder
+    // and give me the URL»). The app is new, so nothing existing is touched.
+    let created_id: string | undefined
+    if (args.create) {
+      const { id: project } = await requireProject(api)
+      const created = await api.createApp(project, { name: args.create })
+      created_id = created.id
+      log.info(`📦 Created ${created.name} (${created.id})`)
+    }
+
+    const app_id =
+      created_id ?? (await find_app_id(args.app, ctx.appId, api, workdir))
     // Nothing to deploy from here. `faable deploy` is the entry point to the
     // whole product, so an unlinked directory is a perfectly normal way to
     // arrive: list what deploy can do (like `faable auth` does) instead of
@@ -217,6 +244,52 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
         // Ignore transient errors while polling and keep waiting
         log.debug(`Polling app status failed, retrying...`)
       }
+    }
+
+    if (args.json) {
+      const outcome = promoted
+        ? 'live'
+        : superseded
+          ? 'superseded'
+          : failure
+            ? 'failed'
+            : 'timeout'
+      const fault = failure
+        ? await api.getDeploymentFault(deployment.id).catch(() => null)
+        : null
+      const result = {
+        app_id: app.id,
+        app_name: app.name,
+        ...(created_id ? { created: true } : {}),
+        deployment_id: deployment.id,
+        outcome,
+        url: `https://${app.url}`,
+        ...(failure
+          ? {
+              phase: failure.phase,
+              reason: failure.reason,
+              ...(fault
+                ? { fault_owner: fault.fault_owner, error_code: fault.error_code }
+                : {})
+            }
+          : {}),
+        dashboard_url
+      }
+      if (failure) {
+        // A failed deploy still exits red (CI depends on it); the outcome
+        // travels in the error so a program reads it without parsing prose.
+        const err = new CliError(
+          'usage',
+          `Deployment ${deployment.id} failed (${failure.phase})${
+            fault?.fault_owner ? ` — ${fault.fault_owner}'s side` : ''
+          }: ${failure.reason ?? 'no reason recorded'}`,
+          { action: JSON.stringify(result) }
+        )
+        // The api's own code when it classified the failure.
+        err.code = fault?.error_code ?? 'deploy_failed'
+        throw err
+      }
+      return print_json(result)
     }
 
     if (promoted) {
