@@ -196,6 +196,17 @@ test.serial('the tools are what the permissions allow', async t => {
         'set_secrets'
       )
     )
+
+    // Faable Auth: only with auth:read; its writes with auth:write.
+    t.false(deploy.includes('list_auth_logins'))
+    const auth = await names('deploy:read auth:read')
+    t.true(auth.includes('list_auth_logins'))
+    t.false(auth.includes('suspend_auth_user'))
+    t.true(
+      (await names('deploy:read auth:read auth:write', '?mode=write')).includes(
+        'suspend_auth_user'
+      )
+    )
   } finally {
     mcp.close()
     api.close()
@@ -226,6 +237,23 @@ test.serial(
       t.regex(header, /error="insufficient_scope"/)
       t.regex(header, /scope="deploy:read deploy:deploy deploy:write"/)
       t.deepEqual(api.requests, [])
+
+      // An Auth tool asks for auth:read the same way.
+      const auth = await rpc(
+        `${mcp.url}/mcp`,
+        {
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'tools/call',
+          params: { name: 'list_auth_logins', arguments: {} }
+        },
+        `Bearer ${token({ permissions: 'deploy:read deploy:deploy' })}`
+      )
+      t.is(auth.status, 403)
+      t.regex(
+        auth.headers.get('www-authenticate') ?? '',
+        /scope="deploy:read deploy:deploy auth:read"/
+      )
     } finally {
       mcp.close()
       api.close()

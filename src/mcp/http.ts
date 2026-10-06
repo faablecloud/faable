@@ -236,7 +236,7 @@ export const llms_txt = (base = PUBLIC_URL) =>
     '> Connects Claude, Cursor and any MCP client to Faable Deploy and Faable Auth: read apps, deployments, build and runtime logs, traffic and domains, and deploy; see who logs in to your apps, count and find users, and suspend them — without leaving the editor.',
     '',
     oauth_enabled()
-      ? `Endpoint: ${base}/mcp (Streamable HTTP). Sign in with OAuth: an MCP client discovers it from the 401 (\`resource_metadata\`), opens a Faable sign-in and consent screen where the user picks one project and what the agent may do (\`deploy:read\`, \`deploy:deploy\`; \`deploy:write\` is asked for the first time a write tool is called). Or send a Faable API key: \`Authorization: Bearer <key>\` (project settings → API keys). Either way it acts on one project only.`
+      ? `Endpoint: ${base}/mcp (Streamable HTTP). Sign in with OAuth: an MCP client discovers it from the 401 (\`resource_metadata\`), opens a Faable sign-in and consent screen where the user picks one project and what the agent may do (\`deploy:read\`, \`deploy:deploy\`; \`deploy:write\`, and \`auth:read\` / \`auth:write\` for the Faable Auth tools, are asked for the first time a tool needs them). Or send a Faable API key: \`Authorization: Bearer <key>\` (project settings → API keys). Either way it acts on one project only.`
       : `Endpoint: ${base}/mcp (Streamable HTTP). Authenticate with a Faable API key: \`Authorization: Bearer <key>\` (create one in the dashboard, project settings → API keys). The key belongs to one project and only acts there.`,
     '',
     `- \`${base}/mcp/<project>\` pins every call to one project.`,

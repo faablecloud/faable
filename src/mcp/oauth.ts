@@ -29,10 +29,10 @@ export type Permission =
   | 'deploy:read'
   | 'deploy:deploy'
   | 'deploy:write'
-  // Faable Auth tools. NOT in ALL_SCOPES yet: Faable Auth has to register
-  // them on the MCP resource (consent screen) first — until then an OAuth
-  // connection is never granted them, so it does not see the Auth tools.
-  // API keys and the local server are unaffected.
+  // Faable Auth tools (backlog §323): registered on the MCP resource and on
+  // the api's, asked for by step-up like deploy:write. The api turns them
+  // into a tenant token for the connection's project — reads only, or the
+  // suspend / sign-out / password-setup set with auth:write.
   | 'auth:read'
   | 'auth:write'
 
@@ -43,7 +43,9 @@ export const DEFAULT_SCOPES: Permission[] = ['deploy:read', 'deploy:deploy']
 export const ALL_SCOPES: Permission[] = [
   'deploy:read',
   'deploy:deploy',
-  'deploy:write'
+  'deploy:write',
+  'auth:read',
+  'auth:write'
 ]
 
 const DEPLOY_TOOLS = new Set(['deploy_app', 'redeploy', 'cancel_deployment'])
