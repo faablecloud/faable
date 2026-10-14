@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
+import { read_stdin } from '../../../lib/stdin'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { managed_warning } from './managed_names'
@@ -30,8 +31,10 @@ const DEFAULT_ENV_FILE = '.env'
 // runs; the short alias is invisible to it.
 const STDIN = '-'
 
-const read_env_file = (raw_path: string): SecretPair[] => {
-  if (raw_path === STDIN) return parse_env(readFileSync(0, 'utf8'), 'stdin')
+const read_env_file = async (raw_path: string): Promise<SecretPair[]> => {
+  // Asynchronously: `readFileSync(0)` throws EAGAIN on a pipe that has not
+  // been written yet (lib/stdin.ts).
+  if (raw_path === STDIN) return parse_env(await read_stdin(), 'stdin')
   const path = raw_path || DEFAULT_ENV_FILE
   let content: string
   try {
@@ -113,7 +116,8 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
 
     // Validate EVERYTHING before writing ANY, so one malformed line or pair
     // aborts the whole command with no partial writes.
-    const from_file = env_file === undefined ? [] : read_env_file(env_file)
+    const from_file =
+      env_file === undefined ? [] : await read_env_file(env_file)
     const parsed = combine(from_file, parse_pairs(pairs))
 
     if (env_file !== undefined) {
