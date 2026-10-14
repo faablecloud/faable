@@ -1004,6 +1004,58 @@ export const TOOLS: ToolDef[] = [
     example: { user: 'ana@example.com' }
   },
   {
+    name: 'update_auth_client_fields',
+    title: "Change an app's profile fields",
+    description:
+      "Declare which custom profile fields the users of one Auth application may write on themselves (auth-js `updateProfile`, stored in user_metadata[\"faable.com/fields\"]). `add` takes `key`, `key:string:120` or `key:enum:a,b,c`; re-adding a key replaces it. `inherit: true` drops the app's own list and uses the tenant's again. An app's own list replaces the tenant's for that app. Only the fields: the app's URLs and settings are not changed here.",
+    input: {
+      client: z
+        .string()
+        .describe(
+          'The application: client resource id (client_…) or OAuth client_id'
+        ),
+      add: z
+        .array(z.string())
+        .max(20)
+        .optional()
+        .describe(
+          'Fields to declare: key, key:string[:max_length] or key:enum:a,b,c'
+        ),
+      remove: z
+        .array(z.string())
+        .max(20)
+        .optional()
+        .describe('Field keys to stop accepting'),
+      inherit: z
+        .boolean()
+        .optional()
+        .describe("Drop the app's own list and use the tenant's"),
+      tenant,
+      project
+    },
+    command: ['auth', 'clients', 'update'],
+    flags: a => [
+      a.client,
+      ...(a.add ?? []).flatMap((f: string) => ['--add-field', f]),
+      ...(a.remove ?? []).flatMap((k: string) => ['--remove-field', k]),
+      ...(a.inherit ? ['--inherit-fields'] : []),
+      ...auth_scope(a)
+    ],
+    shape: (c: any) => ({
+      id: c.id,
+      client_id: c.client_id,
+      name: c.name,
+      profile_fields: c.profile_fields ?? null
+    }),
+    write: true,
+    annotations: AUTH_WRITE,
+    example: {
+      client: 'client_1',
+      add: ['profile:enum:student,teacher'],
+      remove: ['school']
+    }
+  },
+  {
     name: 'send_password_setup',
     title: 'Send a password setup email',
     description:

@@ -3,6 +3,7 @@ import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
 import { log } from '../../../log'
 import { TenantArgs, json_option, tenant_options } from '../options'
 import { print_json } from '../render'
+import { ProfileFieldDeclaration, format_field } from './profile_fields'
 import { resolve_client } from './resolve'
 
 interface ClientsGetArgs extends TenantArgs {
@@ -39,13 +40,21 @@ export const clients_get: CommandModule<unknown, ClientsGetArgs> = {
       log.info(`  Secret:      ${client.client_secret ?? '-'}`)
     }
     if (client.description) log.info(`  Description: ${client.description}`)
-    log.info(`  Callbacks:   ${client.callbacks?.length ? client.callbacks.join(', ') : '-'}`)
+    log.info(
+      `  Callbacks:   ${client.callbacks?.length ? client.callbacks.join(', ') : '-'}`
+    )
     if (client.logout_urls?.length) {
       log.info(`  Logout URLs: ${client.logout_urls.join(', ')}`)
     }
     if (client.web_origins?.length) {
       log.info(`  Web origins: ${client.web_origins.join(', ')}`)
     }
+    const fields = (
+      client as { profile_fields?: ProfileFieldDeclaration[] | null }
+    ).profile_fields
+    log.info(
+      `  Fields:      ${fields ? (fields.length ? fields.map(format_field).join(', ') : 'none') : 'inherited from the tenant'}`
+    )
     log.info(`  Created:     ${client.createdAt ?? '-'}`)
   })
 }
