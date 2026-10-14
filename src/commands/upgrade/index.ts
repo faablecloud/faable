@@ -7,7 +7,7 @@ import {
   isDevBuild,
   isNewerVersion,
 } from "../../lib/UpdateChecker";
-import { cmd } from "../../lib/cmd";
+import { npmDeps, upgradeTo } from "../../lib/self_upgrade";
 import { log } from "../../log";
 
 export const upgrade: CommandModule = {
@@ -31,15 +31,27 @@ export const upgrade: CommandModule = {
     }
 
     const spinner = ora(`Upgrading ${CLI_PACKAGE} ${version} → ${latest}`).start();
-    try {
-      await cmd(`npm install -g --prefer-online ${CLI_PACKAGE}@latest`, { timeout: 180_000 });
+    const res = await upgradeTo(latest, npmDeps, {
+      onRetry: () => {
+        spinner.text = `${latest} was just published and the npm registry is still propagating it — retrying…`;
+      },
+    });
+    if (res.ok) {
       spinner.succeed(`Upgraded to ${latest}`);
-    } catch {
-      spinner.fail("Upgrade failed");
-      log.error(
-        `❌ Could not upgrade automatically. Try manually: npm install -g --prefer-online ${CLI_PACKAGE}@latest`
-      );
-      process.exit(1);
+      return;
     }
+
+    spinner.fail("Upgrade failed");
+    if (res.reason === "not_propagated") {
+      log.error(
+        `❌ ${latest} is not available from the npm registry yet (still on ${res.installed ?? version}). A release takes a few minutes to propagate — run \`faable upgrade\` again shortly.`
+      );
+    } else {
+      if (res.output) log.error(res.output.trim());
+      log.error(
+        `❌ Could not upgrade automatically. Try manually: npm install -g ${CLI_PACKAGE}@${latest}`
+      );
+    }
+    process.exit(1);
   },
 };
