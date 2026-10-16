@@ -69,6 +69,31 @@ export const portable_exec_argv = (
 
 // The last JSON line on stderr is the error document; anything before it is
 // the CLI's own log lines.
+// The command's JSON document on stdout. Normally stdout IS the document; if
+// a stray line got in front of it (a build log once did, and a deploy that
+// went fine came back as an error — arch/deploy/cli-mcp-fallos-2026-10-16-plan.md,
+// F1), the document is still the last thing printed: try each line that
+// opens one at column 0, from the end, through to the end of the output.
+export const parse_output = (
+  stdout: string
+): { ok: true; data: unknown } | { ok: false } => {
+  try {
+    return { ok: true, data: JSON.parse(stdout) }
+  } catch {
+    // look for the document after the stray lines
+  }
+  const lines = stdout.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!/^[[{]/.test(lines[i])) continue
+    try {
+      return { ok: true, data: JSON.parse(lines.slice(i).join('\n')) }
+    } catch {
+      // not where the document starts: keep going up
+    }
+  }
+  return { ok: false }
+}
+
 const parse_error = (stderr: string, code: number | null): CliError => {
   const lines = stderr.trim().split('\n').reverse()
   for (const line of lines) {
@@ -134,15 +159,16 @@ export const run_cli = (
       clearTimeout(timer)
       if (code !== 0)
         return resolve({ ok: false, error: parse_error(stderr, code) })
-      try {
-        resolve({ ok: true, data: JSON.parse(stdout) })
-      } catch {
-        resolve({
-          ok: false,
-          error: {
-            message: `faable printed something that is not JSON: ${stdout.slice(0, 200)}`
-          }
-        })
-      }
+      const parsed = parse_output(stdout)
+      resolve(
+        parsed.ok
+          ? { ok: true, data: parsed.data }
+          : {
+              ok: false,
+              error: {
+                message: `faable printed something that is not JSON: ${stdout.slice(0, 200)}`
+              }
+            }
+      )
     })
   })

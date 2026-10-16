@@ -1,9 +1,10 @@
+import { Writable } from "stream";
 import { FaableApi, FaableApp } from "../../../api/FaableApi";
 import { log } from "../../../log";
 import { git_context } from "../git_context";
 import { format_bytes } from "../inspect/detail";
 import { follow_remote_build } from "./follow";
-import { collect_manifest } from "./manifest";
+import { collect_manifest, ManifestFile } from "./manifest";
 import { upload_missing_blobs } from "./upload";
 
 export interface DeployRemoteProps {
@@ -13,6 +14,12 @@ export interface DeployRemoteProps {
   /** Proposed release version (see release_version.ts); omitted when unknown. */
   release?: string;
   workdir: string;
+  /** Already collected (`deploy --create` checks the source before creating the app). */
+  manifest?: ManifestFile[];
+  /** Where the build log is streamed (see follow_remote_build). */
+  log_stream?: Writable;
+  /** Called once the deployment exists: from here on the app has something to show. */
+  on_deployment?: (deployment_id: string) => void;
 }
 
 /**
@@ -33,7 +40,7 @@ export const deploy_remote = async (
 
   log.info(`☁️ Remote build`);
 
-  const manifest = await collect_manifest(workdir);
+  const manifest = props.manifest ?? (await collect_manifest(workdir));
   // The total is what the api weighs against the plan when the app's last
   // build came out too large — say it before anything is uploaded.
   const total = manifest.reduce((sum, f) => sum + f.size, 0);
@@ -51,7 +58,9 @@ export const deploy_remote = async (
     ...git,
   });
 
+  props.on_deployment?.(deployment.id);
+
   log.info(`Preparing to build in faable cloud · ${deployment.id}`);
-  await follow_remote_build(api, deployment.id);
+  await follow_remote_build(api, deployment.id, props.log_stream);
   return deployment;
 };

@@ -87,6 +87,9 @@ faable login
 faable deploy                       # deploy the current directory (= deploy launch)
 faable deploy launch --app app_x    # deploy another app, from anywhere
 faable deploy apps create --repo acme/web   # create, link, first deploy
+faable deploy --create site --workdir ./public --yes   # a new app from a folder (git or not)
+faable deploy link --app web --repo acme/web      # link a repository to an existing app
+faable deploy apps rm --app app_x   # delete an app (asks first; --yes to skip)
 faable deploy status                # phase, URL and detected stack
 faable deploy logs --build -n 100   # end of the build output (--follow to tail)
 faable deploy traffic --since 7d    # status codes, top and failing paths

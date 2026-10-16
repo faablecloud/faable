@@ -1,7 +1,13 @@
 import test from "ava";
 import { execSync } from "child_process";
 import { createHash } from "crypto";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  symlinkSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { collect_manifest } from "./manifest";
@@ -53,10 +59,31 @@ test("symlinks are rejected with an actionable error", async (t) => {
   });
 });
 
-test("a non-git directory is rejected", async (t) => {
+// A plain folder (the MCP's deploy_directory on a download, a bucket dump…)
+// deploys too: its .gitignore files count, the usual junk stays out, and the
+// folder is left exactly as it was — no .git appears in it.
+test("a folder that is not a repository is collected, without touching it", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "faable-nogit-"));
-  writeFileSync(join(dir, "package.json"), "{}");
+  writeFileSync(join(dir, "index.html"), "<!doctype html>");
+  mkdirSync(join(dir, "blog"));
+  writeFileSync(join(dir, "blog/it's here.png"), "png");
+  writeFileSync(join(dir, ".gitignore"), "dist/\n");
+  mkdirSync(join(dir, "dist"));
+  writeFileSync(join(dir, "dist/out.js"), "built");
+  mkdirSync(join(dir, "node_modules/junk"), { recursive: true });
+  writeFileSync(join(dir, "node_modules/junk/a.js"), "junk");
+  writeFileSync(join(dir, ".env"), "TOKEN=1");
+  writeFileSync(join(dir, ".env.local"), "TOKEN=2");
+  writeFileSync(join(dir, ".DS_Store"), "");
+
+  const paths = (await collect_manifest(dir)).map((f) => f.path).sort();
+  t.deepEqual(paths, [".gitignore", "blog/it's here.png", "index.html"]);
+  t.false(existsSync(join(dir, ".git")));
+});
+
+test("an empty folder that is not a repository says there is nothing to upload", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "faable-nogit-"));
   await t.throwsAsync(() => collect_manifest(dir), {
-    message: /git repository/s,
+    message: /No files to upload/,
   });
 });

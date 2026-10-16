@@ -9,7 +9,9 @@ import { requireProject } from '../../api/project'
 import { git_context } from './git_context'
 import { show_deploy_help } from './help'
 import { propose_release } from './release_version'
+import { assert_name_free } from './apps/name_free'
 import { deploy_remote } from './remote'
+import { collect_manifest, ManifestFile } from './remote/manifest'
 import { find_app_id } from './resolve_app_id'
 import { is_superseded } from './superseded'
 
@@ -104,216 +106,249 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
 
     const config = Configuration.instance().deployConfig()
 
+    // stdout carries the JSON outcome: the build log streams to stderr then.
+    const log_stream =
+      args.json || is_non_interactive() ? process.stderr : process.stdout
+
     // --create: a directory with no app yet (the agent's «deploy this folder
     // and give me the URL»). The app is new, so nothing existing is touched.
-    let created_id: string | undefined
+    // Whatever can fail before the deploy runs first — the source, the name —
+    // and an app that never got a deployment is taken back: a retry must
+    // not leave one empty app per attempt (plan F2, backlog §365).
+    let created: { id: string; team: string } | undefined
+    let manifest: ManifestFile[] | undefined
+    let deployment_started = false
     if (args.create) {
       const { id: project } = await requireProject(api)
-      const created = await api.createApp(project, { name: args.create })
-      created_id = created.id
-      log.info(`📦 Created ${created.name} (${created.id})`)
+      manifest = await collect_manifest(workdir)
+      await assert_name_free(api, project, args.create)
+      const app = await api.createApp(project, { name: args.create })
+      created = { id: app.id, team: app.team }
+      log.info(`📦 Created ${app.name} (${app.id})`)
     }
-
-    const app_id =
-      created_id ?? (await find_app_id(args.app, ctx.appId, api, workdir))
-    // Nothing to deploy from here. `faable deploy` is the entry point to the
-    // whole product, so an unlinked directory is a perfectly normal way to
-    // arrive: list what deploy can do (like `faable auth` does) instead of
-    // answering a bare `faable deploy` with an error and nothing else.
-    if (!app_id) {
-      show_deploy_help()
-      throw new CliError(
-        'app_required',
-        `No app linked to ${workdir}. Connect a repository from the dashboard (or run "faable deploy link"), or target one with --app <app_id>.`
+    const created_id = created?.id
+    const take_back_created = async () => {
+      if (!created || deployment_started) return
+      await api.deleteApp(created.id, created.team).then(
+        () => log.info(`🧹 Removed ${created!.id}: it never got a deployment`),
+        () =>
+          log.warn(
+            `Could not remove ${created!.id}, which never got a deployment — delete it from the dashboard.`
+          )
       )
     }
 
-    const app = await api.getApp(app_id)
+    try {
+      const app_id =
+        created_id ?? (await find_app_id(args.app, ctx.appId, api, workdir))
+      // Nothing to deploy from here. `faable deploy` is the entry point to the
+      // whole product, so an unlinked directory is a perfectly normal way to
+      // arrive: list what deploy can do (like `faable auth` does) instead of
+      // answering a bare `faable deploy` with an error and nothing else.
+      if (!app_id) {
+        show_deploy_help()
+        throw new CliError(
+          'app_required',
+          `No app linked to ${workdir}. Connect a repository from the dashboard (or run "faable deploy link"), or target one with --app <app_id>.`
+        )
+      }
 
-    // Confirm which app/dir is about to go out. Only in a real terminal — CI
-    // (non-TTY) deploys unattended, so pipelines need no changes.
-    if (
-      process.stdout.isTTY &&
-      !(await confirm({
-        message: `Deploy "${app.name}" (${app.id}) from ${workdir}?`,
-        yes: args.yes
-      }))
-    ) {
-      log.info('Cancelled.')
-      return
-    }
+      const app = await api.getApp(app_id)
 
-    // Monorepo Root Directory — single precedence rule everywhere
-    // (arch/deploy/root-dir-faable-json.md): App.root_dir (platform
-    // override, exceptional) > repo faable.json rootDir (the supported
-    // user option) > repo root. Matches the remote builder.
-    if (app.root_dir) {
-      config.rootDir = app.root_dir
-      log.info(`📁 Root directory: ${app.root_dir} (platform override)`)
-    } else if (config.rootDir) {
-      log.info(`📁 Root directory: ${config.rootDir} (from faable.json)`)
-    }
+      // Confirm which app/dir is about to go out. Only in a real terminal — CI
+      // (non-TTY) deploys unattended, so pipelines need no changes.
+      if (
+        process.stdout.isTTY &&
+        !(await confirm({
+          message: `Deploy "${app.name}" (${app.id}) from ${workdir}?`,
+          yes: args.yes
+        }))
+      ) {
+        await take_back_created()
+        log.info('Cancelled.')
+        return
+      }
 
-    // Capture the commit/ref/actor so the deployment records which commit
-    // it came from and who pushed it (env in CI, git fallback locally).
-    const git = await git_context({ workdir })
+      // Monorepo Root Directory — single precedence rule everywhere
+      // (arch/deploy/root-dir-faable-json.md): App.root_dir (platform
+      // override, exceptional) > repo faable.json rootDir (the supported
+      // user option) > repo root. Matches the remote builder.
+      if (app.root_dir) {
+        config.rootDir = app.root_dir
+        log.info(`📁 Root directory: ${app.root_dir} (platform override)`)
+      } else if (config.rootDir) {
+        log.info(`📁 Root directory: ${config.rootDir} (from faable.json)`)
+      }
 
-    // Propose the release version (--release > FAABLE_RELEASE > git tag).
-    // Optional: when absent the platform injects no FAABLE_RELEASE and the
-    // app falls back to its own version source.
-    const proposed = await propose_release({ workdir, explicit: args.release })
-    if (proposed) {
-      log.info(`🏷️ Release: ${proposed.release} (from ${proposed.source})`)
-    }
+      // Capture the commit/ref/actor so the deployment records which commit
+      // it came from and who pushed it (env in CI, git fallback locally).
+      const git = await git_context({ workdir })
 
-    // Remote build only (arch/deploy/remote-artifact-default-cutover.md): the
-    // CLI no longer builds — it uploads the source and the platform builds
-    // server-side (framework detection, buildpacks, artifact/image output all
-    // live in the builder). No Docker, no local fallback: a rejected admission
-    // (build_mode=local opt-out, or the global kill-switch off) or a build
-    // error throws and exits red.
-    log.info(`🚀 Deploying "${app.name}" (${app.id})`)
-    const deployment = await deploy_remote({
-      api,
-      app,
-      git,
-      release: proposed?.release,
-      workdir
-    })
+      // Propose the release version (--release > FAABLE_RELEASE > git tag).
+      // Optional: when absent the platform injects no FAABLE_RELEASE and the
+      // app falls back to its own version source.
+      const proposed = await propose_release({ workdir, explicit: args.release })
+      if (proposed) {
+        log.info(`🏷️ Release: ${proposed.release} (from ${proposed.source})`)
+      }
 
-    const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
-    log.info(`Preparing to deploy in faable cloud · ${deployment.id}`)
-    log.info(`📊 View it in the dashboard -> ${dashboard_url}`)
-
-    // Wait (up to 5 minutes) for the deployment to be promoted (live)
-    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-    const timeoutMs = 5 * 60 * 1000
-    const intervalMs = 5000
-    const start = Date.now()
-
-    log.info(`⏳ Waiting for deployment to be promoted...`)
-
-    let promoted = false
-    let failure: { phase: string; reason?: string } | null = null
-    let superseded: string | null = null
-    // The pointer at wait-start is the PREVIOUS deployment (older than ours)
-    // — only a pointer CHANGE to something that isn't us needs a look.
-    const initialActiveId = app.status?.deployment
-    while (Date.now() - start < timeoutMs) {
-      await wait(intervalMs)
-      try {
-        const current = await api.getApp(app.id)
-        if (current.status?.deployment === deployment.id) {
-          promoted = true
-          break
+      // Remote build only (arch/deploy/remote-artifact-default-cutover.md): the
+      // CLI no longer builds — it uploads the source and the platform builds
+      // server-side (framework detection, buildpacks, artifact/image output all
+      // live in the builder). No Docker, no local fallback: a rejected admission
+      // (build_mode=local opt-out, or the global kill-switch off) or a build
+      // error throws and exits red.
+      log.info(`🚀 Deploying "${app.name}" (${app.id})`)
+      const deployment = await deploy_remote({
+        api,
+        app,
+        git,
+        release: proposed?.release,
+        workdir,
+        manifest,
+        log_stream,
+        on_deployment: () => {
+          deployment_started = true
         }
-        // Superseded: the pointer moved to a deployment at least as new as
-        // ours (twin workflows on the same push, or a rapid follow-up
-        // deploy). It only moves forward — waiting longer can never succeed.
-        const activeId = current.status?.deployment
-        if (activeId && activeId !== initialActiveId) {
-          const active = await api.getDeployment(activeId).catch(() => null)
-          if (
-            active &&
-            is_superseded(
-              deployment as { id: string; createdAt: string },
-              active as { id: string; createdAt: string }
-            )
-          ) {
-            superseded = activeId
+      })
+
+      const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
+      log.info(`Preparing to deploy in faable cloud · ${deployment.id}`)
+      log.info(`📊 View it in the dashboard -> ${dashboard_url}`)
+
+      // Wait (up to 5 minutes) for the deployment to be promoted (live)
+      const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+      const timeoutMs = 5 * 60 * 1000
+      const intervalMs = 5000
+      const start = Date.now()
+
+      log.info(`⏳ Waiting for deployment to be promoted...`)
+
+      let promoted = false
+      let failure: { phase: string; reason?: string } | null = null
+      let superseded: string | null = null
+      // The pointer at wait-start is the PREVIOUS deployment (older than ours)
+      // — only a pointer CHANGE to something that isn't us needs a look.
+      const initialActiveId = app.status?.deployment
+      while (Date.now() - start < timeoutMs) {
+        await wait(intervalMs)
+        try {
+          const current = await api.getApp(app.id)
+          if (current.status?.deployment === deployment.id) {
+            promoted = true
             break
           }
-        }
-        // Watch for a terminal runtime failure so we fail fast (and red)
-        // instead of timing out green. The controller marks a crash-looping
-        // deployment ERROR — with a reason (e.g. a missing module) — within
-        // ~1min, long before this 5min promotion timeout.
-        const dep = await api.getDeployment(deployment.id)
-        const phase = dep.status?.phase
-        if (phase === 'ERROR' || phase === 'BUILD_ERROR') {
-          failure = { phase, reason: dep.status?.reason }
-          break
-        }
-        // CANCELED: the platform superseded this build before it produced a
-        // runnable (a sibling deployment of the app won the promotion).
-        if (phase === 'CANCELED') {
-          superseded = dep.status?.reason ?? 'canceled'
-          break
-        }
-      } catch (_error) {
-        // Ignore transient errors while polling and keep waiting
-        log.debug(`Polling app status failed, retrying...`)
-      }
-    }
-
-    if (args.json) {
-      const outcome = promoted
-        ? 'live'
-        : superseded
-          ? 'superseded'
-          : failure
-            ? 'failed'
-            : 'timeout'
-      const fault = failure
-        ? await api.getDeploymentFault(deployment.id).catch(() => null)
-        : null
-      const result = {
-        app_id: app.id,
-        app_name: app.name,
-        ...(created_id ? { created: true } : {}),
-        deployment_id: deployment.id,
-        outcome,
-        url: `https://${app.url}`,
-        ...(failure
-          ? {
-              phase: failure.phase,
-              reason: failure.reason,
-              ...(fault
-                ? { fault_owner: fault.fault_owner, error_code: fault.error_code }
-                : {})
+          // Superseded: the pointer moved to a deployment at least as new as
+          // ours (twin workflows on the same push, or a rapid follow-up
+          // deploy). It only moves forward — waiting longer can never succeed.
+          const activeId = current.status?.deployment
+          if (activeId && activeId !== initialActiveId) {
+            const active = await api.getDeployment(activeId).catch(() => null)
+            if (
+              active &&
+              is_superseded(
+                deployment as { id: string; createdAt: string },
+                active as { id: string; createdAt: string }
+              )
+            ) {
+              superseded = activeId
+              break
             }
-          : {}),
-        dashboard_url
+          }
+          // Watch for a terminal runtime failure so we fail fast (and red)
+          // instead of timing out green. The controller marks a crash-looping
+          // deployment ERROR — with a reason (e.g. a missing module) — within
+          // ~1min, long before this 5min promotion timeout.
+          const dep = await api.getDeployment(deployment.id)
+          const phase = dep.status?.phase
+          if (phase === 'ERROR' || phase === 'BUILD_ERROR') {
+            failure = { phase, reason: dep.status?.reason }
+            break
+          }
+          // CANCELED: the platform superseded this build before it produced a
+          // runnable (a sibling deployment of the app won the promotion).
+          if (phase === 'CANCELED') {
+            superseded = dep.status?.reason ?? 'canceled'
+            break
+          }
+        } catch (_error) {
+          // Ignore transient errors while polling and keep waiting
+          log.debug(`Polling app status failed, retrying...`)
+        }
       }
-      if (failure) {
-        // A failed deploy still exits red (CI depends on it); the outcome
-        // travels in the error so a program reads it without parsing prose.
-        const err = new CliError(
-          'usage',
-          `Deployment ${deployment.id} failed (${failure.phase})${
-            fault?.fault_owner ? ` — ${fault.fault_owner}'s side` : ''
-          }: ${failure.reason ?? 'no reason recorded'}`,
-          { action: JSON.stringify(result) }
-        )
-        // The api's own code when it classified the failure.
-        err.code = fault?.error_code ?? 'deploy_failed'
-        throw err
-      }
-      return print_json(result)
-    }
 
-    if (promoted) {
-      log.info(`🌍 Deployment promoted and live, visit: https://${app.url}`)
-    } else if (superseded) {
-      // Not a failure: the app IS live, just on a sibling deployment (e.g.
-      // duplicated workflows firing on the same push). Green exit — there is
-      // nothing for the user to fix in THIS run.
-      log.warn(
-        `⚠️ Deployment superseded — a newer deployment of this app was promoted (${superseded}). The app is live: https://${app.url}`
-      )
-    } else if (failure) {
-      // Fail the command (non-zero exit → red GitHub Action) and surface the
-      // reason the controller captured so the user sees WHY without digging.
-      log.error(`❌ Deployment failed (${failure.phase}).`)
-      if (failure.reason) log.error(failure.reason)
-      log.error(`Check the logs in the dashboard -> ${dashboard_url}`)
-      throw new Error(
-        `Deployment ${deployment.id} failed with phase ${failure.phase}`
-      )
-    } else {
-      log.warn(
-        `⌛ Timed out after 5min waiting for promotion. The deployment is still rolling out, check the dashboard -> ${dashboard_url}`
-      )
+      if (args.json) {
+        const outcome = promoted
+          ? 'live'
+          : superseded
+            ? 'superseded'
+            : failure
+              ? 'failed'
+              : 'timeout'
+        const fault = failure
+          ? await api.getDeploymentFault(deployment.id).catch(() => null)
+          : null
+        const result = {
+          app_id: app.id,
+          app_name: app.name,
+          ...(created_id ? { created: true } : {}),
+          deployment_id: deployment.id,
+          outcome,
+          url: `https://${app.url}`,
+          ...(failure
+            ? {
+                phase: failure.phase,
+                reason: failure.reason,
+                ...(fault
+                  ? { fault_owner: fault.fault_owner, error_code: fault.error_code }
+                  : {})
+              }
+            : {}),
+          dashboard_url
+        }
+        if (failure) {
+          // A failed deploy still exits red (CI depends on it); the outcome
+          // travels in the error so a program reads it without parsing prose.
+          const err = new CliError(
+            'usage',
+            `Deployment ${deployment.id} failed (${failure.phase})${
+              fault?.fault_owner ? ` — ${fault.fault_owner}'s side` : ''
+            }: ${failure.reason ?? 'no reason recorded'}`,
+            { action: JSON.stringify(result) }
+          )
+          // The api's own code when it classified the failure.
+          err.code = fault?.error_code ?? 'deploy_failed'
+          throw err
+        }
+        return print_json(result)
+      }
+
+      if (promoted) {
+        log.info(`🌍 Deployment promoted and live, visit: https://${app.url}`)
+      } else if (superseded) {
+        // Not a failure: the app IS live, just on a sibling deployment (e.g.
+        // duplicated workflows firing on the same push). Green exit — there is
+        // nothing for the user to fix in THIS run.
+        log.warn(
+          `⚠️ Deployment superseded — a newer deployment of this app was promoted (${superseded}). The app is live: https://${app.url}`
+        )
+      } else if (failure) {
+        // Fail the command (non-zero exit → red GitHub Action) and surface the
+        // reason the controller captured so the user sees WHY without digging.
+        log.error(`❌ Deployment failed (${failure.phase}).`)
+        if (failure.reason) log.error(failure.reason)
+        log.error(`Check the logs in the dashboard -> ${dashboard_url}`)
+        throw new Error(
+          `Deployment ${deployment.id} failed with phase ${failure.phase}`
+        )
+      } else {
+        log.warn(
+          `⌛ Timed out after 5min waiting for promotion. The deployment is still rolling out, check the dashboard -> ${dashboard_url}`
+        )
+      }
+    } catch (error) {
+      await take_back_created()
+      throw error
     }
   }
 }

@@ -927,10 +927,39 @@ export const TOOLS: ToolDef[] = [
     }
   },
   {
+    name: 'link_repo',
+    title: 'Link a repository to an app',
+    description:
+      "Link a GitHub repository to an app that already exists, so a push deploys it (for a new app, create_app does both). What is live keeps serving until the next push — linking starts no deploy. Needs the Faable GitHub App installed on the repository; if not, the error says what to fix.",
+    input: {
+      app,
+      repo: z.string().describe('GitHub repository, owner/repo'),
+      branch: z
+        .string()
+        .optional()
+        .describe('Branch to deploy (defaults to the repository default)'),
+      project
+    },
+    command: ['deploy', 'link'],
+    flags: a => [
+      '--repo',
+      a.repo,
+      ...opt('--branch', a.branch),
+      ...target(a)
+    ],
+    write: true,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: true
+    },
+    example: { app: 'web', repo: 'acme/web', branch: 'main' }
+  },
+  {
     name: 'deploy_directory',
     title: 'Deploy a local directory',
     description:
-      "Upload a directory of this machine and deploy it (`faable deploy`): Faable builds it and serves it. Pass `app` to deploy to an existing app, or `create` to make a new one with that name. Waits until it is live and returns the URL — or why it failed and whether that is the user's code (`user`) or Faable (`platform`). Only on the local server (`npx @faable/faable mcp`). Prefer create_app/deploy_app when the code is on GitHub: a push then deploys on its own.",
+      "Upload a directory of this machine and deploy it (`faable deploy`): Faable builds it and serves it. Any folder works, a git repository or not — in a plain folder its .gitignore files apply, and node_modules and .env files stay out. Pass `app` to deploy to an existing app, or `create` to make a new one with that name: a name already used in the project is refused (deploy to that app instead), and if the deploy cannot start the new app is removed, so a retry never leaves an empty one. Waits until it is live and returns the URL — or why it failed and whether that is the user's code (`user`) or Faable (`platform`). Only on the local server (`npx @faable/faable mcp`). Prefer create_app/deploy_app when the code is on GitHub: a push then deploys on its own.",
     input: {
       workdir: z
         .string()

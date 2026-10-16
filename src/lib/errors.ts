@@ -16,6 +16,7 @@ export type CliErrorCode =
   | 'confirmation_required' // a prompt nobody can answer (no TTY, no --yes)
   | 'app_required' // the command needs --app and could not infer one
   | 'project_required' // several projects and none chosen: --project
+  | 'name_taken' // creating an app with the name of one already in the project
   | 'usage' // bad invocation: unknown command, missing argument…
 
 export interface CliErrorFields {

@@ -31,6 +31,11 @@ export const ANA = {
   logins_count: 7
 }
 
+// The deployment of a `faable deploy` run, and a line of its build log: it
+// must reach stderr, never the JSON on stdout.
+export const DIR_DEPLOYMENT = 'deployment_dir'
+export const BUILD_LOG_LINE = 'INFO faable-detector · No dependency manifest'
+
 export const start_api = async () => {
   const writes: string[] = []
   const bodies: string[] = []
@@ -117,6 +122,19 @@ export const start_api = async () => {
             deployment_id: 'deployment_first'
           })
         }
+        // `faable deploy` of a directory: the CAS diff and the deployment.
+        // A file named refuse-upload.txt makes the diff fail — a failure
+        // after the app exists and before it has a deployment.
+        if (url.pathname === '/upload/missing') {
+          if (body.includes('refuse-upload.txt')) {
+            res.statusCode = 500
+            return json({ message: 'upload store unavailable' })
+          }
+          return json({ uploads: [] })
+        }
+        if (req.method === 'POST' && url.pathname === '/deployment') {
+          return json({ id: DIR_DEPLOYMENT, createdAt: new Date().toISOString() })
+        }
         json({})
       })
       return
@@ -128,6 +146,16 @@ export const start_api = async () => {
       return basic
         ? Buffer.from(basic[1], 'base64').toString().split(':')[0]
         : 'no-key'
+    }
+    // The app `deploy --create` made, already serving the directory's deploy.
+    if (url.pathname === `/app/${NEW_APP.id}`) {
+      return json({ ...NEW_APP, status: { deployment: DIR_DEPLOYMENT } })
+    }
+    if (url.pathname === `/deployment/${DIR_DEPLOYMENT}`) {
+      return json({ id: DIR_DEPLOYMENT, status: { phase: 'READY' } })
+    }
+    if (url.pathname === `/deployment/${DIR_DEPLOYMENT}/logs`) {
+      return json({ content: BUILD_LOG_LINE + '\n', truncated: false })
     }
     if (url.pathname === `/app/${APP.id}`) {
       return json({ ...APP, slug: `seen-by:${seen_by()}` })

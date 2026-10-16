@@ -1,6 +1,7 @@
 import { CommandModule } from 'yargs'
 import { apps_list } from '../inspect/list'
 import { apps_create } from './create'
+import { apps_rm } from './rm'
 import { apps_set } from './set'
 import { status } from '../inspect/status'
 
@@ -15,7 +16,8 @@ export const apps: CommandModule = {
       .command(apps_get)
       .command(apps_create)
       .command(apps_set)
-      .demandCommand(1, 'Specify an apps command: list, get, create or set'),
+      .command(apps_rm)
+      .demandCommand(1, 'Specify an apps command: list, get, create, set or rm'),
   handler: () => {
     // Unreachable: demandCommand(1) either routes to a subcommand or fails
     // through the global .fail() in src/index.ts.

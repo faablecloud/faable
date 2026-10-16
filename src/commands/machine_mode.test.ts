@@ -13,7 +13,14 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { ANA, APP, NEW_APP, PROJECT, start_api } from '../test/stub_api'
+import {
+  ANA,
+  APP,
+  BUILD_LOG_LINE,
+  NEW_APP,
+  PROJECT,
+  start_api
+} from '../test/stub_api'
 
 // The contract a program driving the CLI relies on — the Faable MCP server
 // sets FAABLE_NONINTERACTIVE=1 on every call (arch/deploy/mcp-cli-gaps.md):
@@ -368,6 +375,161 @@ test('a deploy never infers its target or its go-ahead', async t => {
     const result = await run([...args], NONINTERACTIVE)
     t.is(result.code, 1, args.join(' '))
     t.is(error_of(result.stderr).code, code, args.join(' '))
+  }
+})
+
+// arch/deploy/cli-mcp-fallos-2026-10-16-plan.md, F1-F3: what the MCP's
+// deploy_directory runs. A plain folder (no git), a new app, the outcome as
+// JSON — and no app left behind when the deploy can't start.
+const folder = (files: Record<string, string>) => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'faable-folder-'))
+  for (const [name, body] of Object.entries(files)) {
+    writeFileSync(path.join(dir, name), body)
+  }
+  return dir
+}
+
+const deploy_create = (name: string, dir: string, url: string) =>
+  run(
+    ['deploy', '--create', name, '--workdir', dir, '--yes', '--json'],
+    {
+      ...NONINTERACTIVE,
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: url,
+      FAABLE_PROJECT: PROJECT
+    }
+  )
+
+test('deploy --create of a plain folder: the outcome is the only thing on stdout', async t => {
+  const api = await start_api()
+  try {
+    const dir = folder({ 'index.html': '<!doctype html>' })
+    const { code, stdout, stderr } = await deploy_create('web', dir, api.url)
+    t.is(code, 0, stderr)
+    // The build log streamed, but to stderr: one line of it on stdout and
+    // the caller could not read a deploy that went fine.
+    const out = JSON.parse(stdout)
+    t.is(out.outcome, 'live')
+    t.is(out.app_id, NEW_APP.id)
+    t.true(out.created)
+    t.regex(stderr, new RegExp(BUILD_LOG_LINE))
+    t.deepEqual(api.writes, ['POST /app', 'POST /upload/missing', 'POST /deployment'])
+  } finally {
+    api.close()
+  }
+})
+
+test('deploy --create with the name of an app already there: name_taken, nothing created', async t => {
+  const api = await start_api()
+  try {
+    const dir = folder({ 'index.html': '<!doctype html>' })
+    const { code, stderr } = await deploy_create(APP.name, dir, api.url)
+    t.is(code, 1)
+    const error = error_of(stderr)
+    t.is(error.code, 'name_taken')
+    t.regex(error.message, new RegExp(APP.id))
+    t.deepEqual(api.writes, [])
+  } finally {
+    api.close()
+  }
+})
+
+test('deploy --create of a folder with nothing to upload: refused before the app exists', async t => {
+  const api = await start_api()
+  try {
+    const { code } = await deploy_create('web', folder({}), api.url)
+    t.is(code, 1)
+    t.deepEqual(api.writes, [])
+  } finally {
+    api.close()
+  }
+})
+
+test('deploy --create that fails before its first deployment takes the app back', async t => {
+  const api = await start_api()
+  try {
+    const dir = folder({ 'index.html': '<!doctype html>', 'refuse-upload.txt': 'x' })
+    const { code } = await deploy_create('web', dir, api.url)
+    t.is(code, 1)
+    t.deepEqual(api.writes, [
+      'POST /app',
+      'POST /upload/missing',
+      `DELETE /app/${NEW_APP.id}`
+    ])
+  } finally {
+    api.close()
+  }
+})
+
+// Plan F4 (backlog §366): linking a repository to an app that already exists,
+// with nobody to pick it from a list.
+test('deploy link --app: links without asking, and says how it deploys now', async t => {
+  const api = await start_api()
+  try {
+    const env = {
+      ...NONINTERACTIVE,
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: api.url,
+      FAABLE_PROJECT: PROJECT
+    }
+    const link = (...args: string[]) => run(['deploy', 'link', ...args], env)
+
+    // Driven by a program, neither the app nor the repository is guessed.
+    t.is(error_of((await link('--json')).stderr).code, 'app_required')
+    t.is(error_of((await link('--app', NEW_APP.id)).stderr).code, 'usage')
+    t.deepEqual(api.writes, [])
+
+    const { code, stdout, stderr } = await link(
+      '--app',
+      NEW_APP.id,
+      '--repo',
+      'https://github.com/acme/web.git',
+      '--json'
+    )
+    t.is(code, 0, stderr)
+    t.deepEqual(JSON.parse(stdout), {
+      app_id: NEW_APP.id,
+      app_name: NEW_APP.name,
+      repository: 'acme/web',
+      branch: 'main',
+      deploy_trigger: 'webhook'
+    })
+    t.deepEqual(api.writes, [`POST /app/${NEW_APP.id}/link-repository`])
+    t.is(JSON.parse(api.bodies[0]).repository, 'acme/web')
+
+    // The api's reason comes through as the code.
+    const taken = await link('--app', NEW_APP.id, '--repo', 'acme/taken', '--json')
+    t.is(taken.code, 1)
+    t.is(error_of(taken.stderr).code, 'repository_already_linked')
+  } finally {
+    api.close()
+  }
+})
+
+// Plan F5: deleting an app without the dashboard — always named, always confirmed.
+test('deploy apps rm: needs the app and the go-ahead, then deletes it', async t => {
+  const api = await start_api()
+  try {
+    const env = {
+      ...NONINTERACTIVE,
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: api.url
+    }
+    const rm = (...args: string[]) => run(['deploy', 'apps', 'rm', ...args], env)
+
+    t.is(error_of((await rm('--json')).stderr).code, 'app_required')
+    t.is(
+      error_of((await rm('--app', APP.id, '--json')).stderr).code,
+      'confirmation_required'
+    )
+    t.deepEqual(api.writes, [])
+
+    const { code, stdout, stderr } = await rm('--app', APP.id, '--yes', '--json')
+    t.is(code, 0, stderr)
+    t.deepEqual(JSON.parse(stdout), { deleted: true, id: APP.id, name: APP.name })
+    t.deepEqual(api.writes, [`DELETE /app/${APP.id}`])
+  } finally {
+    api.close()
   }
 })
 

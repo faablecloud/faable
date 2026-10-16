@@ -1,3 +1,4 @@
+import { Writable } from "stream";
 import { FaableApi } from "../../../api/FaableApi";
 import { log } from "../../../log";
 
@@ -17,7 +18,12 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
  */
 export const follow_remote_build = async (
   api: FaableApi,
-  deployment_id: string
+  deployment_id: string,
+  // Where the build log goes. stdout for a person; stderr when stdout carries
+  // a JSON document (--json, or a program driving the CLI): one build line in
+  // front of it and the caller can't parse the outcome — the MCP reported a
+  // live deploy as failed that way (arch/deploy/cli-mcp-fallos-2026-10-16-plan.md, F1).
+  out: Writable = process.stdout
 ): Promise<void> => {
   let printed = 0;
   let last_phase = "";
@@ -28,7 +34,7 @@ export const follow_remote_build = async (
       const logs = await api.getDeploymentLogs(deployment_id);
       const content = logs?.content ?? "";
       if (content.length > printed) {
-        process.stdout.write(content.slice(printed));
+        out.write(content.slice(printed));
         printed = content.length;
       } else if (content.length < printed) {
         // Keep-tail truncation rotated the buffer — resync silently.

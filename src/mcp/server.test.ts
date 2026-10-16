@@ -53,6 +53,7 @@ test('by default: reads and deploy_app; the writes only with --writes', t => {
   t.true(names.includes('deploy_app'))
   for (const write of [
     'create_app',
+    'link_repo',
     'set_secrets',
     'add_domain',
     'cancel_deployment'
