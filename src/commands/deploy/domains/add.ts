@@ -3,7 +3,7 @@ import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
-import { cname_target } from './format'
+import { acme_record, cname_target } from './format'
 
 interface DomainsAddArgs {
   fqdn: string
@@ -51,7 +51,11 @@ export const domains_add: CommandModule<unknown, DomainsAddArgs> = {
     // Same shape as `domains check --json`: the record plus the CNAME to
     // create, which is the whole next step.
     if (args.json) {
-      return print_json({ ...domain, expected_cname: cname_target(domain) })
+      return print_json({
+        ...domain,
+        expected_cname: cname_target(domain),
+        ...(args.tls ? { prevalidation_cname: acme_record(domain) } : {})
+      })
     }
 
     log.info(`🌐 Domain ${domain.fqdn} added to ${app.name} (${app_id}).`)
@@ -64,6 +68,17 @@ export const domains_add: CommandModule<unknown, DomainsAddArgs> = {
         args.tls ? ' and then provisions the TLS certificate' : ''
       }.`
     )
+    if (args.tls) {
+      const acme = acme_record(domain)
+      log.info(``)
+      log.info(
+        `Already serving ${domain.fqdn} somewhere else? Create this record FIRST and leave the CNAME above for later:`
+      )
+      log.info(`  ${acme.name} → ${acme.target}`)
+      log.info(
+        `Faable then issues the certificate before any traffic moves, and switching the CNAME has no TLS gap.`
+      )
+    }
     log.info(`Track it with: faable deploy domains check ${domain.fqdn}`)
   }
 }

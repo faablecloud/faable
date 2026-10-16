@@ -212,6 +212,12 @@ export interface FaableDomain {
     dns_expected?: string[]
     dns_observed?: string[]
     dns_message?: string | null
+    // Certificate pre-validation: `ok` once `_acme-challenge.<fqdn>` CNAMEs to
+    // `acme_expected[0]`, and the certificate is issued before the fqdn
+    // points here (arch/deploy/cli-mcp-fallos-2026-10-16-plan.md, F6).
+    acme_state?: 'pending' | 'ok'
+    acme_expected?: string[]
+    acme_observed?: string[]
   }
 }
 

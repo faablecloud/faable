@@ -1,6 +1,6 @@
 import test from 'ava'
 import { FaableDomain } from '../../../api/FaableApi'
-import { cname_target, dns_badge, find_by_fqdn } from './format'
+import { acme_record, cname_target, dns_badge, find_by_fqdn } from './format'
 
 const domain = (over: Partial<FaableDomain> = {}): FaableDomain => ({
   id: 'domain_abc123',
@@ -48,4 +48,26 @@ test('find_by_fqdn is case-insensitive', t => {
   const list = [domain(), domain({ id: 'domain_x', fqdn: 'api.example.com' })]
   t.is(find_by_fqdn(list, 'API.example.COM')?.id, 'domain_x')
   t.is(find_by_fqdn(list, 'missing.example.com'), undefined)
+})
+
+// F6 (arch/deploy/cli-mcp-fallos-2026-10-16-plan.md): the record that gets the
+// certificate issued before the domain points here.
+test('acme_record: the record to create, and whether it is in place', t => {
+  t.deepEqual(acme_record(domain()), {
+    name: '_acme-challenge.www.example.com',
+    target: 'domain_abc123.acme.faable.com',
+    ready: false
+  })
+  t.deepEqual(
+    acme_record(
+      domain({
+        status: { acme_state: 'ok', acme_expected: ['custom.acme.faable.com'] }
+      })
+    ),
+    {
+      name: '_acme-challenge.www.example.com',
+      target: 'custom.acme.faable.com',
+      ready: true
+    }
+  )
 })

@@ -23,6 +23,18 @@ export const dns_badge = (domain: FaableDomain): string => {
 export const cname_target = (domain: FaableDomain): string =>
   domain.status?.dns_expected?.[0] ?? `${domain.id}.faable.link`
 
+// The optional record that gets the certificate issued BEFORE the domain
+// points here: a domain that is live somewhere else moves without a TLS gap.
+// Published by the api in `status.acme_expected`; derived from the id until
+// the first check fills it in, like the CNAME above.
+export const acme_record = (
+  domain: FaableDomain
+): { name: string; target: string; ready: boolean } => ({
+  name: `_acme-challenge.${domain.fqdn}`,
+  target: domain.status?.acme_expected?.[0] ?? `${domain.id}.acme.faable.com`,
+  ready: domain.status?.acme_state === 'ok'
+})
+
 export const find_by_fqdn = (
   domains: FaableDomain[],
   fqdn: string

@@ -430,7 +430,7 @@ export const TOOLS: ToolDef[] = [
     name: 'check_domain',
     title: 'Check a domain',
     description:
-      'DNS diagnostic of one custom domain: the CNAME it expects, what DNS answers today, and why it is not verified yet.',
+      'DNS diagnostic of one custom domain: the CNAME it expects, what DNS answers today, and why it is not verified yet. `prevalidation_cname.ready` says whether the optional `_acme-challenge` record is in place, so the certificate is issued without waiting for the CNAME.',
     input: {
       app,
       project,
@@ -881,7 +881,7 @@ export const TOOLS: ToolDef[] = [
     name: 'add_domain',
     title: 'Add a custom domain',
     description:
-      'Attach a custom domain to an app. Returns the CNAME record the user must create at their DNS provider; Faable verifies it and issues the certificate on its own.',
+      "Attach a custom domain to an app. Returns the CNAME record the user must create at their DNS provider; Faable verifies it and issues the certificate on its own. If the domain already serves traffic somewhere else, tell the user to create `prevalidation_cname` (`_acme-challenge.<fqdn>` CNAME) FIRST and switch the main CNAME only once check_domain shows it ready: the certificate then exists before traffic moves, with no TLS gap.",
     input: { app, project, fqdn: z.string().describe('e.g. www.example.com') },
     command: ['deploy', 'domains', 'add'],
     flags: a => [a.fqdn, ...target(a)],

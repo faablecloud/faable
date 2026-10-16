@@ -3,7 +3,7 @@ import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
-import { cname_target, dns_badge, find_by_fqdn } from './format'
+import { acme_record, cname_target, dns_badge, find_by_fqdn } from './format'
 
 interface DomainsCheckArgs {
   fqdn: string
@@ -41,7 +41,11 @@ export const domains_check: CommandModule<unknown, DomainsCheckArgs> = {
 
     // The record plus the one thing it does not carry: the CNAME to create.
     if (args.json) {
-      return print_json({ ...domain, expected_cname: cname_target(domain) })
+      return print_json({
+        ...domain,
+        expected_cname: cname_target(domain),
+        ...(domain.tls ? { prevalidation_cname: acme_record(domain) } : {})
+      })
     }
 
     const status = domain.status
@@ -54,6 +58,16 @@ export const domains_check: CommandModule<unknown, DomainsCheckArgs> = {
     }
     if (status?.dns_message) {
       log.info(`  Diagnostic:     ${status.dns_message}`)
+    }
+    if (domain.tls) {
+      const acme = acme_record(domain)
+      log.info(
+        `  Pre-validation: ${acme.name} → ${acme.target} ${
+          acme.ready
+            ? '✅ in place: the certificate is issued without waiting for the CNAME'
+            : '(optional; for a domain live elsewhere, so the move has no TLS gap)'
+        }`
+      )
     }
     if (status?.dns_checked_at) {
       log.info(`  Last checked:   ${status.dns_checked_at}`)
