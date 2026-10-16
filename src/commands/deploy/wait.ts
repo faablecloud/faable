@@ -1,4 +1,5 @@
 import type { FaableApi } from '../../api/FaableApi'
+import { reachable_timeout_ms, wait_reachable } from './reachable'
 
 // The phases a deployment does not leave on its own. READY is the good one.
 export const TERMINAL_PHASES = new Set([
@@ -18,6 +19,9 @@ export interface WaitResult {
   done: boolean
   ok: boolean
   url?: string
+  // READY and the URL answers (not the edge's "app not found" — F9); absent
+  // when the check is off. False: live, but the route is not out yet.
+  reachable?: boolean
   reason?: string
   fault_owner?: 'user' | 'platform' | 'unknown' | null
   error_code?: string | null
@@ -27,6 +31,7 @@ export interface WaitDeps {
   sleep?: (ms: number) => Promise<void>
   now?: () => number
   poll_ms?: number
+  reachable?: (url: string) => Promise<boolean>
 }
 
 /**
@@ -56,7 +61,15 @@ export const wait_for_deployment = async (
         done: true,
         ok: phase === 'READY'
       }
-      if (phase === 'READY' && opts.app_url) result.url = opts.app_url
+      if (phase === 'READY' && opts.app_url) {
+        result.url = opts.app_url
+        const check =
+          deps.reachable ??
+          (reachable_timeout_ms() > 0
+            ? (url: string) => wait_reachable(url, reachable_timeout_ms())
+            : undefined)
+        if (check) result.reachable = await check(opts.app_url)
+      }
       if (phase !== 'READY' && d?.status?.reason) {
         result.reason = d.status.reason
       }

@@ -8,6 +8,7 @@ import { log } from '../../log'
 import { requireProject } from '../../api/project'
 import { git_context } from './git_context'
 import { show_deploy_help } from './help'
+import { reachable_timeout_ms, wait_reachable } from './reachable'
 import { propose_release } from './release_version'
 import { assert_name_free } from './apps/name_free'
 import { deploy_remote } from './remote'
@@ -277,6 +278,17 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
         }
       }
 
+      // Promoted is not yet answering: wait for the edge to route the URL
+      // (F9). `undefined` when the check is off (FAABLE_REACHABLE_TIMEOUT_MS=0).
+      let reachable: boolean | undefined
+      if (promoted && reachable_timeout_ms() > 0) {
+        log.info(`⏳ Live — waiting for https://${app.url} to answer...`)
+        reachable = await wait_reachable(
+          `https://${app.url}`,
+          reachable_timeout_ms()
+        )
+      }
+
       if (args.json) {
         const outcome = promoted
           ? 'live'
@@ -295,6 +307,7 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
           deployment_id: deployment.id,
           outcome,
           url: `https://${app.url}`,
+          ...(reachable !== undefined ? { reachable } : {}),
           ...(failure
             ? {
                 phase: failure.phase,
@@ -325,6 +338,11 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
 
       if (promoted) {
         log.info(`🌍 Deployment promoted and live, visit: https://${app.url}`)
+        if (reachable === false) {
+          log.warn(
+            `⚠️ The URL still answers "app not found" — the edge is picking up the route. Try again in a minute.`
+          )
+        }
       } else if (superseded) {
         // Not a failure: the app IS live, just on a sibling deployment (e.g.
         // duplicated workflows firing on the same push). Green exit — there is
