@@ -218,6 +218,10 @@ export interface FaableDomain {
     acme_state?: 'pending' | 'ok'
     acme_expected?: string[]
     acme_observed?: string[]
+    // What the edge serves over HTTPS for the fqdn (F7): `ok` = a certificate
+    // a browser accepts, read from the PoP with the fqdn as SNI.
+    tls_state?: 'pending' | 'ok'
+    tls_expires_at?: string | null
   }
 }
 

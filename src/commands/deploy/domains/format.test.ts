@@ -1,6 +1,12 @@
 import test from 'ava'
 import { FaableDomain } from '../../../api/FaableApi'
-import { acme_record, cname_target, dns_badge, find_by_fqdn } from './format'
+import {
+  acme_record,
+  cname_target,
+  dns_badge,
+  find_by_fqdn,
+  tls_line
+} from './format'
 
 const domain = (over: Partial<FaableDomain> = {}): FaableDomain => ({
   id: 'domain_abc123',
@@ -35,9 +41,7 @@ test('dns_badge: maps worker states', t => {
 
 test('cname_target: prefers the API-published expected target', t => {
   t.is(
-    cname_target(
-      domain({ status: { dns_expected: ['custom.faable.link'] } })
-    ),
+    cname_target(domain({ status: { dns_expected: ['custom.faable.link'] } })),
     'custom.faable.link'
   )
   // Freshly created domain, worker has not checked yet → derived from id.
@@ -70,4 +74,23 @@ test('acme_record: the record to create, and whether it is in place', t => {
       ready: true
     }
   )
+})
+
+// F7: what the edge serves, so nobody has to probe it with curl to know when
+// the certificate is there.
+test('tls_line: served with its expiry, being issued, or waiting for DNS', t => {
+  t.is(
+    tls_line(
+      domain({
+        status: { tls_state: 'ok', tls_expires_at: '2027-01-14T12:48:27.000Z' }
+      })
+    ),
+    '✅ served, valid until 2027-01-14'
+  )
+  t.regex(
+    tls_line(domain({ status: { acme_state: 'ok', tls_state: 'pending' } })),
+    /being issued/
+  )
+  t.regex(tls_line(domain({ status: { dns_state: 'pending' } })), /issued once/)
+  t.is(tls_line(domain({ tls: false })), 'off (tls: false)')
 })

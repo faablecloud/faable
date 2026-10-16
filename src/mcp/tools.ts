@@ -430,7 +430,7 @@ export const TOOLS: ToolDef[] = [
     name: 'check_domain',
     title: 'Check a domain',
     description:
-      'DNS diagnostic of one custom domain: the CNAME it expects, what DNS answers today, and why it is not verified yet. `prevalidation_cname.ready` says whether the optional `_acme-challenge` record is in place, so the certificate is issued without waiting for the CNAME.',
+      'DNS diagnostic of one custom domain: the CNAME it expects, what DNS answers today, and why it is not verified yet. `prevalidation_cname.ready` says whether the optional `_acme-challenge` record is in place, so the certificate is issued without waiting for the CNAME; `status.tls_state` is `ok` once the edge serves a valid certificate for the domain (`status.tls_expires_at`).',
     input: {
       app,
       project,

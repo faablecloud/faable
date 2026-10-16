@@ -3,7 +3,13 @@ import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
-import { acme_record, cname_target, dns_badge, find_by_fqdn } from './format'
+import {
+  acme_record,
+  cname_target,
+  dns_badge,
+  find_by_fqdn,
+  tls_line
+} from './format'
 
 interface DomainsCheckArgs {
   fqdn: string
@@ -69,6 +75,7 @@ export const domains_check: CommandModule<unknown, DomainsCheckArgs> = {
         }`
       )
     }
+    log.info(`  Certificate:    ${tls_line(domain)}`)
     if (status?.dns_checked_at) {
       log.info(`  Last checked:   ${status.dns_checked_at}`)
     }
