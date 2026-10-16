@@ -4,6 +4,10 @@ import { action_label, format_waf, rule_subject } from './format'
 test('action labels explain what the caller will actually see', t => {
   t.is(action_label('deny'), '403 (blocked at the edge)')
   t.is(action_label('sink'), '404 (answered by Faable, app not woken)')
+  t.is(
+    action_label('allow'),
+    'allowed (reaches your app where Faable blocks it for every app)'
+  )
   // Anything the server grows later prints as-is instead of being hidden.
   t.is(action_label('ratelimit'), 'ratelimit')
 })

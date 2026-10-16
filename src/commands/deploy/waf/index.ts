@@ -1,4 +1,5 @@
 import { CommandModule } from 'yargs'
+import { waf_allow } from './allow'
 import { waf_block } from './block'
 import { waf_list } from './list'
 import { waf_rm } from './rm'
@@ -12,8 +13,12 @@ export const waf: CommandModule = {
       .command(waf_list)
       .command(waf_block)
       .command(waf_sink)
+      .command(waf_allow)
       .command(waf_rm)
-      .demandCommand(1, 'Specify a waf command: list, block, sink or rm'),
+      .demandCommand(
+        1,
+        'Specify a waf command: list, block, sink, allow or rm'
+      ),
   handler: () => {
     // Unreachable: demandCommand(1) either routes to a subcommand or fails
     // through the global .fail() in src/index.ts.

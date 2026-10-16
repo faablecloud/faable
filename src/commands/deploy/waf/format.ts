@@ -8,7 +8,9 @@ export const action_label = (action: string): string =>
       ? '403 (blocked at the edge)'
       : action === 'probe'
         ? 'answered by Faable, app not woken (uptime monitors)'
-        : action
+        : action === 'allow'
+          ? 'allowed (reaches your app where Faable blocks it for every app)'
+          : action
 
 /**
  * Render the effective WAF of an app.

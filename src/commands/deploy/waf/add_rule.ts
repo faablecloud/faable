@@ -1,8 +1,4 @@
-import {
-  FaableApi,
-  FaableAppWaf,
-  FaableWafRule
-} from '../../../api/FaableApi'
+import { FaableApi, FaableAppWaf, FaableWafRule } from '../../../api/FaableApi'
 import { log } from '../../../log'
 
 export type RuleSelector = {
@@ -48,7 +44,7 @@ export const add_rule = async (opts: {
   pattern?: string
   user_agent?: string
   query?: string
-  action: 'deny' | 'sink'
+  action: 'deny' | 'sink' | 'allow'
   description?: string
   force?: boolean
   // --json: the WAF as it is after the write, and no prose.
@@ -109,6 +105,30 @@ export const add_rule = async (opts: {
   }
 
   if (json) return waf
+
+  if (action === 'allow') {
+    // The one rule that opens instead of closing: say exactly what it opens.
+    log.info(`🔓 ${describe_selector(want)} → reaches your app`)
+    log.info(
+      `   for ${app_name} (${app_id}), even where Faable blocks it for every app`
+    )
+    log.info(`   (archives like .zip or .tar.gz, dotfiles, config files).`)
+    log.info(``)
+    log.info(
+      `Your own block and sink rules still win over it, and certificate checks,`
+    )
+    log.info(`/.faable/* and /_next/* are never affected.`)
+    log.info(``)
+    log.info(`It takes about 20s to reach the edge. Then check it with:`)
+    log.info(
+      `  curl -s -o /dev/null -w '%{http_code}\\n' https://${app_url}<path>`
+    )
+    log.info(``)
+    log.info(
+      `Undo: faable deploy waf rm ${undo_args(want)} --action allow -a ${app_id}`
+    )
+    return waf
+  }
 
   const answer = action === 'deny' ? '403' : '404'
   log.info(`🛡️  ${describe_selector(want)} → ${answer} at the edge`)

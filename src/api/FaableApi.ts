@@ -344,7 +344,8 @@ export class FaableApi<T = any> {
             if (res.status === 401) {
               // With an API key there is no session to renew: the key itself
               // is wrong or was revoked (the hosted MCP server runs on keys).
-              const by_key = !!process.env.FAABLE_API_KEY && !process.env.FAABLE_TOKEN
+              const by_key =
+                !!process.env.FAABLE_API_KEY && !process.env.FAABLE_TOKEN
               const expired = new Error(
                 by_key
                   ? 'This Faable API key is invalid or was revoked. Create a new one in the dashboard (project settings → API Keys).'
@@ -352,7 +353,9 @@ export class FaableApi<T = any> {
                 { cause: error }
               )
               ;(expired as any).status = 401
-              ;(expired as any).code = by_key ? 'apikey_invalid' : 'session_expired'
+              ;(expired as any).code = by_key
+                ? 'apikey_invalid'
+                : 'session_expired'
               throw expired
             }
             const serverMessage =
@@ -399,7 +402,9 @@ export class FaableApi<T = any> {
   // Every app the caller can see, across projects (`faable link` offers them
   // to pick from).
   async list() {
-    return allPages<FaableApp>(next => this.listApps({ pageSize: 200, next }, null))
+    return allPages<FaableApp>(next =>
+      this.listApps({ pageSize: 200, next }, null)
+    )
   }
 
   // The apps linked to `repository` (the `org/repo` slug), across projects —
@@ -418,7 +423,10 @@ export class FaableApi<T = any> {
   // One page of apps, scoped to `project` (default: the active project).
   // `null` = unscoped. The api filters by the header, so an admin session
   // doesn't page through the whole platform.
-  async listApps(params: PageParams, project: string | null = this.project ?? null) {
+  async listApps(
+    params: PageParams,
+    project: string | null = this.project ?? null
+  ) {
     return data(
       this.client.get<Page<FaableApp>>(`/app`, {
         params: page_params(params),
@@ -433,7 +441,11 @@ export class FaableApi<T = any> {
     const { q, user_id, ...page } = params
     return data(
       this.client.get<Page<FaableProject>>(`/project`, {
-        params: { ...page_params(page), ...(q ? { q } : {}), ...(user_id ? { user_id } : {}) }
+        params: {
+          ...page_params(page),
+          ...(q ? { q } : {}),
+          ...(user_id ? { user_id } : {})
+        }
       })
     )
   }
@@ -663,7 +675,11 @@ export class FaableApi<T = any> {
     return firstPage(this.listDeploymentsPage(app_id, team))
   }
 
-  async listDeploymentsPage(app_id: string, team: string, params: PageParams = {}) {
+  async listDeploymentsPage(
+    app_id: string,
+    team: string,
+    params: PageParams = {}
+  ) {
     return data(
       this.client.get<Page<FaableDeployment>>(`/deployment`, {
         params: { app_id, ...page_params(params) },
@@ -861,7 +877,7 @@ export class FaableApi<T = any> {
       pattern?: string
       user_agent?: string
       query?: string
-      action: 'deny' | 'sink'
+      action: 'deny' | 'sink' | 'allow'
       description?: string
       force?: boolean
     }
@@ -877,7 +893,7 @@ export class FaableApi<T = any> {
       pattern?: string
       user_agent?: string
       query?: string
-      action?: 'deny' | 'sink'
+      action?: 'deny' | 'sink' | 'allow'
     }
   ) {
     return data(

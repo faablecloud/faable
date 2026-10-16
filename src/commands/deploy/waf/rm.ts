@@ -9,7 +9,7 @@ interface WafRmArgs {
   pattern?: string
   userAgent?: string
   query?: string
-  action?: 'deny' | 'sink'
+  action?: 'deny' | 'sink' | 'allow'
   app?: string
   json?: boolean
 }
@@ -39,7 +39,7 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
       })
       .option('action', {
         type: 'string',
-        choices: ['deny', 'sink'] as const,
+        choices: ['deny', 'sink', 'allow'] as const,
         description: 'Only needed when the same rule exists as both'
       })
       .option('app', {
