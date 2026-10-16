@@ -1,6 +1,7 @@
 import { FaableApi, FaableApp } from "../../../api/FaableApi";
 import { log } from "../../../log";
 import { git_context } from "../git_context";
+import { format_bytes } from "../inspect/detail";
 import { follow_remote_build } from "./follow";
 import { collect_manifest } from "./manifest";
 import { upload_missing_blobs } from "./upload";
@@ -33,7 +34,12 @@ export const deploy_remote = async (
   log.info(`☁️ Remote build`);
 
   const manifest = await collect_manifest(workdir);
-  log.info(`🗂️ ${manifest.length} files in the source manifest`);
+  // The total is what the api weighs against the plan when the app's last
+  // build came out too large — say it before anything is uploaded.
+  const total = manifest.reduce((sum, f) => sum + f.size, 0);
+  log.info(
+    `🗂️ ${manifest.length} files in the source manifest (${format_bytes(total)})`
+  );
   await upload_missing_blobs(api, app.id, workdir, manifest);
 
   // No `plan`: the builder re-detects on the assembled tree and syncs the app's
