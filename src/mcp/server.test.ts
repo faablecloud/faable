@@ -64,14 +64,19 @@ test('by default: reads and deploy_app; the writes only with --writes', t => {
       write
     )
   }
-  // Only reads are marked read-only, and nothing is destructive.
+  // Only reads are marked read-only, and the one destructive tool is
+  // delete_app — a write, and local only.
   for (const t2 of TOOLS) {
     t.is(
       t2.annotations.readOnlyHint,
       !t2.write && t2.name !== 'deploy_app',
       t2.name
     )
-    t.not(t2.annotations.destructiveHint, true, t2.name)
+    t.is(
+      t2.annotations.destructiveHint === true,
+      t2.name === 'delete_app',
+      t2.name
+    )
   }
 })
 
@@ -243,6 +248,18 @@ test('loader flags are resolved before the child moves to the temp dir', t => {
 
 // Faable Auth + the local-only deploy (2026-10-05).
 import { permission_of } from './oauth'
+
+// Deleting an app: what `faable mcp --writes` on the user's machine can do,
+// never the hosted server (it promises nothing destructive), never by default.
+test('delete_app: only with --writes, never hosted, and always with --yes', t => {
+  t.true(tools_for({ writes: true }).some(x => x.name === 'delete_app'))
+  t.false(tools_for({}).some(x => x.name === 'delete_app'))
+  t.false(
+    tools_for({ writes: true, hosted: true }).some(x => x.name === 'delete_app')
+  )
+  const def = TOOLS.find(x => x.name === 'delete_app')!
+  t.is(def.flags({ app: 'app_x' })[0], '--yes')
+})
 
 test('deploy_directory works on the user disk: stdio with --writes only, never hosted', t => {
   t.true(tools_for({ writes: true }).some(x => x.name === 'deploy_directory'))

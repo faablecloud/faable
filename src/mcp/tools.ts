@@ -956,6 +956,26 @@ export const TOOLS: ToolDef[] = [
     example: { app: 'web', repo: 'acme/web', branch: 'main' }
   },
   {
+    name: 'delete_app',
+    title: 'Delete an app',
+    description:
+      "Delete an app, as the dashboard's Delete app does: its deployments, domains and secrets go with it and its URL stops being served. It cannot be undone — confirm with the user which app (get_app) before calling it. Only on the local server with `faable mcp --writes`.",
+    input: { app, project },
+    command: ['deploy', 'apps', 'rm'],
+    flags: a => ['--yes', ...target(a)],
+    write: true,
+    // The hosted server promises its users nothing destructive (the consent
+    // screen and docs/cli.md say so): deleting stays with whoever runs the
+    // MCP on their own machine and passed --writes.
+    local_only: true,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: true
+    },
+    example: { app: 'web' }
+  },
+  {
     name: 'deploy_directory',
     title: 'Deploy a local directory',
     description:
