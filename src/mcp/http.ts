@@ -292,6 +292,17 @@ export const create_http_server = (opts: HttpOptions) => {
       if (req.method === 'GET' && url.pathname === '/llms.txt') {
         return send(res, 200, llms_txt(base), 'text/plain; charset=utf-8')
       }
+      // ChatGPT app submission proves domain ownership by fetching this file;
+      // the token comes from the OpenAI platform, set as a secret of the app.
+      if (
+        req.method === 'GET' &&
+        url.pathname === '/.well-known/openai-apps-challenge'
+      ) {
+        const token = process.env.OPENAI_APPS_CHALLENGE?.trim()
+        return token
+          ? send(res, 200, token, 'text/plain; charset=utf-8')
+          : send(res, 404, { error: 'not_found' })
+      }
       // RFC 9728: at the root and with the resource path inserted (what MCP
       // clients derive from https://mcp.faable.com/mcp). Only with OAuth on.
       if (

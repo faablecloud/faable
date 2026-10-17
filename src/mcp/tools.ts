@@ -32,11 +32,14 @@ export interface ToolDef {
   untrusted?: boolean
   // What of the CLI's JSON the agent needs; the rest is context it pays for.
   shape?: (data: any, a: Args) => unknown
+  // readOnlyHint, destructiveHint and openWorldHint are required, not
+  // optional: ChatGPT's app review rejects a tool where any of the three is
+  // missing rather than an explicit boolean (and Claude's directory flags it).
   annotations: {
     readOnlyHint: boolean
-    destructiveHint?: boolean
+    destructiveHint: boolean
     idempotentHint?: boolean
-    openWorldHint?: boolean
+    openWorldHint: boolean
   }
   // Arguments for the contract test.
   example: Args
@@ -63,7 +66,11 @@ const opt = (flag: string, value: unknown) =>
     ? []
     : [flag, String(value)]
 
-const READ = { readOnlyHint: true, openWorldHint: true } as const
+const READ = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  openWorldHint: true
+} as const
 
 // A value as a double-quoted .env value, escaping exactly what parse_env
 // (src/commands/deploy/secrets/parse_env.ts) unescapes — no more: JSON's

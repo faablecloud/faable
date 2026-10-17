@@ -211,6 +211,20 @@ test.serial(
       t.regex(llms, /http:\/\/mcp\.test\/mcp/)
       t.is((await fetch(`${mcp.url}/healthz`)).status, 200)
       t.is((await fetch(`${mcp.url}/mcp`, { method: 'GET' })).status, 405)
+      // ChatGPT's domain check: the token from the env, or a 404 without it.
+      const challenge = `${mcp.url}/.well-known/openai-apps-challenge`
+      const before = process.env.OPENAI_APPS_CHALLENGE
+      try {
+        delete process.env.OPENAI_APPS_CHALLENGE
+        t.is((await fetch(challenge)).status, 404)
+        process.env.OPENAI_APPS_CHALLENGE = 'tok_123\n'
+        const r = await fetch(challenge)
+        t.is(r.status, 200)
+        t.is(await r.text(), 'tok_123')
+      } finally {
+        if (before === undefined) delete process.env.OPENAI_APPS_CHALLENGE
+        else process.env.OPENAI_APPS_CHALLENGE = before
+      }
     } finally {
       mcp.close()
       api.close()

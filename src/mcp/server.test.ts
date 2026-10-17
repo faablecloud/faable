@@ -292,3 +292,14 @@ test('Auth tools ask OAuth for auth:* — never a deploy permission', t => {
   t.is(by('list_apps'), 'deploy:read')
   t.is(by('deploy_app'), 'deploy:deploy')
 })
+
+// ChatGPT's app review requires all three hints as explicit booleans on
+// every tool; a missing one is a rejection, not a default.
+test('every tool declares readOnlyHint, destructiveHint and openWorldHint', t => {
+  for (const tool of TOOLS) {
+    for (const hint of ['readOnlyHint', 'destructiveHint', 'openWorldHint'] as const) {
+      t.is(typeof tool.annotations[hint], 'boolean', `${tool.name}.${hint}`)
+    }
+    if (tool.annotations.readOnlyHint) t.false(tool.annotations.destructiveHint, tool.name)
+  }
+})
