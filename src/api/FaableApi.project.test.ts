@@ -37,6 +37,8 @@ test("projectHeader maps team_<hex> to project_<hex>", (t) => {
 
 const calls: [string, (api: FaableApi) => Promise<unknown>][] = [
   ["createSecretsBatch", (api) => api.createSecretsBatch("app_1", TEAM, [])],
+  // §374: a user token carries no project; without it the api refuses secrets.
+  ["getAppSecrets", (api) => api.getAppSecrets("app_1", TEAM)],
   ["listDeployments", (api) => api.listDeployments("app_1", TEAM)],
   ["redeployDeployment", (api) => api.redeployDeployment("deployment_1", TEAM)],
   ["cancelDeployment", (api) => api.cancelDeployment("deployment_1", TEAM)],

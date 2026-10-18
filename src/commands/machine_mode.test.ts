@@ -679,3 +679,89 @@ test('apps create --wait: create, link, deploy, then the URL once live', async t
     api.close()
   }
 })
+
+// A tiny api for the §374 cases: JSON by path, and every request recorded.
+const tiny_api = async (
+  route: (path: string, project?: string) => [number, unknown]
+) => {
+  const seen: { path: string; project?: string }[] = []
+  const server = http.createServer((req, res) => {
+    const p = (req.url ?? '/').split('?')[0]
+    const project = req.headers['x-faable-project'] as string | undefined
+    seen.push({ path: p, project })
+    const [status, body] = route(p, project)
+    res.statusCode = status
+    res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify(body))
+  })
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  return { url, seen, close: () => server.close() }
+}
+
+test('apps list without a project falls back to the only one, not to "run faable login" (§374)', async t => {
+  const ONLY = 'project_6ad49e5be0e441d2c75e8520'
+  const api = await tiny_api((p, project) => {
+    if (p === '/app' && !project) {
+      return [
+        401,
+        {
+          error_code: 'team_or_scope_required',
+          code: 'team_or_scope_required',
+          message: 'Cannot query apps without a team or app:list scope'
+        }
+      ]
+    }
+    if (p === '/app') return [200, { results: [APP], next: null }]
+    if (p === '/project') {
+      return [200, { results: [{ id: ONLY, name: 'Demo' }], next: null }]
+    }
+    return [404, { message: 'not found' }]
+  })
+  try {
+    const out = await run(['deploy', 'apps', 'list', '--json'], {
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: api.url
+    })
+    t.is(out.code, 0, out.stderr)
+    t.is(JSON.parse(out.stdout).data[0].id, APP.id)
+    t.is(api.seen.filter(r => r.path === '/app').pop()?.project, ONLY)
+  } finally {
+    api.close()
+  }
+})
+
+test('build logs skip a cancelled redeploy that never built (§374)', async t => {
+  const api = await tiny_api(p => {
+    if (p === `/app/${APP.id}`) return [200, APP]
+    if (p === '/deployment') {
+      return [
+        200,
+        {
+          results: [
+            { id: 'deployment_cancelled', status: { phase: 'CANCELED' } },
+            { id: 'deployment_1', status: { phase: 'BUILD_ERROR' } }
+          ],
+          next: null
+        }
+      ]
+    }
+    if (p === '/deployment/deployment_1') {
+      return [200, { id: 'deployment_1', status: { phase: 'BUILD_ERROR' } }]
+    }
+    if (p === '/deployment/deployment_1/logs') {
+      return [200, { content: 'boom\n', truncated: false }]
+    }
+    return [404, { message: 'not found' }]
+  })
+  try {
+    const out = await run(
+      ['deploy', 'logs', '--build', '--app', APP.id, '--json'],
+      { FAABLE_TOKEN: 'stub', FAABLE_API_URL: api.url }
+    )
+    t.is(out.code, 0, out.stderr)
+    t.is(JSON.parse(out.stdout).deployment_id, 'deployment_1')
+  } finally {
+    api.close()
+  }
+})

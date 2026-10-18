@@ -13,6 +13,18 @@ import { AuthStrategy, AuthStrategyBuilder } from './strategies/types'
 const RESET_CODES = new Set(['ECONNRESET', 'EPIPE'])
 const RETRY_DELAY_MS = 300
 
+// The api's 401 codes that mean the credential itself is dead (api
+// `lib/api_error.ts`). No code at all is an old api or the auth layer: treated
+// as dead too, like before.
+const CREDENTIAL_ERRORS = new Set([
+  'unauthorized',
+  'invalid_token',
+  'invalid_apikey',
+  'apikey_expired'
+])
+export const is_credential_error = (code: string | undefined) =>
+  !code || CREDENTIAL_ERRORS.has(code)
+
 const is_connection_reset = (e: AxiosError) =>
   e.isAxiosError &&
   !e.response &&
@@ -340,8 +352,18 @@ export class FaableApi<T = any> {
           const url = e.config?.url || ''
           if (res) {
             // Uniform handling for an expired/invalid session across every
-            // command, regardless of which endpoint returned the 401.
-            if (res.status === 401) {
+            // command, regardless of which endpoint returned the 401. Only
+            // for a dead credential: the api also answers 401 to a valid one
+            // that may not do this (`team_or_scope_required`,
+            // `secrets_access_denied`…), and telling that caller to log in
+            // again sent them in circles (backlog §374).
+            if (
+              res.status === 401 &&
+              is_credential_error(
+                (res.data as { error_code?: string } | undefined)?.error_code ??
+                  res.data?.code
+              )
+            ) {
               // With an API key there is no session to renew: the key itself
               // is wrong or was revoked (the hosted MCP server runs on keys).
               const by_key =
@@ -590,8 +612,18 @@ export class FaableApi<T = any> {
     )
   }
 
-  async getAppSecrets(app_id: string) {
-    return firstPage(data(this.client.get<Page<Secret>>(`/secret/${app_id}`)))
+  // With the app's project as `x-faable-project`: a user token carries no
+  // project, and the api refuses secrets to a context without one
+  // (`secrets_access_denied`) — `secrets list` failed for every `faable login`
+  // user (backlog §374).
+  async getAppSecrets(app_id: string, team: string) {
+    return firstPage(
+      data(
+        this.client.get<Page<Secret>>(`/secret/${app_id}`, {
+          headers: projectHeader(team)
+        })
+      )
+    )
   }
 
   // Replace the app's whole secret set (the endpoint deletes and recreates).

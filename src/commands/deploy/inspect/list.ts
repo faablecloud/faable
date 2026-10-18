@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { requireProject } from '../../../api/project'
 import {
   ListArgs,
   fetch_page,
@@ -18,8 +19,19 @@ export const apps_list: CommandModule<unknown, ListArgs> = {
   handler: async args => {
     const ctx = await requireApi()
     // Scoped to the active project when there is one (--project,
-    // FAABLE_PROJECT, `faable project use`); every app you can see otherwise.
-    const page = await fetch_page(p => ctx.api.listApps(p), args)
+    // FAABLE_PROJECT, `faable project use`); every app you can see otherwise —
+    // which the api only allows a token with a global scope. Anyone else gets
+    // `team_or_scope_required`: then, like `whoami`, the only project they
+    // belong to, or an error that says how to pick one (backlog §374).
+    const list = () => fetch_page(p => ctx.api.listApps(p), args)
+    let page: Awaited<ReturnType<typeof list>>
+    try {
+      page = await list()
+    } catch (e: any) {
+      if (ctx.api.project || e?.code !== 'team_or_scope_required') throw e
+      ctx.api.project = (await requireProject(ctx.api)).id
+      page = await list()
+    }
     if (args.json) return print_json(page)
 
     if (page.data.length === 0) {

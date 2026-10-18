@@ -143,7 +143,7 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
     // getApp also validates access to the app and provides the team the
     // batch endpoint requires as request context.
     const app = await ctx.api.getApp(app_id)
-    const existing = await ctx.api.getAppSecrets(app_id)
+    const existing = await ctx.api.getAppSecrets(app_id, app.team)
     const merged = merge_app_secrets(existing, parsed)
     await ctx.api.createSecretsBatch(app.id, app.team, merged)
 

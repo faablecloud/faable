@@ -36,7 +36,8 @@ export const secrets_list: CommandModule<unknown, SecretsListArgs> = {
   handler: async args => {
     const ctx = await requireApi()
     const app_id = await resolve_app_id(args.app, ctx.appId, ctx.api)
-    const secrets = await ctx.api.getAppSecrets(app_id)
+    const app = await ctx.api.getApp(app_id)
+    const secrets = await ctx.api.getAppSecrets(app_id, app.team)
     // The whole set in one response (the api doesn't page secrets). Values
     // stay masked unless --show, in JSON as on screen.
     if (args.json) {

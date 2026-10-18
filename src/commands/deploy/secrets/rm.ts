@@ -44,7 +44,7 @@ export const secrets_rm: CommandModule<unknown, SecretsRmArgs> = {
     // remaining set first — this also rejects unknown names and secrets
     // inherited from the team profile.
     const app = await ctx.api.getApp(app_id)
-    const secrets = await ctx.api.getAppSecrets(app_id)
+    const secrets = await ctx.api.getAppSecrets(app_id, app.team)
     const remaining = remove_app_secret(secrets, args.name)
 
     const go = await confirm({

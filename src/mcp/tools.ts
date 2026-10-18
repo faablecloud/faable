@@ -309,7 +309,7 @@ export const TOOLS: ToolDef[] = [
     name: 'get_build_logs',
     title: 'Read build logs',
     description:
-      'The build output of a deployment — the first thing to read when a deploy failed and the user asks why. The cause is usually at the end. Without `deployment`, the newest one.',
+      'The build output of a deployment — the first thing to read when a deploy failed and the user asks why. The cause is usually at the end. Without `deployment`, the newest one that was not cancelled.',
     input: {
       app,
       project,

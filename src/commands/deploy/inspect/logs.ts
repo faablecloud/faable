@@ -87,12 +87,18 @@ export const logs: CommandModule<unknown, LogsArgs> = {
     const app = await ctx.api.getApp(app_id)
 
     if (args.build) {
-      // Build output lives on the deployment. Default to the newest one —
-      // exactly what you want after a red `faable deploy`.
+      // Build output lives on the deployment. Default to the newest one that
+      // was not cancelled — exactly what you want after a red `faable deploy`.
+      // A cancelled redeploy usually never built: picking it answered 404 to
+      // "why did my build fail?" (backlog §374). Only cancelled ones: the
+      // newest anyway.
       let deployment_id = args.deployment
       if (!deployment_id) {
         const deployments = await ctx.api.listDeployments(app_id, app.team)
-        deployment_id = deployments[0]?.id
+        deployment_id = (
+          deployments.find(d => d.status?.phase !== 'CANCELED') ??
+          deployments[0]
+        )?.id
         if (!deployment_id) {
           if (args.json) {
             return print_json({
