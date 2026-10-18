@@ -188,11 +188,15 @@ test.serial('the tools are what the permissions allow', async t => {
 
     const deploy = await names('deploy:read deploy:deploy')
     t.true(deploy.includes('deploy_app'))
-    t.false(deploy.includes('set_secrets'))
-
-    // ?mode=write lists the writes so the agent can ask for them.
-    t.true(
-      (await names('deploy:read deploy:deploy', '?mode=write')).includes(
+    // An OAuth connection lists its writes without ?mode=write, so the agent
+    // can ask for them by step-up (§377) — never the local-only ones.
+    t.true(deploy.includes('set_secrets'))
+    t.true(deploy.includes('create_app'))
+    t.false(deploy.includes('delete_app'))
+    t.false(deploy.includes('deploy_directory'))
+    // ?readonly=1 still hides them.
+    t.false(
+      (await names('deploy:read deploy:deploy', '?readonly=1')).includes(
         'set_secrets'
       )
     )
@@ -201,12 +205,10 @@ test.serial('the tools are what the permissions allow', async t => {
     t.false(deploy.includes('list_auth_logins'))
     const auth = await names('deploy:read auth:read')
     t.true(auth.includes('list_auth_logins'))
-    t.false(auth.includes('suspend_auth_user'))
-    t.true(
-      (await names('deploy:read auth:read auth:write', '?mode=write')).includes(
-        'suspend_auth_user'
-      )
-    )
+    // Its writes are listed once it can read Auth, to be asked by step-up…
+    t.true(auth.includes('suspend_auth_user'))
+    // …but not to a connection that cannot even read Auth.
+    t.false(deploy.includes('suspend_auth_user'))
   } finally {
     mcp.close()
     api.close()

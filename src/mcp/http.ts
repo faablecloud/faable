@@ -404,7 +404,12 @@ export const create_http_server = (opts: HttpOptions) => {
         }
       }
 
-      const writes = url.searchParams.get('mode') === 'write'
+      // An OAuth connection always lists its writes: the consent screen asks
+      // for each one the first time it is called (step-up), and a tool the
+      // client never sees is a permission it never asks for — the directory
+      // listing promised writes that `/mcp` did not show (§377). An API key
+      // has no step-up, so it still needs ?mode=write.
+      const writes = url.searchParams.get('mode') === 'write' || !!granted
       const server = create_server({
         hosted: true,
         writes,
@@ -414,10 +419,15 @@ export const create_http_server = (opts: HttpOptions) => {
         // An OAuth connection acts on the project the user picked on the
         // consent screen, whatever the path or the agent say.
         project: claims?.project ?? route.project,
-        // Its tools are the ones its permissions allow — plus, with
-        // ?mode=write, the writes it may ask for by step-up.
+        // Its tools are the ones its permissions allow, plus the writes it
+        // may ask for by step-up — Auth's only once it can read Auth.
         allow: granted
-          ? t => granted.includes(permission_of(t)) || (writes && !!t.write)
+          ? t => {
+              const p = permission_of(t)
+              if (granted.includes(p)) return true
+              if (!t.write) return false
+              return p !== 'auth:write' || granted.includes('auth:read')
+            }
           : undefined,
         run: runner_for(
           claims
