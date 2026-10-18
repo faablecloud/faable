@@ -36,16 +36,19 @@ export type Permission =
   | 'auth:read'
   | 'auth:write'
 
-// What the consent screen asks for on a first connection (Marc, 05-10:
-// reads plus deploy, like the hosted server by default; 18-10: plus the Auth
-// reads). deploy:write and auth:write come by step-up, the first time an
-// agent calls a tool that needs them. auth:read cannot: `tools/list` only
-// shows what the connection was allowed, so without it the Auth tools never
-// appear and no call ever asks for it (backlog §373).
+// What the consent screen asks for on a first connection: everything the
+// hosted server can do (Marc, 18-10). Until then the writes came by step-up
+// (05-10), but claude.ai does not step up: on the 403 `insufficient_scope` it
+// re-authorizes with the scopes of a fresh 401 — this list — so a write not
+// asked for here can never be granted there (backlog §377). auth:read had the
+// same problem from the other side: without it the Auth tools never appeared
+// (§373).
 export const DEFAULT_SCOPES: Permission[] = [
   'deploy:read',
   'deploy:deploy',
-  'auth:read'
+  'deploy:write',
+  'auth:read',
+  'auth:write'
 ]
 export const ALL_SCOPES: Permission[] = [
   'deploy:read',

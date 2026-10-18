@@ -143,7 +143,10 @@ test.serial(
         header,
         /resource_metadata="http:\/\/mcp\.test\/\.well-known\/oauth-protected-resource\/mcp"/
       )
-      t.regex(header, /scope="deploy:read deploy:deploy auth:read"/)
+      t.regex(
+        header,
+        /scope="deploy:read deploy:deploy deploy:write auth:read auth:write"/
+      )
     } finally {
       mcp.close()
       api.close()
