@@ -108,6 +108,12 @@ export interface FaableDeployment {
   trigger?: string | null
   detected?: DeploymentDetected
   createdAt?: string
+  // The platform retried this failed build once on the previous Python
+  // (api runtime_fallback.plugin, arch/deploy/runtime-versions.md §12):
+  // `deployment_id` is the clone, as bare hex.
+  runtime_fallback_retry?: { to: string; deployment_id?: string } | null
+  // On the clone: the minor it builds on, and the default that failed.
+  runtime_fallback?: { name: string; from: string; to: string; of: string } | null
   status?: {
     phase?: string
     reason?: string

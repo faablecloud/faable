@@ -61,6 +61,11 @@ export const deploy_remote = async (
   props.on_deployment?.(deployment.id);
 
   log.info(`Preparing to build in faable cloud · ${deployment.id}`);
-  await follow_remote_build(api, deployment.id, props.log_stream);
+  const landed = await follow_remote_build(api, deployment.id, props.log_stream);
+  // The platform retried the build on the previous Python (§12): what goes
+  // live is the clone, so the promotion poll must wait for IT.
+  if (landed.id !== deployment.id) {
+    return await api.getDeployment(landed.id);
+  }
   return deployment;
 };
