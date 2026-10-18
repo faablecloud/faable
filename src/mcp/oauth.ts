@@ -37,9 +37,16 @@ export type Permission =
   | 'auth:write'
 
 // What the consent screen asks for on a first connection (Marc, 05-10:
-// reads plus deploy, like the hosted server by default). deploy:write comes
-// by step-up, the first time an agent calls a tool that needs it.
-export const DEFAULT_SCOPES: Permission[] = ['deploy:read', 'deploy:deploy']
+// reads plus deploy, like the hosted server by default; 18-10: plus the Auth
+// reads). deploy:write and auth:write come by step-up, the first time an
+// agent calls a tool that needs them. auth:read cannot: `tools/list` only
+// shows what the connection was allowed, so without it the Auth tools never
+// appear and no call ever asks for it (backlog §373).
+export const DEFAULT_SCOPES: Permission[] = [
+  'deploy:read',
+  'deploy:deploy',
+  'auth:read'
+]
 export const ALL_SCOPES: Permission[] = [
   'deploy:read',
   'deploy:deploy',
