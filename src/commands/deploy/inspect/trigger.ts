@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { dashboardAppUrl } from '../../../lib/dashboard_url'
 import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
@@ -14,7 +15,8 @@ interface TriggerArgs {
 
 export const trigger: CommandModule<unknown, TriggerArgs> = {
   command: 'trigger',
-  describe: 'Build and deploy the latest commit of the deploy branch, server-side',
+  describe:
+    'Build and deploy the latest commit of the deploy branch, server-side',
   builder: yargs =>
     json_option(yargs)
       .option('app', {
@@ -31,7 +33,8 @@ export const trigger: CommandModule<unknown, TriggerArgs> = {
       .option('timeout', {
         type: 'number',
         default: 900,
-        description: 'With --wait: give up waiting after this many seconds (the build goes on)'
+        description:
+          'With --wait: give up waiting after this many seconds (the build goes on)'
       })
       .example(
         '$0 deploy trigger',
@@ -78,7 +81,7 @@ export const trigger: CommandModule<unknown, TriggerArgs> = {
       )
     }
     log.info(
-      `Track it with: faable deploy status -a ${app.id}  ·  or in the dashboard: https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
+      `Track it with: faable deploy status -a ${app.id}  ·  or in the dashboard: ${dashboardAppUrl(String(app.team), app.id)}`
     )
   }
 }

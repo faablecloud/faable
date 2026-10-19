@@ -1,18 +1,19 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../api/context'
+import { requireProject } from '../../api/project'
 import { Configuration } from '../../lib/Configuration'
+import { dashboardAppUrl } from '../../lib/dashboard_url'
 import { CliError } from '../../lib/errors'
 import { confirm, is_non_interactive } from '../../lib/interactive'
 import { print_json } from '../../lib/listing'
 import { log } from '../../log'
-import { requireProject } from '../../api/project'
+import { assert_name_free } from './apps/name_free'
 import { git_context } from './git_context'
 import { show_deploy_help } from './help'
 import { reachable_timeout_ms, wait_reachable } from './reachable'
 import { propose_release } from './release_version'
-import { assert_name_free } from './apps/name_free'
 import { deploy_remote } from './remote'
-import { collect_manifest, ManifestFile } from './remote/manifest'
+import { ManifestFile, collect_manifest } from './remote/manifest'
 import { find_app_id } from './resolve_app_id'
 import { is_superseded } from './superseded'
 
@@ -188,7 +189,10 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
       // Propose the release version (--release > FAABLE_RELEASE > git tag).
       // Optional: when absent the platform injects no FAABLE_RELEASE and the
       // app falls back to its own version source.
-      const proposed = await propose_release({ workdir, explicit: args.release })
+      const proposed = await propose_release({
+        workdir,
+        explicit: args.release
+      })
       if (proposed) {
         log.info(`🏷️ Release: ${proposed.release} (from ${proposed.source})`)
       }
@@ -213,12 +217,13 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
         }
       })
 
-      const dashboard_url = `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
+      const dashboard_url = dashboardAppUrl(String(app.team), app.id)
       log.info(`Preparing to deploy in faable cloud · ${deployment.id}`)
       log.info(`📊 View it in the dashboard -> ${dashboard_url}`)
 
       // Wait (up to 5 minutes) for the deployment to be promoted (live)
-      const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+      const wait = (ms: number) =>
+        new Promise(resolve => setTimeout(resolve, ms))
       const timeoutMs = 5 * 60 * 1000
       const intervalMs = 5000
       const start = Date.now()
@@ -313,7 +318,10 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
                 phase: failure.phase,
                 reason: failure.reason,
                 ...(fault
-                  ? { fault_owner: fault.fault_owner, error_code: fault.error_code }
+                  ? {
+                      fault_owner: fault.fault_owner,
+                      error_code: fault.error_code
+                    }
                   : {})
               }
             : {}),

@@ -1,6 +1,7 @@
 import openBrowser from 'open'
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { dashboardAppUrl } from '../../../lib/dashboard_url'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 
@@ -33,7 +34,7 @@ export const open_app: CommandModule<unknown, OpenArgs> = {
     const app = await ctx.api.getApp(app_id)
 
     const url = args.dashboard
-      ? `https://dashboard.faable.com/deploy/${app.team}/app/${app.id}`
+      ? dashboardAppUrl(String(app.team), app.id)
       : `https://${app.url}`
     log.info(`🌍 Opening ${url}`)
     await openBrowser(url).catch(() => {
