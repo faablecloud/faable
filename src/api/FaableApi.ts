@@ -861,6 +861,16 @@ export class FaableApi<T = any> {
     )
   }
 
+  // The GitLab project (numeric id) whose CI may deploy the app keyless; null
+  // revokes it.
+  async setCiTrust(app_id: string, gitlab_project_id: string | null) {
+    return data(
+      this.client.post<FaableApp>(`/app/${app_id}/ci-trust`, {
+        gitlab_project_id
+      })
+    )
+  }
+
   // null clears the platform override (faable.json's rootDir applies again).
   async setRootDir(app_id: string, root_dir: string | null) {
     return data(

@@ -11,6 +11,7 @@ interface AppsSetArgs {
   branch?: string
   rootDir?: string
   mode?: (typeof MODES)[number]
+  gitlabProject?: string
   json?: boolean
 }
 
@@ -44,20 +45,35 @@ export const apps_set: CommandModule<unknown, AppsSetArgs> = {
         description:
           'push: every push deploys · ci: once CI tags a release · workflow: your own GitHub workflow runs faable deploy'
       })
-      .check(({ branch, rootDir, mode }: any) => {
+      .option('gitlab-project', {
+        type: 'string',
+        description:
+          'GitLab project ID (the number on its page) whose CI may deploy this app without an API key ("" revokes it)'
+      })
+      .check(({ branch, rootDir, mode, gitlabProject }: any) => {
         if (
           branch === undefined &&
           rootDir === undefined &&
-          mode === undefined
+          mode === undefined &&
+          gitlabProject === undefined
         ) {
           throw new Error(
-            'Nothing to change: pass --branch, --root-dir or --mode.'
+            'Nothing to change: pass --branch, --root-dir, --mode or --gitlab-project.'
+          )
+        }
+        if (gitlabProject && !/^[0-9]+$/.test(String(gitlabProject))) {
+          throw new Error(
+            '--gitlab-project takes the numeric Project ID shown on the GitLab project page, not its path.'
           )
         }
         return true
       })
       .example('$0 deploy apps set --branch release', 'Deploy from "release"')
       .example('$0 deploy apps set --root-dir apps/web', 'A monorepo app')
+      .example(
+        '$0 deploy apps set --gitlab-project 12345678',
+        'Let that GitLab project deploy keyless'
+      )
       .showHelpOnFail(false) as any,
   handler: async args => {
     const ctx = await requireApi()
@@ -79,6 +95,15 @@ export const apps_set: CommandModule<unknown, AppsSetArgs> = {
     if (args.mode !== undefined) {
       await ctx.api.setDeployMode(app_id, args.mode)
       log.info(`⚙️ Deploy mode: ${args.mode}`)
+    }
+
+    if (args.gitlabProject !== undefined) {
+      await ctx.api.setCiTrust(app_id, String(args.gitlabProject) || null)
+      log.info(
+        args.gitlabProject
+          ? `🦊 GitLab project ${args.gitlabProject} can deploy this app without an API key`
+          : '🦊 GitLab keyless deploys revoked'
+      )
     }
 
     const app = await ctx.api.getApp(app_id)

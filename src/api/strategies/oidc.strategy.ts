@@ -5,6 +5,40 @@ import { AuthStrategyBuilder } from "./types";
 
 type TokenExchange = {access_token:string, app_id:string}
 
+export type OidcProvider = "github" | "gitlab";
+
+// GitLab has no linked repository to infer the app from: the job names it
+// with `faable deploy --app`, and the api checks the app trusts the token's
+// project (`faable deploy apps set --gitlab-project <id>`).
+const exchangeGitlabOidcToken = async (gl_token: string, target_app_id?: string) => {
+  if (!target_app_id) {
+    throw new Error(
+      "Keyless deploys from GitLab CI need the app: run `faable deploy --app <app_id>`."
+    );
+  }
+  const client = create_base_client();
+  try {
+    const res = await client.post<TokenExchange>("/auth/gitlab-oidc", {
+      token: gl_token,
+      app_id: target_app_id,
+    });
+    const { access_token, app_id } = res.data;
+    return { access_token, app_id };
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status;
+      const serverMessage = (err.response?.data as { message?: string } | undefined)?.message;
+      throw new Error(
+        `Faable OIDC token exchange failed (${status ?? "network error"})${
+          serverMessage ? `: ${serverMessage}` : ""
+        }`,
+        { cause: err }
+      );
+    }
+    throw err;
+  }
+};
+
 const exchangeGithubOidcToken = async(gh_token:string, target_app_id?:string)=>{
   const client = create_base_client()
   try {
@@ -52,15 +86,19 @@ const exchangeGithubOidcToken = async(gh_token:string, target_app_id?:string)=>{
 export const oidc_strategy: AuthStrategyBuilder<{
   idToken: string;
   appId?: string;
+  provider?: OidcProvider;
 }> = (config) => {
-  const { idToken, appId } = config;
+  const { idToken, appId, provider = "github" } = config;
   if (!idToken) {
     throw new Error("Missing idToken.");
   }
 
   let token_ex:TokenExchange;
   const ensure = async () => {
-    if (!token_ex) token_ex = await exchangeGithubOidcToken(idToken, appId);
+    if (!token_ex)
+      token_ex = await (provider === "gitlab"
+        ? exchangeGitlabOidcToken(idToken, appId)
+        : exchangeGithubOidcToken(idToken, appId));
     return token_ex;
   };
 

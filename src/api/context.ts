@@ -38,6 +38,20 @@ export const context = async (targetAppId?: string) => {
         "Error fetching token, configure 'permissions: id-token: write'"
       );
     }
+  } else if (process.env.GITLAB_CI === "true" && process.env.FAABLE_ID_TOKEN) {
+    // GitLab CI: the job declares
+    //   id_tokens: { FAABLE_ID_TOKEN: { aud: https://faable.com } }
+    // and the app must trust its project (`deploy apps set --gitlab-project`).
+    // Without FAABLE_ID_TOKEN a GitLab job falls through to an API key or
+    // the local credentials, as before.
+    api = FaableApi.create({
+      authStrategy: oidc_strategy,
+      auth: {
+        idToken: process.env.FAABLE_ID_TOKEN,
+        appId: targetAppId,
+        provider: "gitlab",
+      },
+    });
   } else {
     const store = new CredentialsStore();
     // Auto-refreshes an expired access token via the stored refresh_token.
