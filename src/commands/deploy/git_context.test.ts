@@ -26,6 +26,58 @@ test("prefers GitHub Actions env vars, but reads the commit message from git", a
   });
 });
 
+test("reads commit and ref from GitLab CI env, never the actor", async (t) => {
+  const run = async (command: string) => {
+    if (command.includes("rev-parse")) {
+      throw new Error("git should not be called when CI env is present");
+    }
+    if (command.includes("--format=%B")) return "fix: thing";
+    return undefined;
+  };
+  const branch = await git_context({
+    env: {
+      CI_COMMIT_SHA: "c0ffee",
+      CI_COMMIT_REF_NAME: "feature/x",
+      GITLAB_USER_LOGIN: "someone",
+    } as any,
+    run,
+  });
+  t.deepEqual(branch, {
+    github_commit: "c0ffee",
+    github_ref: "refs/heads/feature/x",
+    github_commit_message: "fix: thing",
+  });
+
+  const tag = await git_context({
+    env: {
+      CI_COMMIT_SHA: "c0ffee",
+      CI_COMMIT_TAG: "v1.2.0",
+      CI_COMMIT_REF_NAME: "v1.2.0",
+    } as any,
+    run,
+  });
+  t.is(tag.github_ref, "refs/tags/v1.2.0");
+});
+
+test("reads commit and ref from Bitbucket Pipelines env", async (t) => {
+  const ctx = await git_context({
+    env: { BITBUCKET_COMMIT: "beef", BITBUCKET_BRANCH: "main" } as any,
+    run: async (command) => {
+      if (command.includes("rev-parse")) {
+        throw new Error("git should not be called when CI env is present");
+      }
+      return undefined;
+    },
+  });
+  t.deepEqual(ctx, { github_commit: "beef", github_ref: "refs/heads/main" });
+
+  const tag = await git_context({
+    env: { BITBUCKET_COMMIT: "beef", BITBUCKET_TAG: "v2" } as any,
+    run: async () => undefined,
+  });
+  t.is(tag.github_ref, "refs/tags/v2");
+});
+
 test("falls back to git locally and builds refs/heads from branch", async (t) => {
   const ctx = await git_context({
     env: {} as any,

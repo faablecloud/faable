@@ -23,6 +23,18 @@ const gitRunner =
       });
     });
 
+// Ref from GitLab CI / Bitbucket Pipelines env, as a full `refs/...` name.
+// Tags first: on a tag pipeline GitLab's CI_COMMIT_REF_NAME is the tag name.
+// CI_COMMIT_REF_NAME (not CI_COMMIT_BRANCH) so merge request pipelines still
+// record their source branch.
+const ci_ref = (env: Record<string, string | undefined>) => {
+  const tag = env.CI_COMMIT_TAG || env.BITBUCKET_TAG;
+  if (tag) return `refs/tags/${tag}`;
+  const branch = env.CI_COMMIT_REF_NAME || env.BITBUCKET_BRANCH;
+  if (branch) return `refs/heads/${branch}`;
+  return undefined;
+};
+
 // Resolve the commit / ref / actor for the current deploy. In GitHub Actions
 // these come from the standard env vars; locally we fall back to git so manual
 // deploys still record a commit. `github_actor` is CI-only (a GitHub login),
@@ -37,9 +49,18 @@ export const git_context = async (opts?: {
   const env = opts?.env ?? process.env;
   const run = opts?.run ?? gitRunner(opts?.workdir);
 
-  const github_commit = env.GITHUB_SHA || (await run("git rev-parse HEAD"));
+  const github_commit =
+    env.GITHUB_SHA ||
+    env.CI_COMMIT_SHA ||
+    env.BITBUCKET_COMMIT ||
+    (await run("git rev-parse HEAD"));
 
-  let github_ref = env.GITHUB_REF || undefined;
+  // GitLab CI and Bitbucket Pipelines check out a detached HEAD, so the branch
+  // only survives in their env vars. Their actor vars are NOT mapped to
+  // `github_actor`: the dashboard renders it as a GitHub login (avatar and
+  // profile link), and a GitLab username would show whoever owns that name on
+  // GitHub.
+  let github_ref = env.GITHUB_REF || ci_ref(env);
   if (!github_ref) {
     const branch = await run("git rev-parse --abbrev-ref HEAD");
     if (branch && branch !== "HEAD") github_ref = `refs/heads/${branch}`;
