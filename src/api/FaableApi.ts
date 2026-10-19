@@ -113,7 +113,12 @@ export interface FaableDeployment {
   // `deployment_id` is the clone, as bare hex.
   runtime_fallback_retry?: { to: string; deployment_id?: string } | null
   // On the clone: the minor it builds on, and the default that failed.
-  runtime_fallback?: { name: string; from: string; to: string; of: string } | null
+  runtime_fallback?: {
+    name: string
+    from: string
+    to: string
+    of: string
+  } | null
   status?: {
     phase?: string
     reason?: string
@@ -388,10 +393,21 @@ export class FaableApi<T = any> {
             }
             const serverMessage =
               res.data?.message || res.statusText || 'Unknown Error'
+            // A 4xx with the api's own sentence is written for the user — say
+            // just that ("New accounts can have up to 2 apps…"), the way the
+            // dashboard does (`friendlyErrorMessage`). The "FaableApi <url>
+            // <status>:" prefix is for us: it stays on 5xx and on bodies with
+            // no sentence, and url/status ride on the error for --json and
+            // for whoever catches it (backlog §390).
+            const userFacing =
+              res.status >= 400 && res.status < 500 && !!res.data?.message
             const wrapped = new Error(
-              `FaableApi ${url} ${res.status}: ${serverMessage}`,
+              userFacing
+                ? serverMessage
+                : `FaableApi ${url} ${res.status}: ${serverMessage}`,
               { cause: error }
             )
+            ;(wrapped as any).url = url
             // Surface the structured error contract (e.g. the repository-link
             // flow returns { code, action }) so callers can branch on it.
             ;(wrapped as any).status = res.status
