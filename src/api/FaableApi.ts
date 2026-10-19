@@ -689,6 +689,22 @@ export class FaableApi<T = any> {
     )
   }
 
+  // Native GitLab (api §393): link a gitlab.com project; the api creates the
+  // push webhook with the caller's GitLab token.
+  async linkGitlab(
+    app_id: string,
+    params: { project_id: string; branch?: string },
+    team: string
+  ) {
+    return data(
+      this.client.post<FaableApp & { gitlab_project_path?: string; gitlab_branch?: string }>(
+        `/app/${app_id}/link-gitlab`,
+        params,
+        { headers: projectHeader(team) }
+      )
+    )
+  }
+
   // Organizations/accounts where the Faable GitHub App is installed.
   async listGithubInstallations() {
     return data(

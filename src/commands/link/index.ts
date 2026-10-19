@@ -16,6 +16,7 @@ type Options = {
   app?: string;
   repo?: string;
   branch?: string;
+  gitlab?: string;
   json?: boolean;
 };
 
@@ -41,6 +42,11 @@ export const link: CommandModule<object, Options> = {
         description:
           "GitHub repository, owner/repo or its URL (defaults to the origin remote of --workdir)",
       })
+      .option("gitlab", {
+        type: "string",
+        description:
+          "Link a gitlab.com project instead: its Project ID (the number on its page). Needs --app and GitLab connected in the dashboard",
+      })
       .option("branch", {
         alias: "b",
         type: "string",
@@ -56,9 +62,14 @@ export const link: CommandModule<object, Options> = {
         "$0 deploy link --app web --repo acme/web",
         "Link acme/web to the app web: from now on a push deploys it"
       )
+      .example(
+        "$0 deploy link --app web --gitlab 12345678",
+        "Link that gitlab.com project to the app web: pushes deploy it"
+      )
       .showHelpOnFail(false) as any;
   },
   handler: async (args) => {
+    if (args.gitlab !== undefined) return link_gitlab(args);
     if (args.app || args.json || is_non_interactive()) {
       return link_to_app(args);
     }
@@ -195,6 +206,50 @@ export const link: CommandModule<object, Options> = {
 // repository to an existing app at all (arch/deploy/cli-mcp-fallos-2026-10-16-plan.md,
 // F4; backlog §366). Driven by a program, the repository is spelled out too:
 // the origin remote of whatever directory the process runs in is a guess.
+const link_gitlab = async (args: Options) => {
+  if (!args.app) {
+    throw new CliError("app_required", "Say which app to link: --app <id|name>.");
+  }
+  const project_id = String(args.gitlab ?? "");
+  if (!/^[0-9]+$/.test(project_id)) {
+    throw new CliError(
+      "usage",
+      "--gitlab takes the numeric Project ID shown on the GitLab project page, not its path."
+    );
+  }
+  const { api } = await requireApi();
+  const app = await api.getApp(await resolve_app_ref(api, args.app));
+  let linked;
+  try {
+    linked = await api.linkGitlab(
+      app.id,
+      { project_id, ...(args.branch ? { branch: args.branch } : {}) },
+      app.team
+    );
+  } catch (err) {
+    const e = err as Error & { code?: string; status?: number; action?: string };
+    const failed = new CliError(
+      "usage",
+      `Could not link GitLab project ${project_id} to ${app.name}: ${e.message}`,
+      { status: e.status, action: e.action, cause: err }
+    );
+    // gitlab_identity_missing / gitlab_token_invalid / gitlab_project_not_accessible
+    if (e.code) failed.code = e.code;
+    throw failed;
+  }
+  const result = {
+    app_id: app.id,
+    app_name: app.name,
+    gitlab_project: linked?.gitlab_project_path ?? project_id,
+    branch: linked?.gitlab_branch,
+  };
+  if (args.json) return print_json(result);
+  log.info(`Linked ${result.gitlab_project} (GitLab) to ${app.name} (${app.id}).`);
+  log.info(
+    `Push to deploy is on: the next push to "${result.branch ?? "the default branch"}" deploys.`
+  );
+};
+
 const link_to_app = async (args: Options) => {
   if (!args.app) {
     throw new CliError(
