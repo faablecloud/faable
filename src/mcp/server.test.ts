@@ -221,6 +221,19 @@ test('end to end with --writes: secrets go on stdin and never come back', async 
       api.bodies.some(b => b.includes(secret)),
       'the value reached the api'
     )
+    // Nothing to relaunch: the agent is told so, explicitly.
+    t.regex(text_of(result), /"redeploy":\s*null/)
+
+    // api §403: the save relaunched a deployment that crashed at runtime;
+    // the agent gets the new id to follow with get_deployment.
+    const fixed = await client.callTool({
+      name: 'set_secrets',
+      arguments: { app: APP.id, variables: { FIX_CRASH: '1' } }
+    })
+    t.falsy(fixed.isError, text_of(fixed))
+    t.regex(text_of(fixed), /"status":\s*"started"/)
+    t.regex(text_of(fixed), /"deployment_id":\s*"deployment_relaunched"/)
+    t.regex(text_of(fixed), /"restarting":\s*false/)
   } finally {
     await client.close()
     api.close()

@@ -291,6 +291,23 @@ const page_params = ({ pageSize, next }: PageParams) => ({
   ...(next ? { next } : {})
 })
 
+// What the api did after a secrets save (api §403). `started`: the failed
+// deployment was relaunched as `deployment_id`. `needs_rebuild`: it failed at
+// BUILD and nothing was relaunched. `not_started`: a relaunch was due but the
+// platform refused it (quota, disabled app, no sources).
+export interface SecretsRedeploy {
+  status: 'started' | 'needs_rebuild' | 'not_started'
+  failed_deployment_id: string
+  deployment_id: string | null
+}
+
+// `redeploy: null`: nothing to relaunch — the app runs and restarts as
+// always, or the save changed nothing.
+export interface SecretsBatchResult {
+  secrets: Secret[]
+  redeploy: SecretsRedeploy | null
+}
+
 const data = async <T, Q extends Promise<AxiosResponse<T>>>(
   res: Q
 ): Promise<Awaited<Q>['data']> => {
@@ -649,23 +666,30 @@ export class FaableApi<T = any> {
   }
 
   // Replace the app's whole secret set (the endpoint deletes and recreates).
-  // This is the only mutation path that triggers an immediate restart of the
-  // app; the per-secret upsert/delete endpoints are not used by the CLI.
+  // The per-secret upsert/delete endpoints are not used by the CLI.
   // The endpoint stamps the created secrets with the team from the request
   // context, which a CLI user token does not carry — pass the app's team
   // (from getApp) so it travels as the `x-faable-project` header.
+  //
+  // `with_redeploy=true` (api §403): a running app restarts to apply the new
+  // values, but an app with nothing running whose last deployment failed at
+  // runtime has nothing to restart — the api relaunches that deployment and
+  // says so in `redeploy`. An api that predates it ignores the parameter and
+  // answers the bare array: read that as "no redeploy to report".
   async createSecretsBatch(
     context_id: string,
     team: string,
     secrets: { name: string; value: string }[]
-  ) {
-    return data(
-      this.client.post<Secret[]>(
+  ): Promise<SecretsBatchResult> {
+    const body = await data(
+      this.client.post<Secret[] | Partial<SecretsBatchResult>>(
         `/secret/createbatch`,
         { context_id, secrets },
-        { headers: projectHeader(team) }
+        { headers: projectHeader(team), params: { with_redeploy: true } }
       )
     )
+    if (Array.isArray(body)) return { secrets: body, redeploy: null }
+    return { secrets: body?.secrets ?? [], redeploy: body?.redeploy ?? null }
   }
 
   async updateApp(

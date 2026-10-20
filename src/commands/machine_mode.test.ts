@@ -228,13 +228,60 @@ test('the writes say what they did, and a no-op says so', async t => {
       added: ['NEW_KEY'],
       updated: [],
       unchanged: ['API_KEY'],
-      restarting: true
+      restarting: true,
+      redeploy: null
     })
     t.false(set.stdout.includes(secret))
     t.true(
       api.bodies.some(b => b.includes(secret)),
       'the value did reach the api'
     )
+  } finally {
+    api.close()
+  }
+})
+
+test('secrets set on an app whose last deployment crashed: the redeploy, not a restart', async t => {
+  const api = await start_api()
+  try {
+    const env = {
+      ...NONINTERACTIVE,
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: api.url
+    }
+    const args = ['deploy', 'secrets', 'set', 'FIX_CRASH=1', '--app', APP.id]
+
+    const json = await run([...args, '--json'], env)
+    t.is(json.code, 0, json.stderr)
+    const out = JSON.parse(json.stdout)
+    t.deepEqual(out.redeploy, {
+      status: 'started',
+      failed_deployment_id: 'deployment_crashed',
+      deployment_id: 'deployment_relaunched'
+    })
+    t.false(out.restarting)
+    t.true(
+      api.writes
+        .filter(w => w.startsWith('POST /secret/createbatch'))
+        .every(w => w.includes('with_redeploy=true'))
+    )
+
+    const human = await run(args, env)
+    t.is(human.code, 0, human.stderr)
+    const said = human.stdout + human.stderr
+    t.true(
+      said.includes(
+        `Redeploying ${APP.name} with the new variables (deployment deployment_relaunched)`
+      ),
+      said
+    )
+    t.true(
+      said.includes(
+        `faable deploy logs --build -d deployment_relaunched -a ${APP.id} --follow`
+      ),
+      said
+    )
+    t.false(said.includes('is restarting'), said)
   } finally {
     api.close()
   }

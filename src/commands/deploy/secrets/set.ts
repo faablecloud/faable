@@ -6,6 +6,7 @@ import { json_option, print_json } from '../../../lib/listing'
 import { read_stdin } from '../../../lib/stdin'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
+import { after_save_lines, is_restarting } from './after_save'
 import { managed_warning } from './managed_names'
 import { merge_app_secrets } from './merge'
 import { parse_env } from './parse_env'
@@ -145,7 +146,11 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
     const app = await ctx.api.getApp(app_id)
     const existing = await ctx.api.getAppSecrets(app_id, app.team)
     const merged = merge_app_secrets(existing, parsed)
-    await ctx.api.createSecretsBatch(app.id, app.team, merged)
+    const { redeploy } = await ctx.api.createSecretsBatch(
+      app.id,
+      app.team,
+      merged
+    )
 
     const current = new Map(
       existing
@@ -153,7 +158,7 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
         .map(s => [s.name, s.value] as const)
     )
     const updated = parsed.filter(({ name }) => current.has(name)).length
-    // Only claim the restart when something actually changed. Setting a name
+    // Only claim a restart when something actually changed. Setting a name
     // to the value it already has is a no-op end to end — the API compares
     // before writing and never emits the event, so the pod keeps running —
     // and this line used to promise a restart that was not coming.
@@ -172,7 +177,10 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
         unchanged: parsed
           .filter(p => current.get(p.name) === p.value)
           .map(p => p.name),
-        restarting: changed
+        restarting: is_restarting(redeploy, changed),
+        // api §403: what the api did for an app with nothing running whose
+        // last deployment failed — null when there was nothing to relaunch.
+        redeploy
       })
     }
     if (parsed.length <= MAX_DETAILED) {
@@ -187,10 +195,12 @@ export const secrets_set: CommandModule<unknown, SecretsSetArgs> = {
       log.info(`🔑 ${parsed.length - updated} added, ${updated} updated`)
     }
     log.info(`✅ ${parsed.length} secret(s) saved to ${app_id}.`)
-    log.info(
+    for (const { level, text } of after_save_lines({
+      app,
+      redeploy,
       changed
-        ? `ℹ️ The app is restarting to apply the changes.`
-        : `ℹ️ Already up to date — the app was not restarted.`
-    )
+    })) {
+      log[level](text)
+    }
   }
 }

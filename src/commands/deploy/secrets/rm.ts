@@ -3,6 +3,7 @@ import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
+import { after_save_lines, is_restarting } from './after_save'
 import { remove_app_secret } from './merge'
 import { confirm } from '../../../lib/interactive'
 
@@ -56,11 +57,26 @@ export const secrets_rm: CommandModule<unknown, SecretsRmArgs> = {
       return
     }
 
-    await ctx.api.createSecretsBatch(app.id, app.team, remaining)
+    const { redeploy } = await ctx.api.createSecretsBatch(
+      app.id,
+      app.team,
+      remaining
+    )
     if (args.json) {
-      return print_json({ deleted: true, name: args.name, restarting: true })
+      return print_json({
+        deleted: true,
+        name: args.name,
+        restarting: is_restarting(redeploy, true),
+        redeploy
+      })
     }
     log.info(`🗑️ Removed secret ${args.name} from ${app_id}.`)
-    log.info(`ℹ️ The app is restarting to apply the changes.`)
+    const lines = after_save_lines({
+      app,
+      redeploy,
+      changed: true,
+      what: 'the updated variables'
+    })
+    for (const { level, text } of lines) log[level](text)
   }
 }

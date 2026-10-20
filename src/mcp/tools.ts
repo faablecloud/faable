@@ -860,7 +860,7 @@ export const TOOLS: ToolDef[] = [
     name: 'set_secrets',
     title: 'Set environment variables',
     description:
-      'Add or update environment variables of an app. The app restarts to apply them when a value changed. Returns the names added, updated and unchanged — never the values.',
+      'Add or update environment variables of an app. When the app is running, it restarts to apply them (only if a value changed); if its last deployment failed at runtime and nothing is running, Faable redeploys it with the new variables. Returns the names added, updated and unchanged — never the values — and `redeploy`: null when there was nothing to relaunch; otherwise `status` is `started` (follow `deployment_id` with get_deployment), `needs_rebuild` (the last deployment failed to build: retry `failed_deployment_id` with redeploy) or `not_started` (the platform refused the relaunch: retry it with redeploy to see why).',
     input: {
       app,
       project,

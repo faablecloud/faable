@@ -86,3 +86,37 @@ test("listApps without an active project sends no project", async (t) => {
   t.is(header(seen[0], "x-faable-project"), undefined);
   t.deepEqual(seen[0].params, { pageSize: 100, next: "cur" });
 });
+
+// api §403: the save asks what happened to an app with nothing running, and
+// an api that predates it (the bare array) reads as "nothing relaunched".
+const answering = (api: FaableApi, body: unknown) => {
+  const seen: AxiosRequestConfig[] = [];
+  api.client.defaults.adapter = async (config) => {
+    seen.push(config);
+    return { data: body, status: 200, statusText: "OK", headers: {}, config } as AxiosResponse;
+  };
+  return seen;
+};
+
+test("createSecretsBatch asks with_redeploy and returns the api's redeploy", async (t) => {
+  const api = FaableApi.create();
+  const redeploy = {
+    status: "started",
+    failed_deployment_id: "deployment_1",
+    deployment_id: "deployment_2",
+  };
+  const secrets = [{ name: "A", value: "1" }];
+  const seen = answering(api, { secrets, redeploy });
+  t.deepEqual(await api.createSecretsBatch("app_1", TEAM, secrets), { secrets, redeploy });
+  t.deepEqual(seen[0].params, { with_redeploy: true });
+});
+
+test("createSecretsBatch: an old api's bare array is redeploy null", async (t) => {
+  const api = FaableApi.create();
+  const secrets = [{ name: "A", value: "1" }];
+  answering(api, secrets);
+  t.deepEqual(await api.createSecretsBatch("app_1", TEAM, secrets), {
+    secrets,
+    redeploy: null,
+  } as any);
+});

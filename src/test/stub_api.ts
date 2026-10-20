@@ -73,6 +73,30 @@ export const start_api = async () => {
             branch: 'main'
           })
         }
+        // api §403: with `with_redeploy=true`, `{ secrets, redeploy }`; a
+        // variable named FIX_CRASH stands for the save that relaunches a
+        // deployment that crashed at runtime. Without the parameter, the
+        // bare array of an api that predates it.
+        if (url.pathname === '/secret/createbatch') {
+          const secrets = JSON.parse(body).secrets ?? []
+          if (url.searchParams.get('with_redeploy') !== 'true') {
+            res.statusCode = 201
+            return json(secrets)
+          }
+          const fix = secrets.some(
+            (s: { name: string }) => s.name === 'FIX_CRASH'
+          )
+          return json({
+            secrets,
+            redeploy: fix
+              ? {
+                  status: 'started',
+                  failed_deployment_id: 'deployment_crashed',
+                  deployment_id: 'deployment_relaunched'
+                }
+              : null
+          })
+        }
         if (url.pathname === '/deployment/deployment_1/redeploy') {
           return json({ id: 'deployment_2', redeploy_of: 'deployment_1' })
         }
