@@ -272,7 +272,7 @@ test('Auth reads are on by default; Auth writes need --writes', t => {
   for (const name of ['list_auth_logins', 'count_auth_users', 'get_auth_user']) {
     t.true(reads.includes(name), name)
   }
-  for (const name of ['suspend_auth_user', 'revoke_auth_sessions', 'send_password_setup', 'update_auth_client_fields']) {
+  for (const name of ['suspend_auth_user', 'revoke_auth_sessions', 'send_password_setup', 'update_auth_client_fields', 'update_auth_client_login']) {
     t.false(reads.includes(name), name)
     t.true(tools_for({ writes: true }).some(x => x.name === name), name)
   }
@@ -289,6 +289,7 @@ test('Auth tools ask OAuth for auth:* — never a deploy permission', t => {
   t.is(by('list_auth_logins'), 'auth:read')
   t.is(by('suspend_auth_user'), 'auth:write')
   t.is(by('update_auth_client_fields'), 'auth:write')
+  t.is(by('update_auth_client_login'), 'auth:write')
   t.is(by('list_apps'), 'deploy:read')
   t.is(by('deploy_app'), 'deploy:deploy')
 })

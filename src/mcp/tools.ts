@@ -1112,6 +1112,67 @@ export const TOOLS: ToolDef[] = [
     }
   },
   {
+    name: 'update_auth_client_login',
+    title: "Change how users sign in to an app",
+    description:
+      "Choose which login methods one Auth application offers: which connections (by id or name, as list_auth_connections shows them) and whether the passkey button appears. `only` keeps exactly those connections and removes the rest; `disable`/`enable` change one at a time. A removed connection is refused at /authorize too, not just hidden. `passkey` needs the Pro plan. `inherit: true` drops the app's own settings and follows the tenant's again. Settings not mentioned keep their current value.",
+    input: {
+      client: z
+        .string()
+        .describe(
+          'The application: client resource id (client_…) or OAuth client_id'
+        ),
+      only: z
+        .array(z.string())
+        .max(50)
+        .optional()
+        .describe('Offer exactly these connections (id or name)'),
+      disable: z
+        .array(z.string())
+        .max(50)
+        .optional()
+        .describe('Connections (id or name) to stop offering'),
+      enable: z
+        .array(z.string())
+        .max(50)
+        .optional()
+        .describe('Removed connections (id or name) to offer again'),
+      passkey: z
+        .enum(['on', 'off', 'inherit'])
+        .optional()
+        .describe('Passkey sign-in button; inherit follows the tenant'),
+      inherit: z
+        .boolean()
+        .optional()
+        .describe("Drop the app's own login methods and use the tenant's"),
+      tenant,
+      project
+    },
+    command: ['auth', 'clients', 'update'],
+    flags: a => [
+      a.client,
+      ...(a.only ?? []).flatMap((c: string) => ['--only-connections', c]),
+      ...(a.disable ?? []).flatMap((c: string) => ['--disable-connection', c]),
+      ...(a.enable ?? []).flatMap((c: string) => ['--enable-connection', c]),
+      ...opt('--passkey-login', a.passkey),
+      ...(a.inherit ? ['--inherit-login-methods'] : []),
+      ...auth_scope(a)
+    ],
+    shape: (c: any) => ({
+      id: c.id,
+      client_id: c.client_id,
+      name: c.name,
+      login_methods: c.login_methods ?? null
+    }),
+    write: true,
+    annotations: AUTH_WRITE,
+    example: {
+      client: 'client_1',
+      only: ['OTP'],
+      passkey: 'on'
+    }
+  },
+  {
     name: 'send_password_setup',
     title: 'Send a password setup email',
     description:
