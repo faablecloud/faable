@@ -1,7 +1,7 @@
 import test from 'ava'
 import { Writable } from 'stream'
 import { FaableApi, FaableDeployment } from '../../../api/FaableApi'
-import { follow_remote_build, unseen } from './follow'
+import { follow_remote_build, format_build_warnings, unseen } from './follow'
 
 // backlog §379: when the platform already retried a failed build on the
 // previous Python (api runtime_fallback.plugin, runtime-versions.md §12), the
@@ -123,4 +123,39 @@ test('unseen: a different buffer longer than the first still prints from its sta
   const detect = 'short detect log\n'
   const build = 'added 68 packages in 2s\n' + 'y'.repeat(400) + '\n'
   t.true(replay([detect, build]).endsWith(build))
+})
+
+// The build's warnings close the follow, after the log they would scroll away in.
+test('a READY build with warnings prints them last and returns them', async t => {
+  const build_warnings = [
+    {
+      code: 'install_legacy_peer_deps',
+      message: 'npm could not resolve your peer dependencies (ERESOLVE).'
+    }
+  ]
+  const { api } = fake_api({
+    deployment_x: {
+      id: 'deployment_x',
+      status: { phase: 'READY' },
+      build_warnings
+    }
+  })
+  let written = ''
+  const out = new Writable({
+    write(chunk, _enc, done) {
+      written += String(chunk)
+      done()
+    }
+  })
+
+  const landed = await follow_remote_build(api, 'deployment_x', out)
+
+  t.deepEqual(landed, { id: 'deployment_x', build_warnings })
+  t.regex(written, /1 build warning — /)
+  t.regex(written, /• npm could not resolve your peer dependencies/)
+})
+
+test('no warnings, nothing printed', t => {
+  t.is(format_build_warnings([]), '')
+  t.is(format_build_warnings(undefined), '')
 })

@@ -119,6 +119,10 @@ export interface FaableDeployment {
     to: string
     of: string
   } | null
+  // What the build worked around instead of failing on (api
+  // schemas/DeploymentBuildWarning.ts): a stale lockfile, --legacy-peer-deps,
+  // Python deps inferred from imports.
+  build_warnings?: { code: string; message: string }[]
   status?: {
     phase?: string
     reason?: string

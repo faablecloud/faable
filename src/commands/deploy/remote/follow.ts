@@ -39,6 +39,23 @@ const retry_of = (
 const TAIL_CHARS = 200
 
 /**
+ * The build's warnings, after its log (api `deployment.build_warnings`). The
+ * same lines are in the log above, but scrolled away among hundreds of npm
+ * lines; a deploy that ends READY is exactly the one nobody scrolls back on.
+ */
+export const format_build_warnings = (
+  warnings: { message: string }[] | undefined
+): string => {
+  if (!warnings?.length) return ''
+  const n = warnings.length
+  return (
+    `\n⚠️  ${n} build warning${n === 1 ? '' : 's'} — the build worked around ${n === 1 ? 'this' : 'these'}; fix ${n === 1 ? 'it' : 'them'} so it does not have to:\n` +
+    warnings.map(w => `   • ${w.message}\n`).join('') +
+    '\n'
+  )
+}
+
+/**
  * The part of `content` not shown yet, given how much was `printed` and the
  * last characters of it (`seen_tail`).
  *
@@ -75,7 +92,10 @@ export const follow_remote_build = async (
   // front of it and the caller can't parse the outcome — the MCP reported a
   // live deploy as failed that way (arch/deploy/cli-mcp-fallos-2026-10-16-plan.md, F1).
   out: Writable = process.stdout
-): Promise<{ id: string }> => {
+): Promise<{
+  id: string
+  build_warnings?: { code: string; message: string }[]
+}> => {
   let printed = 0
   let last_phase = ''
   let followed_retry = false
@@ -130,7 +150,13 @@ export const follow_remote_build = async (
     // already live (READY) — the promotion poll takes over from here.
     if (phase === 'INITIALIZING' || phase === 'READY') {
       await tail_logs()
-      return { id: deployment_id }
+      const build_warnings = deployment?.build_warnings
+      const summary = format_build_warnings(build_warnings)
+      if (summary) out.write(summary)
+      return {
+        id: deployment_id,
+        ...(build_warnings?.length ? { build_warnings } : {})
+      }
     }
 
     await wait(POLL_INTERVAL_MS)
