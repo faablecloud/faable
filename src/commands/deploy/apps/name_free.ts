@@ -16,8 +16,11 @@ export const assert_name_free = async (
     limit: 200,
     all: true
   })
-  const wanted = name.toLowerCase()
-  const clash = apps.data.find(a => a.name.toLowerCase() === wanted)
+  // Same comparison as the api (app_name_unique.plugin.ts): trimmed, NFC,
+  // case-insensitive.
+  const key = (s: string) => s.trim().normalize('NFC').toLowerCase()
+  const wanted = key(name)
+  const clash = apps.data.find(a => key(a.name) === wanted)
   if (clash) {
     throw new CliError(
       'name_taken',

@@ -66,6 +66,14 @@ const opt = (flag: string, value: unknown) =>
     ? []
     : [flag, String(value)]
 
+// Free text that may start with "-" (an app name is any text): as a separate
+// argument yargs reads "--no-deploy" as a flag of its own and the name comes
+// out empty. Glued with "=" it can only be the value.
+const optText = (flag: string, value: unknown) =>
+  value === undefined || value === null || value === ''
+    ? []
+    : [`${flag}=${String(value)}`]
+
 const READ = {
   readOnlyHint: true,
   destructiveHint: false,
@@ -808,7 +816,7 @@ export const TOOLS: ToolDef[] = [
     flags: a => [
       '--repo',
       a.repo,
-      ...opt('--name', a.name),
+      ...optText('--name', a.name),
       ...opt('--branch', a.branch),
       ...(a.deploy === false ? ['--no-deploy'] : []),
       ...(a.wait && a.deploy !== false ? ['--wait', '--timeout', '300'] : []),
@@ -1004,7 +1012,7 @@ export const TOOLS: ToolDef[] = [
       '--workdir',
       a.workdir,
       ...opt('--app', a.app),
-      ...opt('--create', a.create),
+      ...optText('--create', a.create),
       '--yes',
       ...scope(a)
     ],

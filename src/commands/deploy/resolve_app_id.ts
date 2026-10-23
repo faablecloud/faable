@@ -24,9 +24,12 @@ export const resolve_app_ref = async (
     limit: 200,
     all: true
   })
-  const wanted = ref.toLowerCase()
+  // NFC: an app name is free text, and a decomposed "é" (typed on macOS,
+  // pasted from a file) must match the composed one the api stores.
+  const key = (s?: string) => s?.trim().normalize('NFC').toLowerCase()
+  const wanted = key(ref)
   const matches = apps.data.filter(
-    a => a.name.toLowerCase() === wanted || a.slug?.toLowerCase() === wanted
+    a => key(a.name) === wanted || key(a.slug) === wanted
   )
   if (matches.length === 1) return matches[0].id
   if (matches.length === 0) {

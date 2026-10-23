@@ -317,3 +317,15 @@ test('every tool declares readOnlyHint, destructiveHint and openWorldHint', t =>
     if (tool.annotations.readOnlyHint) t.false(tool.annotations.destructiveHint, tool.name)
   }
 })
+
+// An app name is free text. Passed as its own argument, "--no-deploy" was a
+// flag to yargs: the name came out empty and the deploy was skipped.
+test('create_app and deploy_directory glue the name to its flag', t => {
+  const create = TOOLS.find(x => x.name === 'create_app')!
+  const dir = TOOLS.find(x => x.name === 'deploy_directory')!
+  t.true(create.flags({ repo: 'a/b', name: '--no-deploy' }).includes('--name=--no-deploy'))
+  t.true(
+    dir.flags({ workdir: '/x', create: 'Felicitación 🎉' }).includes('--create=Felicitación 🎉')
+  )
+  t.false(create.flags({ repo: 'a/b' }).some(f => f.startsWith('--name')))
+})
