@@ -20,8 +20,9 @@ export interface ToolDef {
   stdin?: (a: Args) => string
   // Reversible writes: registered only with `faable mcp --writes`.
   write?: boolean
-  // Works on the user's own disk (uploads a directory): stdio only, never on
-  // the hosted server, which has no disk of the user's.
+  // Stdio only, never on the hosted server: works on the user's own disk
+  // (uploads a directory), or needs more than the hosted token may do (role
+  // writes).
   local_only?: boolean
   // How long the CLI may take (default 120 s): a deploy that waits for its
   // build needs minutes.
@@ -1134,6 +1135,9 @@ export const TOOLS: ToolDef[] = [
       ...auth_scope(a)
     ],
     write: true,
+    // Role writes hand permissions to end users: never on the hosted
+    // server, whose token only reads roles (api tenant_access.ts).
+    local_only: true,
     annotations: { ...AUTH_WRITE, idempotentHint: false },
     example: { name: 'support', description: 'Support staff' }
   },
@@ -1164,6 +1168,9 @@ export const TOOLS: ToolDef[] = [
       ...auth_scope(a)
     ],
     write: true,
+    // Role writes hand permissions to end users: never on the hosted
+    // server, whose token only reads roles (api tenant_access.ts).
+    local_only: true,
     shape: (rows: any) =>
       (Array.isArray(rows) ? rows : []).map((p: any) => ({
         value: p.value,
@@ -1200,6 +1207,9 @@ export const TOOLS: ToolDef[] = [
       ...auth_scope(a)
     ],
     write: true,
+    // Role writes hand permissions to end users: never on the hosted
+    // server, whose token only reads roles (api tenant_access.ts).
+    local_only: true,
     shape: (rows: any) =>
       (Array.isArray(rows) ? rows : []).map((r: any) => ({
         id: r.id,
