@@ -1,9 +1,11 @@
 import { CommandModule } from 'yargs'
 import { accounts, auth_use } from './accounts'
 import { actions } from './actions'
+import { apis } from './apis'
 import { clients } from './clients'
 import { connections } from './connections'
 import { logs } from './logs'
+import { roles } from './roles'
 import { sessions } from './sessions'
 import { users } from './users'
 import { webhooks } from './webhooks'
@@ -14,10 +16,13 @@ import { webhooks } from './webhooks'
 // resolveTenant in src/api/auth_admin.ts.
 export const auth: CommandModule = {
   command: 'auth',
-  describe: 'Manage Faable Auth (users, sessions, logins, actions, clients, webhooks, audit logs)',
+  describe:
+    'Manage Faable Auth (users, roles, APIs, sessions, logins, actions, clients, webhooks, audit logs)',
   builder: yargs =>
     yargs
       .command(users)
+      .command(roles)
+      .command(apis)
       .command(actions)
       .command(clients)
       .command(logs)

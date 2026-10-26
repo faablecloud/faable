@@ -4,12 +4,15 @@ import { users_get } from './get'
 import { users_import } from './import'
 import { users_list } from './list'
 import { users_password_setup } from './password_setup'
+import { users_permissions } from './permissions'
 import { users_reinstate } from './reinstate'
+import { users_roles } from './roles'
 import { users_suspend } from './suspend'
 
 export const users: CommandModule = {
   command: 'users',
-  describe: 'List, count, inspect, suspend, reinstate, import and export users',
+  describe:
+    'List, count, inspect, suspend, reinstate, import and export users, and manage their roles',
   builder: yargs =>
     yargs
       .command(users_list)
@@ -17,6 +20,8 @@ export const users: CommandModule = {
       .command(users_suspend)
       .command(users_reinstate)
       .command(users_password_setup)
+      .command(users_roles)
+      .command(users_permissions)
       .command(users_import)
       .command(users_export)
       .demandCommand(1)

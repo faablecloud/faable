@@ -784,6 +784,94 @@ export const TOOLS: ToolDef[] = [
     example: { app: 'web' }
   },
 
+  // ── Faable Auth: roles and API permissions (RBAC) ─────────────────────────
+  {
+    name: 'list_auth_roles',
+    title: 'List roles',
+    description:
+      'Roles of the Auth tenant and how many API permissions each grants. A role assigned to a user gives them its permissions in tokens for APIs with RBAC on; team roles grant none. Use get_auth_role for what one role grants and who holds it.',
+    input: { limit, cursor, tenant, project },
+    command: ['auth', 'roles', 'list'],
+    flags: a => [
+      ...limit_flag(a),
+      ...opt('--starting-after', a.cursor),
+      ...auth_scope(a)
+    ],
+    shape: page((r: any) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description || undefined,
+      permissions: r.permissions?.length ?? 0
+    })),
+    annotations: AUTH_READ,
+    example: { limit: 10, cursor: 'c' }
+  },
+  {
+    name: 'get_auth_role',
+    title: 'Get a role',
+    description:
+      'One role of the Auth tenant, by id or exact name: the API permissions it grants (with their API) and the users it is assigned to.',
+    input: {
+      role: z.string().describe('Role id (role_…) or exact name'),
+      tenant,
+      project
+    },
+    command: ['auth', 'roles', 'get'],
+    flags: a => [a.role, ...auth_scope(a)],
+    untrusted: true,
+    shape: (r: any) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description || undefined,
+      permissions: (r.permissions ?? []).map((p: any) => ({
+        value: p.value,
+        api: p.api_identifier
+      })),
+      users: r.users
+    }),
+    annotations: AUTH_READ,
+    example: { role: 'support' }
+  },
+  {
+    name: 'get_auth_user_access',
+    title: "Get a user's roles and permissions",
+    description:
+      "What a user of the Auth tenant may do: the roles assigned to them and the API permissions those roles grant, with the role behind each one. Answers 'why can (or can't) X do Y?'. A token carries the permissions the client requests that the user holds, for APIs with RBAC on.",
+    input: { user: user_ref, tenant, project },
+    command: ['auth', 'users', 'permissions'],
+    flags: a => [a.user, ...auth_scope(a)],
+    shape: (rows: any) =>
+      (Array.isArray(rows) ? rows : []).map((p: any) => ({
+        value: p.value,
+        api: p.api_identifier,
+        roles: (p.roles ?? []).map((r: any) => r.name)
+      })),
+    annotations: AUTH_READ,
+    example: { user: 'ana@example.com' }
+  },
+  {
+    name: 'list_auth_apis',
+    title: 'List APIs',
+    description:
+      'APIs (resource servers) of the Auth tenant: the audience each token is issued for, its token dialect, whether RBAC is on and how many permissions its catalog has.',
+    input: { limit, cursor, tenant, project },
+    command: ['auth', 'apis', 'list'],
+    flags: a => [
+      ...limit_flag(a),
+      ...opt('--starting-after', a.cursor),
+      ...auth_scope(a)
+    ],
+    shape: page((a: any) => ({
+      id: a.id,
+      name: a.name,
+      identifier: a.identifier,
+      token_dialect: a.token_dialect,
+      rbac: !!a.rbac,
+      permissions: (a.permissions ?? []).map((p: any) => p.value)
+    })),
+    annotations: AUTH_READ,
+    example: { limit: 10, cursor: 'c' }
+  },
   // ── Reversible writes: only with `faable mcp --writes` ────────────────────
   {
     name: 'create_app',
@@ -1027,6 +1115,99 @@ export const TOOLS: ToolDef[] = [
     example: { workdir: '/home/me/web', app: 'web' }
   },
   // ── Faable Auth writes: only with `faable mcp --writes` ───────────────────
+  {
+    name: 'create_auth_role',
+    title: 'Create a role',
+    description:
+      'Create a role in the Auth tenant. It grants nothing until you give it permissions with update_auth_role_permissions.',
+    input: {
+      name: z.string().min(1).max(120).describe('Role name, e.g. support'),
+      description: z.string().max(512).optional(),
+      tenant,
+      project
+    },
+    command: ['auth', 'roles', 'create'],
+    flags: a => [
+      // A name may start with "-": glued with "=" it can only be the value.
+      `--name=${a.name}`,
+      ...optText('--description', a.description),
+      ...auth_scope(a)
+    ],
+    write: true,
+    annotations: { ...AUTH_WRITE, idempotentHint: false },
+    example: { name: 'support', description: 'Support staff' }
+  },
+  {
+    name: 'update_auth_role_permissions',
+    title: "Change a role's permissions",
+    description:
+      "Grant (`add`) or revoke (`remove`) permissions of ONE API on a role. Each must be in that API's catalog (see list_auth_apis). Everyone who holds the role gets the change in their next tokens, refreshes included.",
+    input: {
+      role: z.string().describe('Role id (role_…) or exact name'),
+      api: z
+        .string()
+        .describe(
+          'API id (api_…) or identifier (audience URL) the permissions belong to'
+        ),
+      add: z.array(z.string()).optional(),
+      remove: z.array(z.string()).optional(),
+      tenant,
+      project
+    },
+    command: ['auth', 'roles', 'permissions'],
+    flags: a => [
+      a.role,
+      '--api',
+      a.api,
+      ...(a.add ?? []).flatMap((p: string) => ['--add', p]),
+      ...(a.remove ?? []).flatMap((p: string) => ['--rm', p]),
+      ...auth_scope(a)
+    ],
+    write: true,
+    shape: (rows: any) =>
+      (Array.isArray(rows) ? rows : []).map((p: any) => ({
+        value: p.value,
+        api: p.api_identifier
+      })),
+    annotations: AUTH_WRITE,
+    example: {
+      role: 'support',
+      api: 'https://api.example.com',
+      add: ['tickets:write'],
+      remove: ['tickets:admin']
+    }
+  },
+  {
+    name: 'update_auth_user_roles',
+    title: "Change a user's roles",
+    description:
+      "Assign (`add`) or remove (`remove`) roles of a user of the Auth tenant. Their permissions reach the user's next tokens, refreshes included; tokens already issued keep theirs until they expire. Confirm with get_auth_user that it is the right person first.",
+    input: {
+      user: user_ref,
+      add: z.array(z.string()).optional().describe('Role ids or exact names'),
+      remove: z
+        .array(z.string())
+        .optional()
+        .describe('Role ids or exact names'),
+      tenant,
+      project
+    },
+    command: ['auth', 'users', 'roles'],
+    flags: a => [
+      a.user,
+      ...(a.add ?? []).flatMap((r: string) => ['--add', r]),
+      ...(a.remove ?? []).flatMap((r: string) => ['--rm', r]),
+      ...auth_scope(a)
+    ],
+    write: true,
+    shape: (rows: any) =>
+      (Array.isArray(rows) ? rows : []).map((r: any) => ({
+        id: r.id,
+        name: r.name
+      })),
+    annotations: AUTH_WRITE,
+    example: { user: 'ana@example.com', add: ['support'], remove: ['viewer'] }
+  },
   {
     name: 'suspend_auth_user',
     title: 'Suspend a user',
