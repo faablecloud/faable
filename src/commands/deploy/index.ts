@@ -1,8 +1,8 @@
-import { github } from './github'
 import { CommandModule } from 'yargs'
 import { link } from '../link'
 import { apps, apps_list_legacy } from './apps'
 import { domains } from './domains'
+import { github } from './github'
 import { capture_deploy_help } from './help'
 import { cancel } from './inspect/cancel'
 import { deployments } from './inspect/deployments'
@@ -10,6 +10,7 @@ import { inspect } from './inspect/inspect'
 import { logs } from './inspect/logs'
 import { open_app } from './inspect/open'
 import { redeploy } from './inspect/redeploy'
+import { run } from './inspect/run'
 import { status } from './inspect/status'
 import { traffic } from './inspect/traffic'
 import { trigger } from './inspect/trigger'
@@ -49,6 +50,7 @@ export const deploy: CommandModule = {
         .command(waf)
         .command(logs)
         .command(status)
+        .command(run)
         .command(traffic)
         .command(usage)
         .command(quota)

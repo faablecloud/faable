@@ -305,6 +305,21 @@ export interface SecretsRedeploy {
   deployment_id: string | null
 }
 
+export type FaableTask = {
+  id: string
+  app_id: string
+  deployment_id: string
+  argv: string[]
+  status:
+    'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out' | 'canceled'
+  reason: string | null
+  exit_code: number | null
+  output_tail: string | null
+  timeout_s: number
+  started_at: string | null
+  finished_at: string | null
+}
+
 // `redeploy: null`: nothing to relaunch — the app runs and restarts as
 // always, or the save changed nothing.
 export interface SecretsBatchResult {
@@ -725,11 +740,9 @@ export class FaableApi<T = any> {
     team: string
   ) {
     return data(
-      this.client.post<FaableApp & { gitlab_project_path?: string; gitlab_branch?: string }>(
-        `/app/${app_id}/link-gitlab`,
-        params,
-        { headers: projectHeader(team) }
-      )
+      this.client.post<
+        FaableApp & { gitlab_project_path?: string; gitlab_branch?: string }
+      >(`/app/${app_id}/link-gitlab`, params, { headers: projectHeader(team) })
     )
   }
 
@@ -804,6 +817,26 @@ export class FaableApi<T = any> {
   // Rebuild a failed deployment from its recorded source (CAS manifest or
   // git ref). The API enforces the guards: failed phase only, never older
   // than what production serves.
+  // Tasks (one-off commands in a copy of the app's pod; api `task/`).
+  async createTask(
+    team: string,
+    body: { app_id: string; argv: string[]; timeout_s?: number }
+  ) {
+    return data(
+      this.client.post<FaableTask>(`/task`, body, {
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  async getTask(task_id: string, team: string) {
+    return data(
+      this.client.get<FaableTask>(`/task/${task_id}`, {
+        headers: projectHeader(team)
+      })
+    )
+  }
+
   async redeployDeployment(deployment_id: string, team: string) {
     return data(
       this.client.post<FaableDeployment>(
