@@ -320,6 +320,27 @@ export type FaableTask = {
   finished_at: string | null
 }
 
+// A cron schedule that queues a task (api `/taskschedule`, Hobby and Pro).
+export type FaableTaskSchedule = {
+  id: string
+  app_id: string
+  name: string | null
+  cron: string
+  argv: string[]
+  timeout_s: number
+  enabled: boolean
+  next_run_at: string | null
+  last_run_at: string | null
+  last_task_id: string | null
+  skip_reason:
+    | 'plan_required'
+    | 'previous_running'
+    | 'app_unavailable'
+    | 'enqueue_failed'
+    | null
+  skipped_at: string | null
+}
+
 // `redeploy: null`: nothing to relaunch — the app runs and restarts as
 // always, or the save changed nothing.
 export interface SecretsBatchResult {
@@ -824,6 +845,54 @@ export class FaableApi<T = any> {
   ) {
     return data(
       this.client.post<FaableTask>(`/task`, body, {
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  async listTaskSchedules(team: string, app_id: string) {
+    return data(
+      this.client.get<{ results: FaableTaskSchedule[] }>(`/taskschedule`, {
+        params: { app_id },
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  async createTaskSchedule(
+    team: string,
+    body: {
+      app_id: string
+      cron: string
+      argv: string[]
+      name?: string
+      timeout_s?: number
+    }
+  ) {
+    return data(
+      this.client.post<FaableTaskSchedule>(`/taskschedule`, body, {
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  async updateTaskSchedule(
+    team: string,
+    id: string,
+    body: Partial<
+      Pick<FaableTaskSchedule, 'cron' | 'argv' | 'name' | 'timeout_s' | 'enabled'>
+    >
+  ) {
+    return data(
+      this.client.post<FaableTaskSchedule>(`/taskschedule/${id}`, body, {
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  async deleteTaskSchedule(team: string, id: string) {
+    return data(
+      this.client.delete<FaableTaskSchedule>(`/taskschedule/${id}`, {
         headers: projectHeader(team)
       })
     )

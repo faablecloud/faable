@@ -16,6 +16,7 @@ import { traffic } from './inspect/traffic'
 import { trigger } from './inspect/trigger'
 import { launch } from './launch'
 import { quota, usage } from './project_usage'
+import { schedule } from './schedule'
 import { secrets } from './secrets'
 import { waf } from './waf'
 
@@ -51,6 +52,7 @@ export const deploy: CommandModule = {
         .command(logs)
         .command(status)
         .command(run)
+        .command(schedule)
         .command(traffic)
         .command(usage)
         .command(quota)
