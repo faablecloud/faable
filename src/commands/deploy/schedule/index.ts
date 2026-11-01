@@ -8,9 +8,7 @@ import { schedule_disable, schedule_enable } from './toggle'
 // runs a task of the app — the same thing `faable deploy run` runs once.
 export const schedule: CommandModule = {
   command: 'schedule <command>',
-  // Hidden, like `run`, until tasks on code apps are published.
-  // 'Run a command of the app on a cron schedule'
-  describe: false,
+  describe: 'Run a command of the app on a cron schedule (Hobby and Pro)',
   builder: yargs =>
     yargs
       .command(schedule_list)

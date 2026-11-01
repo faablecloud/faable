@@ -17,10 +17,10 @@ interface RunArgs {
 
 export const run: CommandModule<unknown, RunArgs> = {
   command: 'run',
-  // Hidden until the WordPress blueprint is published (api `/task` is
-  // internal: blueprint apps and staff only). Then: the describe below.
-  // 'Run a one-off command with the image, variables and volumes of the live deployment'
-  describe: false,
+  // Hobby and Pro on code apps; blueprint apps run only their own commands
+  // (api deploy/task/task.ts). Published 2026-11-01 with task schedules.
+  describe:
+    'Run a one-off command with the image, variables and volumes of the live deployment',
   builder: yargs =>
     json_option(yargs)
       .parserConfiguration({ 'populate--': true })
