@@ -344,7 +344,7 @@ export type FaableVolumeOperation = {
   id: string
   volume_id: string
   app_id: string
-  kind: 'backup' | 'restore' | 'export' | 'import'
+  kind: 'backup' | 'restore' | 'export' | 'import' | 'put'
   reason: 'manual' | 'scheduled' | 'pre_restore' | 'pre_import'
   state: 'awaiting_upload' | 'queued' | 'running' | 'completed' | 'failed'
   backup_id: string | null
@@ -928,7 +928,10 @@ export class FaableApi<T = any> {
     team: string,
     id: string,
     body: Partial<
-      Pick<FaableTaskSchedule, 'cron' | 'argv' | 'name' | 'timeout_s' | 'enabled'>
+      Pick<
+        FaableTaskSchedule,
+        'cron' | 'argv' | 'name' | 'timeout_s' | 'enabled'
+      >
     >
   ) {
     return data(
@@ -963,12 +966,12 @@ export class FaableApi<T = any> {
     )
   }
 
-  // backup, export and import: each queues (or, an import, opens) one
-  // operation of the volume.
+  // backup, export, import and put: each queues (or, an import or a put,
+  // opens) one operation of the volume.
   async createVolumeOperation(
     team: string,
     volume_id: string,
-    kind: 'backup' | 'export' | 'import'
+    kind: 'backup' | 'export' | 'import' | 'put'
   ) {
     return data(
       this.client.post<FaableVolumeOperation>(

@@ -1,7 +1,11 @@
 import test from 'ava'
 import type { FaableApi, FaableVolumeOperation } from '../../../api/FaableApi'
-import { format_usage, is_archive, volume_dest, wait_operation } from './operation'
-
+import {
+  format_usage,
+  is_archive,
+  volume_dest,
+  wait_operation
+} from './operation'
 
 test('--to stays inside the volume', t => {
   t.is(volume_dest(undefined), '.')
@@ -25,7 +29,10 @@ test('an archive is a .tar.gz or .tgz', t => {
 test('usage against the quota', t => {
   const v = { used_bytes: 1_250_000_000, quota_gb: 10 } as never
   t.is(format_usage(v), '1.3 GB of 10 GB (13%)')
-  t.regex(format_usage({ used_bytes: null, quota_gb: 10 } as never), /not measured/)
+  t.regex(
+    format_usage({ used_bytes: null, quota_gb: 10 } as never),
+    /not measured/
+  )
 })
 
 test('waits through the backup that goes first, until the operation is done', async t => {

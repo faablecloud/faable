@@ -1,7 +1,7 @@
 import { CommandModule } from 'yargs'
 import { volumes_backup, volumes_backups } from './backups'
 import { volumes_export } from './export'
-import { volumes_import } from './import'
+import { volumes_import, volumes_put } from './import'
 import { volumes_list } from './list'
 import { volumes_restore } from './restore'
 
@@ -11,7 +11,7 @@ import { volumes_restore } from './restore'
 // describe below. Arch: deploy/volumenes-cli-comparativa.md (backlog §460).
 export const volumes: CommandModule = {
   command: 'volumes <command>',
-  // 'Manage the volumes of an app: usage, backups, restore, export and import'
+  // 'Manage the volumes of an app: usage, backups, restore, export, import and put'
   describe: false,
   builder: yargs =>
     yargs
@@ -21,9 +21,10 @@ export const volumes: CommandModule = {
       .command(volumes_restore)
       .command(volumes_export)
       .command(volumes_import)
+      .command(volumes_put)
       .demandCommand(
         1,
-        'Specify a volumes command: list, backups, backup, restore, export or import'
+        'Specify a volumes command: list, backups, backup, restore, export, import or put'
       ),
   handler: () => {
     // Unreachable: demandCommand(1) either routes to a subcommand or fails

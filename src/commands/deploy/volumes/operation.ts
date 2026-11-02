@@ -1,5 +1,9 @@
 import { posix } from 'node:path'
-import type { FaableApi, FaableVolume, FaableVolumeOperation } from '../../../api/FaableApi'
+import type {
+  FaableApi,
+  FaableVolume,
+  FaableVolumeOperation
+} from '../../../api/FaableApi'
 import { CliError } from '../../../lib/errors'
 
 // The pure half of the volumes commands (no api context): waiting for an
