@@ -17,6 +17,7 @@ export type CliErrorCode =
   | 'app_required' // the command needs --app and could not infer one
   | 'project_required' // several projects and none chosen: --project
   | 'name_taken' // creating an app with the name of one already in the project
+  | 'operation_failed' // a queued operation (a volume backup, restore…) ended failed
   | 'usage' // bad invocation: unknown command, missing argument…
 
 export interface CliErrorFields {

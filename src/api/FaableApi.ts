@@ -320,6 +320,54 @@ export type FaableTask = {
   finished_at: string | null
 }
 
+// A volume of an app (api `/volume`): today, the ones a blueprint defines
+// (WordPress: `site` at /faable/app). The api answers them as internal until
+// the blueprints are published.
+export type FaableVolume = {
+  id: string
+  app_id: string
+  name: string
+  mount_path: string
+  quota_gb: number
+  storage_tier: string | null
+  backup: boolean
+  state: 'ready' | 'retained'
+  retain_until: string | null
+  used_bytes: number | null
+  used_inodes: number | null
+  usage_measured_at: string | null
+}
+
+// A backup, restore, export or import of a volume (api `/volume-operation`).
+// The signed URLs are fresh on every read and valid one hour.
+export type FaableVolumeOperation = {
+  id: string
+  volume_id: string
+  app_id: string
+  kind: 'backup' | 'restore' | 'export' | 'import'
+  reason: 'manual' | 'scheduled' | 'pre_restore' | 'pre_import'
+  state: 'awaiting_upload' | 'queued' | 'running' | 'completed' | 'failed'
+  backup_id: string | null
+  after_id: string | null
+  size_bytes: number | null
+  error: string | null
+  started_at: string | null
+  finished_at: string | null
+  object_deleted_at: string | null
+  download_url?: string | null
+  download_expires_at?: string | null
+  upload_url?: string | null
+  upload_expires_at?: string | null
+  createdAt?: string
+}
+
+export type FaableVolumeBackups = {
+  results: FaableVolumeOperation[]
+  retention: number | null
+  scheduled: boolean
+  last_completed_at: string | null
+}
+
 // A cron schedule that queues a task (api `/taskschedule`, Hobby and Pro).
 export type FaableTaskSchedule = {
   id: string
@@ -895,6 +943,68 @@ export class FaableApi<T = any> {
       this.client.delete<FaableTaskSchedule>(`/taskschedule/${id}`, {
         headers: projectHeader(team)
       })
+    )
+  }
+
+  async listVolumes(team: string, app_id: string) {
+    return data(
+      this.client.get<{ results: FaableVolume[] }>(`/volume`, {
+        params: { app_id },
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  async listVolumeBackups(team: string, volume_id: string) {
+    return data(
+      this.client.get<FaableVolumeBackups>(`/volume/${volume_id}/backups`, {
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  // backup, export and import: each queues (or, an import, opens) one
+  // operation of the volume.
+  async createVolumeOperation(
+    team: string,
+    volume_id: string,
+    kind: 'backup' | 'export' | 'import'
+  ) {
+    return data(
+      this.client.post<FaableVolumeOperation>(
+        `/volume/${volume_id}/${kind}`,
+        undefined,
+        { headers: projectHeader(team) }
+      )
+    )
+  }
+
+  async restoreVolume(team: string, volume_id: string, backup_id: string) {
+    return data(
+      this.client.post<FaableVolumeOperation>(
+        `/volume/${volume_id}/restore`,
+        { backup_id },
+        { headers: projectHeader(team) }
+      )
+    )
+  }
+
+  async getVolumeOperation(team: string, operation_id: string) {
+    return data(
+      this.client.get<FaableVolumeOperation>(
+        `/volume-operation/${operation_id}`,
+        { headers: projectHeader(team) }
+      )
+    )
+  }
+
+  async applyVolumeImport(team: string, operation_id: string) {
+    return data(
+      this.client.post<FaableVolumeOperation>(
+        `/volume-operation/${operation_id}/apply`,
+        undefined,
+        { headers: projectHeader(team) }
+      )
     )
   }
 

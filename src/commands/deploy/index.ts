@@ -18,6 +18,7 @@ import { launch } from './launch'
 import { quota, usage } from './project_usage'
 import { schedule } from './schedule'
 import { secrets } from './secrets'
+import { volumes } from './volumes'
 import { waf } from './waf'
 
 export type { DeployCommandArgs } from './launch'
@@ -53,6 +54,7 @@ export const deploy: CommandModule = {
         .command(status)
         .command(run)
         .command(schedule)
+        .command(volumes)
         .command(traffic)
         .command(usage)
         .command(quota)
