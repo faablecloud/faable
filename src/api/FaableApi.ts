@@ -344,7 +344,16 @@ export type FaableVolumeOperation = {
   id: string
   volume_id: string
   app_id: string
-  kind: 'backup' | 'restore' | 'export' | 'import' | 'put' | 'list'
+  kind:
+    | 'backup'
+    | 'restore'
+    | 'export'
+    | 'import'
+    | 'put'
+    | 'list'
+    | 'remove'
+    | 'untrash'
+    | 'purge'
   reason: 'manual' | 'scheduled' | 'pre_restore' | 'pre_import'
   state: 'awaiting_upload' | 'queued' | 'running' | 'completed' | 'failed'
   backup_id: string | null
@@ -358,6 +367,9 @@ export type FaableVolumeOperation = {
   path?: string | null
   // A completed list: the directory's entries (at most 1000).
   entries?: FaableVolumeEntry[] | null
+  // A remove or an untrash: the paths; an untrash or a purge: its remove.
+  paths?: string[] | null
+  source_id?: string | null
   download_url?: string | null
   download_expires_at?: string | null
   upload_url?: string | null
@@ -1011,6 +1023,28 @@ export class FaableApi<T = any> {
         `/volume/${volume_id}/list-files`,
         undefined,
         { params: path ? { path } : {}, headers: projectHeader(team) }
+      )
+    )
+  }
+
+  // rm: the paths go to the volume's trash (7 days), never deleted at once.
+  async removeVolumePaths(team: string, volume_id: string, paths: string[]) {
+    return data(
+      this.client.post<FaableVolumeOperation>(
+        `/volume/${volume_id}/remove`,
+        { paths },
+        { headers: projectHeader(team) }
+      )
+    )
+  }
+
+  // rm --undo: what a remove sent to the trash comes back.
+  async undoVolumeOperation(team: string, operation_id: string) {
+    return data(
+      this.client.post<FaableVolumeOperation>(
+        `/volume-operation/${operation_id}/undo`,
+        undefined,
+        { headers: projectHeader(team) }
       )
     )
   }
