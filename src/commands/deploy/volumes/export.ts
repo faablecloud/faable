@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { execFile } from 'node:child_process'
 import { createWriteStream } from 'node:fs'
-import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
@@ -156,6 +156,15 @@ export const volumes_get: CommandModule<unknown, GetArgs> = {
       args.volume
     )
     const out = args.output ?? '.'
+    // Like cp, but never over what is here: GNU tar -k fails on an existing
+    // file, macOS tar skips it in silence; say it before downloading.
+    const local_target = path.join(out, path.posix.basename(sub))
+    if (await stat(local_target).catch(() => null)) {
+      throw new CliError(
+        'usage',
+        `${local_target} already exists: nothing is overwritten (move it, or --output another directory)`
+      )
+    }
     const work = await mkdtemp(path.join(tmpdir(), 'faable-volume-get-'))
     try {
       if (!args.json)
@@ -186,7 +195,7 @@ export const volumes_get: CommandModule<unknown, GetArgs> = {
           `Could not unpack into ${out}: ${(error.stderr ?? String(error)).trim().split('\n')[0]}`
         )
       })
-      const local = path.join(out, path.posix.basename(sub))
+      const local = local_target
       if (args.json) return print_json({ ...done, local })
       log.info(`✅ ${local} (${format_bytes(done.size_bytes)} compressed).`)
     } finally {
