@@ -1,6 +1,7 @@
 import test from 'ava'
 import type { FaableApi, FaableVolumeOperation } from '../../../api/FaableApi'
 import {
+  format_entry,
   format_usage,
   is_archive,
   volume_dest,
@@ -50,4 +51,25 @@ test('waits through the backup that goes first, until the operation is done', as
   })
   t.is(done.state, 'completed')
   t.deepEqual(seen, ['queued', 'running', 'completed'])
+})
+
+test('one line of volumes ls', t => {
+  t.is(
+    format_entry({
+      name: 'ferp',
+      type: 'dir',
+      size: 4096,
+      mtime: '2026-11-02T13:32:37.592Z'
+    }),
+    'd         —  2026-11-02 13:32  ferp/'
+  )
+  t.is(
+    format_entry({
+      name: 'ferp.php',
+      type: 'file',
+      size: 2500,
+      mtime: '2026-11-02T13:32:37.592Z'
+    }),
+    '-    2.5 KB  2026-11-02 13:32  ferp.php'
+  )
 })

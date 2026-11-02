@@ -2,6 +2,7 @@ import { posix } from 'node:path'
 import type {
   FaableApi,
   FaableVolume,
+  FaableVolumeEntry,
   FaableVolumeOperation
 } from '../../../api/FaableApi'
 import { CliError } from '../../../lib/errors'
@@ -96,3 +97,13 @@ export const volume_dest = (to: string | undefined): string => {
 }
 
 export const is_archive = (p: string) => /\.(tar\.gz|tgz)$/i.test(p)
+
+const TYPE_MARK = { dir: 'd', file: '-', link: 'l', other: '?' } as const
+
+/** `d        —  2026-11-02 13:32  ferp/` — one line of `volumes ls`. */
+export const format_entry = (e: FaableVolumeEntry): string => {
+  const size = e.type === 'dir' ? '—' : format_bytes(e.size)
+  const when = e.mtime.slice(0, 16).replace('T', ' ')
+  const name = e.type === 'dir' ? `${e.name}/` : e.name
+  return `${TYPE_MARK[e.type] ?? '?'}  ${size.padStart(8)}  ${when}  ${name}`
+}

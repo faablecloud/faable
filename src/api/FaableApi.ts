@@ -344,7 +344,7 @@ export type FaableVolumeOperation = {
   id: string
   volume_id: string
   app_id: string
-  kind: 'backup' | 'restore' | 'export' | 'import' | 'put'
+  kind: 'backup' | 'restore' | 'export' | 'import' | 'put' | 'list'
   reason: 'manual' | 'scheduled' | 'pre_restore' | 'pre_import'
   state: 'awaiting_upload' | 'queued' | 'running' | 'completed' | 'failed'
   backup_id: string | null
@@ -354,11 +354,22 @@ export type FaableVolumeOperation = {
   started_at: string | null
   finished_at: string | null
   object_deleted_at: string | null
+  // An export of part of the volume, or the directory a list reads.
+  path?: string | null
+  // A completed list: the directory's entries (at most 1000).
+  entries?: FaableVolumeEntry[] | null
   download_url?: string | null
   download_expires_at?: string | null
   upload_url?: string | null
   upload_expires_at?: string | null
   createdAt?: string
+}
+
+export type FaableVolumeEntry = {
+  name: string
+  type: 'file' | 'dir' | 'link' | 'other'
+  size: number
+  mtime: string
 }
 
 export type FaableVolumeBackups = {
@@ -978,6 +989,28 @@ export class FaableApi<T = any> {
         `/volume/${volume_id}/${kind}`,
         undefined,
         { headers: projectHeader(team) }
+      )
+    )
+  }
+
+  // An export of the whole volume, or of one file or directory of it.
+  async exportVolume(team: string, volume_id: string, path?: string) {
+    return data(
+      this.client.post<FaableVolumeOperation>(
+        `/volume/${volume_id}/export`,
+        undefined,
+        { params: path ? { path } : {}, headers: projectHeader(team) }
+      )
+    )
+  }
+
+  // Queues a read of one directory; its entries come with the completed op.
+  async listVolumeFiles(team: string, volume_id: string, path?: string) {
+    return data(
+      this.client.post<FaableVolumeOperation>(
+        `/volume/${volume_id}/list-files`,
+        undefined,
+        { params: path ? { path } : {}, headers: projectHeader(team) }
       )
     )
   }
