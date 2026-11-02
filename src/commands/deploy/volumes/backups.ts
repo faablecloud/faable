@@ -22,9 +22,7 @@ export const volumes_backups: CommandModule<unknown, BackupsArgs> = {
   command: 'backups',
   describe: 'List the backups of a volume (nightly, and the ones you take)',
   builder: yargs =>
-    volume_option(app_option(json_option(yargs))).showHelpOnFail(
-      false
-    ) as any,
+    volume_option(app_option(json_option(yargs))).showHelpOnFail(false) as any,
   handler: async args => {
     const { api, team, app, volume } = await resolve_volume(
       args.app,
@@ -79,7 +77,8 @@ export const volumes_backup: CommandModule<unknown, BackupArgs> = {
       log.info(`🗄  Backup ${op.id} of ${app.name}/${volume.name} queued.`)
       return
     }
-    if (!args.json) log.info(`🗄  Backing up ${app.name}/${volume.name} (${op.id})`)
+    if (!args.json)
+      log.info(`🗄  Backing up ${app.name}/${volume.name} (${op.id})`)
     const done = await wait_operation(api, team, op, {
       onState: s => {
         if (!args.json && s !== 'completed' && s !== 'failed')
