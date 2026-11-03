@@ -30,7 +30,8 @@ export const volumes_restore: CommandModule<unknown, RestoreArgs> = {
       .positional('backup_id', {
         type: 'string',
         demandOption: true,
-        description: 'The backup (see `faable deploy volumes backups`)'
+        description:
+          'The backup (see `faable deploy volumes backups`). It may be one of another app of the project: a look at it without touching that app'
       })
       .option('yes', {
         alias: 'y',
