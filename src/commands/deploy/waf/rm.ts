@@ -85,7 +85,9 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
       })} from ${app.name} (${app_id}).`
     )
     log.info(
-      `They reach your app again within ~20s, once the edge picks up the change.`
+      args.action === 'monitor'
+        ? `It never blocked anything: those requests kept reaching your app.`
+        : `They reach your app again within ~20s, once the edge picks up the change.`
     )
   }
 }
