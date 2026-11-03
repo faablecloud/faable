@@ -615,7 +615,7 @@ export const TOOLS: ToolDef[] = [
     name: 'get_auth_user',
     title: 'Get a user',
     description:
-      "One user of the Auth tenant by id or email: profile, verification, suspension (and why), last login and login count, and the social identities they sign in with. Use it to confirm who a user is before suspending them, or to see why they can't log in (together with list_auth_logs).",
+      "One user of the Auth tenant by id or email: profile, verification, suspension (and why), last login and login count, the social identities they sign in with, and `credentials` — the email/username they actually TYPE at the database (password) login. That login identifier can differ from the profile `email`; when it does, a login failing with the profile email is the bug. Use it to confirm who a user is before suspending them, or to see why they can't log in (together with list_auth_logs).",
     input: { user: user_ref, tenant, project },
     command: ['auth', 'users', 'get'],
     flags: a => [a.user, ...auth_scope(a)],
@@ -627,16 +627,38 @@ export const TOOLS: ToolDef[] = [
       identities: (u.identities ?? []).map((i: any) => ({
         provider: i.provider ?? i.connection_type,
         user_id: i.user_id ?? i.provider_user_id
+      })),
+      credentials: (u.credentials ?? []).map((c: any) => ({
+        connection: c.connection_name ?? c.connection,
+        identifier: c.email ?? c.username
       }))
     }),
     annotations: AUTH_READ,
     example: { user: 'ana@example.com' }
   },
   {
+    name: 'diagnose_auth_login',
+    title: 'Diagnose a login identifier',
+    description:
+      "Given the exact email or username a person is trying to log in with, explain in one call whether it signs anyone in. `logs_in: true` → it is a real login identifier (so a failure is the password or a suspension, not the identifier). `logs_in: false` with `profile_email_only` populated → a user has that address as their PROFILE email but logs in with a different identifier (the usual trap: the address they were given is not the one on the account); `login_identifiers` lists what they must actually type. `suggestions` offers near matches when nothing matched. Use this first for 'X cannot log in'.",
+    input: {
+      identifier: z
+        .string()
+        .describe('The email or username the person is trying to log in with'),
+      tenant,
+      project
+    },
+    command: ['auth', 'users', 'diagnose'],
+    flags: a => [a.identifier, ...auth_scope(a)],
+    untrusted: true,
+    annotations: AUTH_READ,
+    example: { identifier: 'ana@personal.com' }
+  },
+  {
     name: 'list_auth_logs',
     title: 'Read the Auth audit log',
     description:
-      "The Auth tenant's audit log, newest first: logins, failed logins (`status: failed`), sign-ups, password resets, admin changes (`type` prefix `admin.user`). Filter by user to answer 'why can't X log in?' — the failed attempts say why.",
+      "The Auth tenant's audit log, newest first: logins, failed logins (`status: failed`), sign-ups, password resets, admin changes (`type` prefix `admin.user`). Filter by user to answer 'why can't X log in?' — the failed attempts say why. On a failed login no user resolves, so each row also carries `attempted_identifier`: the email/username the person actually typed (diagnose_auth_login turns that into the account they should be using).",
     input: {
       email: z.string().optional().describe("Only this user's events (exact email)"),
       user: z.string().optional().describe('Only this user id (user_…)'),
@@ -665,14 +687,24 @@ export const TOOLS: ToolDef[] = [
     ],
     untrusted: true,
     shape: (d: any) => ({
-      events: (d?.data ?? []).map((l: any) => ({
-        at: l.createdAt,
-        type: l.type,
-        status: l.status,
-        ...log_user(l),
-        message: l.message,
-        ip: l.data?.ip
-      })),
+      events: (d?.data ?? []).map((l: any) => {
+        const resolved = log_user(l)
+        // The identifier the person TYPED. On a failed login no user resolves,
+        // so this is the only record of who tried and with what address —
+        // surface it when it adds something the resolved user does not.
+        const tried = l.data?.email
+        return {
+          at: l.createdAt,
+          type: l.type,
+          status: l.status,
+          ...resolved,
+          ...(tried && tried !== (resolved as { email?: string }).email
+            ? { attempted_identifier: tried }
+            : {}),
+          message: l.message,
+          ip: l.data?.ip
+        }
+      }),
       has_more: !!d?.has_more
     }),
     annotations: AUTH_READ,
@@ -1387,5 +1419,95 @@ export const TOOLS: ToolDef[] = [
     write: true,
     annotations: { ...AUTH_WRITE, idempotentHint: false },
     example: { user: 'ana@example.com', channel: 'email' }
+  },
+  {
+    name: 'update_auth_user',
+    title: 'Update a user profile',
+    description:
+      "Change a user's profile: `email`, `name`, `email_verified`. Changing `email` also moves their database login identifier (the email they type at the password login) so sign-in keeps working — pass `profile_only: true` to change only the profile email and leave the login identifier. Use this when someone cannot log in because the address they were given is not the one on their account. Confirm the person first with get_auth_user.",
+    input: {
+      user: user_ref,
+      email: z.string().optional().describe('New email — also the database login identifier unless profile_only'),
+      name: z.string().optional(),
+      email_verified: z.boolean().optional().describe('Mark the email verified (true) or clear verification (false)'),
+      profile_only: z
+        .boolean()
+        .optional()
+        .describe('With email, change only the profile email, not the login identifier'),
+      connection: z
+        .string()
+        .optional()
+        .describe('Database connection id or name, when the user has more than one credential'),
+      tenant,
+      project
+    },
+    command: ['auth', 'users', 'update'],
+    flags: a => [
+      a.user,
+      ...opt('--email', a.email),
+      ...opt('--name', a.name),
+      ...(a.email_verified === undefined
+        ? []
+        : [a.email_verified ? '--email-verified' : '--no-email-verified']),
+      ...(a.profile_only ? ['--profile-only'] : []),
+      ...opt('--connection', a.connection),
+      '--yes',
+      ...auth_scope(a)
+    ],
+    write: true,
+    annotations: { ...AUTH_WRITE, idempotentHint: true },
+    example: { user: 'ana@example.com', email: 'ana@new.com' }
+  },
+  {
+    name: 'set_auth_user_password',
+    title: "Set a user's password",
+    description:
+      "Set a user's database password directly, to a value you choose or one this tool generates. Use it only when the person cannot receive a password-setup link at all (e.g. the email on the account does not exist) — with a link they pick their own password and it never passes through anyone else. Pass `generate: true` to get a strong password back once, or put the exact password in `password`. The password is sent to the CLI over stdin, never in the command line; it is returned only when generated.",
+    input: {
+      user: user_ref,
+      password: z
+        .string()
+        .optional()
+        .describe('The exact new password. Omit and set generate:true to have one made.'),
+      generate: z.boolean().optional().describe('Generate a strong password and return it once'),
+      connection: z
+        .string()
+        .optional()
+        .describe('Database connection id or name, when the user has more than one credential'),
+      tenant,
+      project
+    },
+    command: ['auth', 'users', 'set-password'],
+    flags: a => [
+      a.user,
+      ...(a.generate ? ['--generate'] : []),
+      ...opt('--connection', a.connection),
+      '--yes',
+      ...auth_scope(a)
+    ],
+    // The password goes on stdin, never in argv. Nothing is piped for the
+    // generate path (the CLI makes its own and never reads stdin then).
+    stdin: a => (a.generate ? undefined : (a.password as string | undefined)),
+    write: true,
+    annotations: { ...AUTH_WRITE, idempotentHint: false },
+    example: { user: 'ana@example.com', generate: true }
+  },
+  {
+    name: 'get_auth_recovery_link',
+    title: 'Get a password-reset link',
+    description:
+      "Mint a fresh password-reset link for a user and return it, so you can hand it over by another channel when the reset email will not reach them (e.g. the address on the account is not a real inbox). This ALSO sends the standard reset email. The link lets whoever holds it set the password, so treat it like a password; it works once, until used or expired. Returns `link` (email channel only), `ticket_id` and `channel`.",
+    input: { user: user_ref, tenant, project },
+    command: ['auth', 'users', 'password-setup'],
+    flags: a => [a.user, '--print', '--yes', ...auth_scope(a)],
+    shape: (r: any) => ({
+      link: r.link,
+      ticket_id: r.ticket_id,
+      channel: r.channel,
+      user_id: r.user_id
+    }),
+    write: true,
+    annotations: { ...AUTH_WRITE, idempotentHint: false },
+    example: { user: 'ana@example.com' }
   }
 ]
