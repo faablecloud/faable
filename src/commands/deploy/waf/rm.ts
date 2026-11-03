@@ -9,7 +9,7 @@ interface WafRmArgs {
   pattern?: string
   userAgent?: string
   query?: string
-  action?: 'deny' | 'sink' | 'allow'
+  action?: 'deny' | 'sink' | 'allow' | 'monitor'
   app?: string
   json?: boolean
 }
