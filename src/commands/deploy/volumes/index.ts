@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs'
 import { volumes_backup, volumes_backups } from './backups'
+import { volumes_clone } from './clone'
 import { volumes_export, volumes_get } from './export'
 import { volumes_import, volumes_put } from './import'
 import { volumes_list } from './list'
@@ -24,12 +25,13 @@ export const volumes: CommandModule = {
       .command(volumes_backups)
       .command(volumes_backup)
       .command(volumes_restore)
+      .command(volumes_clone)
       .command(volumes_export)
       .command(volumes_import)
       .command(volumes_put)
       .demandCommand(
         1,
-        'Specify a volumes command: list, ls, get, rm, backups, backup, restore, export, import or put'
+        'Specify a volumes command: list, ls, get, rm, backups, backup, restore, clone, export, import or put'
       ),
   handler: () => {
     // Unreachable: demandCommand(1) either routes to a subcommand or fails

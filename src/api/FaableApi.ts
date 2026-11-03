@@ -384,6 +384,28 @@ export type FaableVolumeEntry = {
   mtime: string
 }
 
+// An app's database (api `/database`), as far as moving its data goes.
+export type FaableDatabase = {
+  id: string
+  app_id: string
+  engine: 'mariadb'
+  state: 'provisioning' | 'ready' | 'failed' | 'retained'
+}
+
+export type FaableDatabaseExport = {
+  export_id: string
+  state: string
+  size_bytes: number | null
+  url: string | null
+  error: string | null
+}
+
+export type FaableDatabaseImport = {
+  import_id: string
+  state: 'waiting_upload' | 'running' | 'completed' | 'failed'
+  error: string | null
+}
+
 export type FaableVolumeBackups = {
   results: FaableVolumeOperation[]
   retention: number | null
@@ -1043,6 +1065,77 @@ export class FaableApi<T = any> {
     return data(
       this.client.post<FaableVolumeOperation>(
         `/volume-operation/${operation_id}/undo`,
+        undefined,
+        { headers: projectHeader(team) }
+      )
+    )
+  }
+
+  async listDatabases(team: string, app_id: string) {
+    return data(
+      this.client.get<{ results: FaableDatabase[] }>(`/database`, {
+        params: { app_id },
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  async exportDatabase(team: string, database_id: string) {
+    return data(
+      this.client.post<{ export_id: string }>(
+        `/database/${database_id}/export`,
+        undefined,
+        { headers: projectHeader(team) }
+      )
+    )
+  }
+
+  async getDatabaseExport(
+    team: string,
+    database_id: string,
+    export_id: string
+  ) {
+    return data(
+      this.client.get<FaableDatabaseExport>(
+        `/database/${database_id}/export/${export_id}`,
+        { headers: projectHeader(team) }
+      )
+    )
+  }
+
+  async importDatabase(team: string, database_id: string) {
+    return data(
+      this.client.post<{
+        import_id: string
+        upload_url: string
+        expires_at: string
+      }>(`/database/${database_id}/import`, undefined, {
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  async getDatabaseImport(
+    team: string,
+    database_id: string,
+    import_id: string
+  ) {
+    return data(
+      this.client.get<FaableDatabaseImport>(
+        `/database/${database_id}/import/${import_id}`,
+        { headers: projectHeader(team) }
+      )
+    )
+  }
+
+  async applyDatabaseImport(
+    team: string,
+    database_id: string,
+    import_id: string
+  ) {
+    return data(
+      this.client.post<{ accepted: true }>(
+        `/database/${database_id}/import/${import_id}/apply`,
         undefined,
         { headers: projectHeader(team) }
       )
