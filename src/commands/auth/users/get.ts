@@ -33,7 +33,8 @@ type ProfileData = {
 
 export const users_get: CommandModule<unknown, UsersGetArgs> = {
   command: 'get <user_id>',
-  describe: 'Show a user (by id or email), including their federated identities',
+  describe:
+    'Show a user (by id or email), their federated identities and their database login identifiers',
   builder: yargs =>
     json_option(tenant_options(yargs))
       .positional('user_id', {
@@ -59,10 +60,40 @@ export const users_get: CommandModule<unknown, UsersGetArgs> = {
       .then(r => r.data.map(i => sanitize_identity(i as never)))
       .catch(() => [] as Record<string, unknown>[])
 
-    // Resolve connection ids to names ("github") once per distinct id.
+    // Database-connection credentials: the email/username the user actually
+    // TYPES to log in. Distinct from `user.email` (the profile email), which
+    // is NOT what the password login matches — the gap that otherwise sends
+    // you to the dashboard to find out why a login keeps failing. Best-effort.
+    const credentials = await fetch_page(
+      from_paginator(api.credentialsList({ user: user_id })),
+      { limit: 200, all: true }
+    )
+      .then(r =>
+        r.data.map(c => ({
+          id: String((c as { id?: unknown }).id ?? ''),
+          connection: String((c as { connection?: unknown }).connection ?? ''),
+          email: (c as { email?: string }).email,
+          username: (c as { username?: string }).username
+        }))
+      )
+      .catch(
+        () =>
+          [] as {
+            id: string
+            connection: string
+            email?: string
+            username?: string
+          }[]
+      )
+
+    // Resolve connection ids to names ("github", "default") once per distinct
+    // id — identities and credentials alike.
     const connection_names = new Map<string, string>()
     for (const id of new Set(
-      identities.map(i => String(i.connection ?? '')).filter(Boolean)
+      [
+        ...identities.map(i => String(i.connection ?? '')),
+        ...credentials.map(c => c.connection)
+      ].filter(Boolean)
     )) {
       const conn = (await api.connectionGet(id).catch(() => null)) as {
         connection_name?: string
@@ -74,11 +105,30 @@ export const users_get: CommandModule<unknown, UsersGetArgs> = {
       )
     }
 
-    if (args.json) return print_json({ ...user, identities })
+    if (args.json)
+      return print_json({
+        ...user,
+        identities,
+        credentials: credentials.map(c => ({
+          ...c,
+          connection_name: connection_names.get(c.connection) ?? c.connection
+        }))
+      })
 
     log.info(`👤 ${user.id}`)
     log.info(`  Email:      ${user.email ?? '-'} (verified: ${yes_no(user.email_verified)})`)
     log.info(`  Name:       ${user.name ?? '-'}`)
+    if (credentials.length > 0) {
+      // What the user types at the password login — may differ from the
+      // profile email above, in which case that mismatch is the bug.
+      const ids = credentials
+        .map(c => {
+          const conn = connection_names.get(c.connection) ?? (c.connection || 'default')
+          return `${c.email ?? c.username ?? '-'} (${conn})`
+        })
+        .join(', ')
+      log.info(`  Login IDs:  ${ids}`)
+    }
     if (user.phone) log.info(`  Phone:      ${user.phone}`)
     if (user.country_iso) log.info(`  Country:    ${user.country_iso}`)
     log.info(`  Created:    ${user.createdAt ?? '-'}`)

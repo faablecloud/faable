@@ -119,15 +119,25 @@ export const logs_list: CommandModule<unknown, LogsListArgs> = {
       return
     }
     log.info(`📜 ${page.data.length} entr${page.data.length === 1 ? 'y' : 'ies'}:`)
+    // The USER column: the resolved user when there is one; otherwise the
+    // identifier the person actually TYPED (`data.email`), marked `(tried)`.
+    // A failed login never resolves a user — that typed value is the whole
+    // point of the row (who was trying, with what address).
+    const user_cell = (entry: (typeof page.data)[number]): string => {
+      const resolved =
+        typeof entry.user === 'string'
+          ? entry.user
+          : ((entry.user as { email?: string; id?: string } | undefined)?.email ??
+            (entry.user as { id?: string } | undefined)?.id)
+      if (resolved) return resolved
+      const tried = (entry.data as { email?: string } | undefined)?.email
+      return tried ? `${tried} (tried)` : '-'
+    }
     const rows = page.data.map(entry => [
       entry.createdAt ?? '-',
       entry.type ?? '-',
       log_status_badge(entry.status),
-      typeof entry.user === 'string'
-        ? entry.user
-        : ((entry.user as { email?: string; id?: string } | undefined)?.email ??
-          (entry.user as { id?: string } | undefined)?.id ??
-          '-'),
+      user_cell(entry),
       truncate(entry.message, 48),
       entry.id ?? '-'
     ])
