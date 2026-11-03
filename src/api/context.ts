@@ -1,44 +1,45 @@
-import { FaableApi } from "./FaableApi";
-import { apikey_strategy } from "./strategies/apikey.strategy";
-import { getIDToken } from "@actions/core";
-import { oidc_strategy } from "./strategies/oidc.strategy";
-import { bearer_strategy } from "./strategies/bearer.strategy";
-import { CredentialsStore } from "../lib/CredentialsStore";
-import { loadLiveCredentials } from "./session";
-import { configuredProject, resolveProjectRef } from "./project";
-import { CliError, NOT_LOGGED_IN } from "../lib/errors";
+import { getIDToken } from '@actions/core'
+import { CredentialsStore } from '../lib/CredentialsStore'
+import { CliError, NOT_LOGGED_IN } from '../lib/errors'
+import { FaableApi } from './FaableApi'
+import { configuredProject, resolveProjectRef } from './project'
+import { loadLiveCredentials } from './session'
+import { apikey_strategy } from './strategies/apikey.strategy'
+import { bearer_strategy } from './strategies/bearer.strategy'
+import { oidc_strategy } from './strategies/oidc.strategy'
+import { session_strategy } from './strategies/session.strategy'
 
 export const context = async (targetAppId?: string) => {
-  let api: FaableApi | undefined;
+  let api: FaableApi | undefined
 
   // Auth resolution: FAABLE_TOKEN → FAABLE_API_KEY → OIDC (CI) → local
   // `faable login` credentials.
   if (process.env.FAABLE_TOKEN) {
     // Token in environment
-    const token = process.env.FAABLE_TOKEN;
-    api = FaableApi.create({ authStrategy: bearer_strategy, auth: { token } });
+    const token = process.env.FAABLE_TOKEN
+    api = FaableApi.create({ authStrategy: bearer_strategy, auth: { token } })
   } else if (process.env.FAABLE_API_KEY) {
     // A dashboard API key, scoped to its project — how the hosted MCP server
     // (`faable mcp --http`) runs each call with the caller's own key.
-    const apikey = process.env.FAABLE_API_KEY;
-    api = FaableApi.create({ authStrategy: apikey_strategy, auth: { apikey } });
-  } else if (process.env.GITHUB_ACTIONS === "true") {
+    const apikey = process.env.FAABLE_API_KEY
+    api = FaableApi.create({ authStrategy: apikey_strategy, auth: { apikey } })
+  } else if (process.env.GITHUB_ACTIONS === 'true') {
     // Github actions environment
     try {
       const idToken =
-        process.env.FAABLE_ID_TOKEN || (await getIDToken("https://faable.com"));
+        process.env.FAABLE_ID_TOKEN || (await getIDToken('https://faable.com'))
       // targetAppId disambiguates a monorepo (several apps, one repo) in the
       // OIDC exchange — from `faable deploy --app <app_id>`.
       api = FaableApi.create({
         authStrategy: oidc_strategy,
-        auth: { idToken, appId: targetAppId },
-      });
+        auth: { idToken, appId: targetAppId }
+      })
     } catch (_) {
       console.error(
         "Error fetching token, configure 'permissions: id-token: write'"
-      );
+      )
     }
-  } else if (process.env.GITLAB_CI === "true" && process.env.FAABLE_ID_TOKEN) {
+  } else if (process.env.GITLAB_CI === 'true' && process.env.FAABLE_ID_TOKEN) {
     // GitLab CI: the job declares
     //   id_tokens: { FAABLE_ID_TOKEN: { aud: https://faable.com } }
     // and the app must trust its project (`deploy apps set --gitlab-project`).
@@ -49,24 +50,25 @@ export const context = async (targetAppId?: string) => {
       auth: {
         idToken: process.env.FAABLE_ID_TOKEN,
         appId: targetAppId,
-        provider: "gitlab",
-      },
-    });
+        provider: 'gitlab'
+      }
+    })
   } else {
-    const store = new CredentialsStore();
+    const store = new CredentialsStore()
     // Auto-refreshes an expired access token via the stored refresh_token.
-    const config = await loadLiveCredentials(store);
+    const config = await loadLiveCredentials(store)
     if (config) {
       if (config.token) {
+        // Refreshed mid-command too, not only here (session.strategy.ts).
         api = FaableApi.create({
-          authStrategy: bearer_strategy,
-          auth: { token: config.token },
-        });
+          authStrategy: session_strategy,
+          auth: { token: config.token }
+        })
       } else if (config.apikey) {
         api = FaableApi.create({
           authStrategy: apikey_strategy,
-          auth: { apikey: config.apikey },
-        });
+          auth: { apikey: config.apikey }
+        })
       }
     }
   }
@@ -75,24 +77,24 @@ export const context = async (targetAppId?: string) => {
   // when one is configured: picking a default here would cost a request on
   // every command, including a deploy.
   if (api) {
-    const configured = await configuredProject();
-    if (configured) api.project = await resolveProjectRef(api, configured.ref);
+    const configured = await configuredProject()
+    if (configured) api.project = await resolveProjectRef(api, configured.ref)
   }
 
-  const appId = await api?.strategy?.app_id?.();
+  const appId = await api?.strategy?.app_id?.()
 
   return {
     api,
-    appId,
-  };
-};
+    appId
+  }
+}
 
 // Resolve the API client for a command that needs an authenticated session.
 // Exits with a uniform message when there is no session at all. An expired
 // session that could not be refreshed still surfaces here as a working `api`
 // whose first call returns 401 — FaableApi maps that to the same re-login hint.
 export const requireApi = async (targetAppId?: string) => {
-  const ctx = await context(targetAppId);
-  if (!ctx.api) throw new CliError("not_logged_in", NOT_LOGGED_IN);
-  return ctx as { api: FaableApi; appId?: string };
-};
+  const ctx = await context(targetAppId)
+  if (!ctx.api) throw new CliError('not_logged_in', NOT_LOGGED_IN)
+  return ctx as { api: FaableApi; appId?: string }
+}
