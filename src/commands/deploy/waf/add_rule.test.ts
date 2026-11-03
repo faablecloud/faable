@@ -1,5 +1,11 @@
 import test from 'ava'
-import { describe_selector, rule_matches_request, undo_args } from './add_rule'
+import { log } from '../../../log'
+import {
+  add_rule,
+  describe_selector,
+  rule_matches_request,
+  undo_args
+} from './add_rule'
 
 test('describe_selector says what a rule actually catches', t => {
   t.is(describe_selector({ pattern: '^/wp-admin' }), 'requests for ^/wp-admin')
@@ -96,3 +102,46 @@ test('undo_args reverses a query rule exactly', t => {
     "'^/$' --query 'rest_route'"
   )
 })
+
+// A monitor rule reads the past: right after adding it, the CLI says what it
+// WOULD have stopped in the last week (backlog §469), and how to promote it.
+test.serial(
+  'monitor says what the rule would have stopped, and blocks nothing',
+  async t => {
+    const lines: string[] = []
+    const orig = log.info
+    ;(log as any).info = (m: string) => lines.push(m)
+    const api: any = {
+      addAppWafRule: async () => ({
+        enabled: true,
+        platform_profiles: [],
+        rules: [{ pattern: '^/admin', action: 'monitor', match: 'path' }]
+      }),
+      appWafWouldBlock: async () => ({
+        would_block: {
+          total: 12,
+          top_rules: [{ rule: 'rule:0', requests: 12 }]
+        },
+        rules: [{ id: 'rule:0', action: 'monitor', pattern: '^/admin' }]
+      })
+    }
+    try {
+      await add_rule({
+        api,
+        app_id: 'app_1',
+        app_name: 'shop',
+        app_url: 'shop.faable.link',
+        pattern: '^/admin',
+        action: 'monitor'
+      })
+    } finally {
+      ;(log as any).info = orig
+    }
+    const out = lines.join('\n')
+    t.regex(out, /monitor only, nothing is blocked/)
+    t.regex(out, /would have stopped 12 requests/)
+    t.regex(out, /faable deploy waf block '\^\/admin' -a app_1/)
+    t.regex(out, /--action monitor/)
+    t.notRegex(out, /at the edge/)
+  }
+)

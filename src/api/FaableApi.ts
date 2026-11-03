@@ -1360,7 +1360,7 @@ export class FaableApi<T = any> {
       pattern?: string
       user_agent?: string
       query?: string
-      action: 'deny' | 'sink' | 'allow'
+      action: 'deny' | 'sink' | 'allow' | 'monitor'
       description?: string
       force?: boolean
     }
@@ -1370,13 +1370,39 @@ export class FaableApi<T = any> {
     )
   }
 
+  /**
+   * What the app's `monitor` rules WOULD have stopped (GET /app/:id/waf/activity,
+   * `would_block`): the same rules checked against the traffic it served.
+   * Absent on a server without monitor rules, or for an app with none.
+   */
+  async appWafWouldBlock(app_id: string, from: number, to: number) {
+    const body = await data(
+      this.client.get<{
+        would_block?: {
+          total: number
+          top_rules: Array<{ rule: string; requests: number }>
+        }
+        rules?: Array<{
+          id: string
+          action: string
+          pattern?: string
+          user_agent?: string
+          query?: string
+        }>
+      }>(`/app/${app_id}/waf/activity`, {
+        params: { from, to, interval: 86400 }
+      })
+    )
+    return body
+  }
+
   async removeAppWafRule(
     app_id: string,
     params: {
       pattern?: string
       user_agent?: string
       query?: string
-      action?: 'deny' | 'sink' | 'allow'
+      action?: 'deny' | 'sink' | 'allow' | 'monitor'
     }
   ) {
     return data(

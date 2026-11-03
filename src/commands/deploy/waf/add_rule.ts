@@ -44,7 +44,7 @@ export const add_rule = async (opts: {
   pattern?: string
   user_agent?: string
   query?: string
-  action: 'deny' | 'sink' | 'allow'
+  action: 'deny' | 'sink' | 'allow' | 'monitor'
   description?: string
   force?: boolean
   // --json: the WAF as it is after the write, and no prose.
@@ -126,6 +126,43 @@ export const add_rule = async (opts: {
     log.info(``)
     log.info(
       `Undo: faable deploy waf rm ${undo_args(want)} --action allow -a ${app_id}`
+    )
+    return waf
+  }
+
+  if (action === 'monitor') {
+    log.info(`👀 ${describe_selector(want)} → monitor only, nothing is blocked`)
+    log.info(`   for ${app_name} (${app_id}).`)
+    log.info(``)
+    // It reads the past: the rule is checked against traffic already served,
+    // so its first answer is the last week, not a week from now.
+    const now = Math.floor(Date.now() / 1000)
+    const seen = await api
+      .appWafWouldBlock(app_id, now - 7 * 86400, now)
+      .catch(() => undefined)
+    const legend = seen?.rules ?? []
+    const id = legend.find(r =>
+      rule_matches_request(r as any, want, 'monitor')
+    )?.id
+    const n = id
+      ? (seen?.would_block?.top_rules.find(r => r.rule === id)?.requests ?? 0)
+      : undefined
+    if (n !== undefined) {
+      log.info(
+        n === 0
+          ? `In the last 7 days it would have stopped nothing.`
+          : `In the last 7 days it would have stopped ${n.toLocaleString()} request${n === 1 ? '' : 's'} your app served.`
+      )
+    }
+    log.info(
+      `The Firewall tab of the app shows what it would stop, request by request.`
+    )
+    log.info(``)
+    log.info(
+      `When it only catches what it should: faable deploy waf block ${undo_args(want)} -a ${app_id}`
+    )
+    log.info(
+      `Undo: faable deploy waf rm ${undo_args(want)} --action monitor -a ${app_id}`
     )
     return waf
   }

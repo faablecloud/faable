@@ -8,6 +8,8 @@ test('action labels explain what the caller will actually see', t => {
     action_label('allow'),
     'allowed (reaches your app where Faable blocks it for every app)'
   )
+  // A monitor rule must never read like it protects anything.
+  t.regex(action_label('monitor'), /nothing blocked/)
   // Anything the server grows later prints as-is instead of being hidden.
   t.is(action_label('ratelimit'), 'ratelimit')
 })
