@@ -13,6 +13,15 @@ export const APP = {
   url: 'test-app.app.faable.com'
 }
 
+export const ORGANIZATION = {
+  id: 'organization_6ac3d280fd627e9f494c7848',
+  name: 'Acme SL',
+  slug: 'acme-sl',
+  is_admin: true,
+  projects: [{ id: 'project_65a66419863cb24b65b5bd40', name: 'Acme web' }],
+  admins: ['user_6555fd293acc2f0fac0e3452']
+}
+
 export const PROJECT = 'project_65a66419863cb24b65b5bd40'
 export const NEW_APP = {
   id: 'app_new',
@@ -99,6 +108,9 @@ export const start_api = async () => {
         }
         if (url.pathname === '/deployment/deployment_1/redeploy') {
           return json({ id: 'deployment_2', redeploy_of: 'deployment_1' })
+        }
+        if (url.pathname === '/organization') {
+          return json({ ...ORGANIZATION, name: JSON.parse(body).name })
         }
         if (url.pathname === '/domain') {
           return json({ id: 'domain_2', fqdn: 'www.new.example.com' })
@@ -210,6 +222,12 @@ export const start_api = async () => {
         results: [{ name: 'API_KEY', value: 'secret', related_model: 'app' }],
         next: null
       })
+    }
+    if (url.pathname === '/organization') {
+      return json({ results: [ORGANIZATION] })
+    }
+    if (url.pathname === `/organization/${ORGANIZATION.id}`) {
+      return json(ORGANIZATION)
     }
     if (url.pathname === '/domain') {
       return json({

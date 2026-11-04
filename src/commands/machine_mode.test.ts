@@ -18,6 +18,7 @@ import {
   APP,
   BUILD_LOG_LINE,
   NEW_APP,
+  ORGANIZATION,
   PROJECT,
   start_api
 } from '../test/stub_api'
@@ -282,6 +283,55 @@ test('secrets set on an app whose last deployment crashed: the redeploy, not a r
       said
     )
     t.false(said.includes('is restarting'), said)
+  } finally {
+    api.close()
+  }
+})
+
+test('organization: by name, and the removals need --yes', async t => {
+  const api = await start_api()
+  const USER = 'user_aaaaaaaaaaaaaaaaaaaaaaaa'
+  try {
+    const env = {
+      ...NONINTERACTIVE,
+      FAABLE_TOKEN: 'stub',
+      FAABLE_API_URL: api.url
+    }
+    const created = await run(
+      ['organization', 'create', 'Acme SL', '--project', PROJECT, '--json'],
+      env
+    )
+    t.is(created.code, 0, created.stderr)
+    t.is(JSON.parse(created.stdout).name, 'Acme SL')
+    t.deepEqual(JSON.parse(api.bodies[0]), {
+      name: 'Acme SL',
+      project_id: PROJECT
+    })
+
+    const got = await run(['org', 'get', 'acme-sl', '--json'], env)
+    t.is(JSON.parse(got.stdout).id, ORGANIZATION.id)
+
+    t.is((await run(['org', 'projects', 'add', 'Acme SL', PROJECT], env)).code, 0)
+    t.is((await run(['org', 'admins', 'add', 'Acme SL', USER], env)).code, 0)
+
+    const before = api.writes.length
+    const refused = await run(['org', 'admins', 'rm', 'Acme SL', USER], env)
+    t.is(refused.code, 1)
+    t.is(error_of(refused.stderr).code, 'confirmation_required')
+    t.is(api.writes.length, before, 'nothing reached the api')
+
+    t.is(
+      (await run(['org', 'projects', 'rm', 'Acme SL', PROJECT, '--yes'], env)).code,
+      0
+    )
+    t.deepEqual(api.writes.slice(1), [
+      `POST /organization/${ORGANIZATION.id}/project`,
+      `POST /organization/${ORGANIZATION.id}/admin`,
+      `DELETE /organization/${ORGANIZATION.id}/project/${PROJECT}`
+    ])
+
+    const missing = await run(['org', 'get', 'Nope'], env)
+    t.is(error_of(missing.stderr).code, 'not_found')
   } finally {
     api.close()
   }

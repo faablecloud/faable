@@ -441,6 +441,15 @@ export interface SecretsBatchResult {
   redeploy: SecretsRedeploy | null
 }
 
+export type FaableOrganization = {
+  id: string
+  name: string
+  slug: string
+  is_admin: boolean
+  projects: { id: string; name: string }[]
+  admins?: string[]
+}
+
 const data = async <T, Q extends Promise<AxiosResponse<T>>>(
   res: Q
 ): Promise<Awaited<Q>['data']> => {
@@ -642,6 +651,47 @@ export class FaableApi<T = any> {
         }
       })
     )
+  }
+
+  // ---- organizations (a person's session: api keys are refused) ----
+
+  async listOrganizations() {
+    return data(
+      this.client.get<{ results: FaableOrganization[] }>(`/organization`)
+    )
+  }
+
+  async getOrganization(id: string) {
+    return data(this.client.get<FaableOrganization>(`/organization/${id}`))
+  }
+
+  async createOrganization(name: string, project_id: string) {
+    return data(
+      this.client.post<FaableOrganization>(`/organization`, {
+        name,
+        project_id
+      })
+    )
+  }
+
+  async addOrganizationProject(id: string, project_id: string) {
+    return data(
+      this.client.post(`/organization/${id}/project`, { project_id })
+    )
+  }
+
+  async removeOrganizationProject(id: string, project_id: string) {
+    return data(
+      this.client.delete(`/organization/${id}/project/${project_id}`)
+    )
+  }
+
+  async addOrganizationAdmin(id: string, user_id: string) {
+    return data(this.client.post(`/organization/${id}/admin`, { user_id }))
+  }
+
+  async removeOrganizationAdmin(id: string, user_id: string) {
+    return data(this.client.delete(`/organization/${id}/admin/${user_id}`))
   }
 
   async getProject(project_id: string) {

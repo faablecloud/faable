@@ -29,6 +29,7 @@ npm i -g @faable/faable
 | --- | --- | --- |
 | `faable login` / `whoami` / `logout` | Session management (device flow; CI uses OIDC, no login needed) | [Authentication](https://faable.com/docs/cli#authentication) |
 | `faable project` | The project commands act on: `list`, `use`, `current`, `clear` (or `--project` on any command) | [Projects](https://faable.com/docs/cli#projects) |
+| `faable organization` | Group projects under a company: `list`, `get`, `create`, `projects add`/`rm`, `admins add`/`rm` (`org` for short) | [Organizations](https://faable.com/docs/cli#organizations) |
 | `faable deploy` | `launch` (the default: a bare `faable deploy` deploys the current directory), then `status`, `logs`, `deployments`, `inspect`, `trigger`, `redeploy`, `cancel`, `traffic`, `usage`, `quota`, `open` | [Deployment](https://faable.com/docs/cli#deployment) |
 | `faable deploy apps` | `list`, `get`, `create` (from a GitHub repository, first deploy included), `set` (branch, root directory, deploy mode) | [Apps](https://faable.com/docs/cli#apps) |
 | `faable deploy secrets` | Environment variables: `list`, `set` (`KEY=VALUE`, `--env-file`, or `-f -` from stdin), `rm` | [Secrets](https://faable.com/docs/cli#secrets) |
