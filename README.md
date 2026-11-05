@@ -1,26 +1,37 @@
 <p align="center">
-  <a href="https://faable.com">
-    <img src="https://www.faable.com/assets/logo/Emblem.png" height="96">
-    <h3 align="center">Faable</h3>
+  <a href="https://faable.com/docs/cli">
+    <img src="https://raw.githubusercontent.com/faablecloud/faable/main/.github/assets/cover.png" alt="Faable CLI: deploy and run your apps from the terminal" width="100%">
   </a>
 </p>
 
 <p align="center">
-  Your React, Node.js or Python apps, up to the cloud in seconds.
+  <a href="https://www.npmjs.com/package/@faable/faable"><img alt="npm version" src="https://img.shields.io/npm/v/@faable/faable.svg?labelColor=121a29&color=7270ee"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-7270ee?labelColor=121a29"></a>
+  <a href="https://faable.com/docs/cli"><img alt="Documentation" src="https://img.shields.io/badge/docs-faable.com-7270ee?labelColor=121a29"></a>
 </p>
 
-## Faable CLI
+# Faable CLI
 
-`@faable/faable` is the command-line interface for the Faable platform. It covers
-**Faable Deploy** (ship and operate apps) and **Faable Auth** (manage an identity
-tenant: users, login-flow actions, OAuth clients and the audit log) from one binary.
+`@faable/faable` is the command-line interface for the [Faable](https://faable.com) platform. It
+covers **Faable Deploy** (ship and operate apps) and **Faable Auth** (manage an identity tenant:
+users, login-flow actions, OAuth clients and the audit log) from one binary.
 
 Full reference: **[faable.com/docs/cli](https://faable.com/docs/cli)**.
 
-To install the latest version:
+## Install
+
+Requires Node.js 22.8 or later.
 
 ```bash
 npm i -g @faable/faable
+```
+
+## Quick start
+
+```bash
+faable login    # sign in from your browser
+faable deploy   # deploy the current directory
+faable deploy status
 ```
 
 ## Commands
@@ -156,3 +167,16 @@ the public docs, not here.
 - [Login flows](https://faable.com/docs/auth/login-flows) and [actions](https://faable.com/docs/auth/extensibility/actions) — the hooks managed by `auth actions`
 - [Logs](https://faable.com/docs/auth/logs) — the audit trail read by `auth logs`
 - [OAuth 2.0 flows](https://faable.com/docs/auth/oauth-flows) · [OpenID Connect](https://faable.com/docs/auth/oidc) · [Validate access tokens](https://faable.com/docs/auth/validate-access-tokens)
+
+## Support
+
+- **Documentation:** [faable.com/docs](https://faable.com/docs)
+- **Help with your account or deployments:** [support@faable.com](mailto:support@faable.com) or the
+  [support page](https://faable.com/docs/platform/support)
+- **Bugs and feature requests:** [open an issue](https://github.com/faablecloud/faable/issues)
+- **Security issues:** report them privately to [support@faable.com](mailto:support@faable.com),
+  not in a public issue
+
+## License
+
+[MIT](LICENSE) © Faable Cloud SLU
