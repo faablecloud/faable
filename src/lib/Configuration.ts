@@ -3,6 +3,9 @@ import fs from "fs-extra";
 import { log } from "../log";
 interface ProjectConfig {
   startCommand?: string;
+  /** Replaces the default dependency install. Absent → the default install runs. */
+  installCommand?: string;
+  /** Runs after the dependencies are installed. */
   buildCommand?: string;
   /** Force a specific buildpack (php | node | python | docker) instead of auto-detection. */
   buildpack?: string;
@@ -55,6 +58,10 @@ export class Configuration {
     return this.config.startCommand;
   }
 
+  get installCommand() {
+    return this.config.installCommand;
+  }
+
   get buildCommand() {
     return this.config.buildCommand;
   }
@@ -66,6 +73,7 @@ export class Configuration {
   deployConfig() {
     return {
       startCommand: this.config.startCommand,
+      installCommand: this.config.installCommand,
       buildCommand: this.config.buildCommand,
       buildpack: this.config.buildpack,
       rootDir: this.config.rootDir,
