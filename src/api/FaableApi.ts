@@ -1293,6 +1293,20 @@ export class FaableApi<T = any> {
     )
   }
 
+  // Relink a domain to another app of its project (or `null` to unlink it).
+  // Keeps the row: same id, same CNAME target, same certificate.
+  async updateDomain(
+    domain_id: string,
+    team: string,
+    params: { app_id: string | null }
+  ) {
+    return data(
+      this.client.post<FaableDomain>(`/domain/${domain_id}`, params, {
+        headers: projectHeader(team)
+      })
+    )
+  }
+
   async deleteDomain(domain_id: string, team: string) {
     return data(
       this.client.delete(`/domain/${domain_id}`, {

@@ -4,6 +4,7 @@ import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
 import { acme_record, cname_target } from './format'
+import { add_conflict_hint } from './locate'
 
 interface DomainsAddArgs {
   fqdn: string
@@ -42,11 +43,21 @@ export const domains_add: CommandModule<unknown, DomainsAddArgs> = {
     const app_id = await resolve_app_id(args.app, ctx.appId, ctx.api)
     const app = await ctx.api.getApp(app_id)
 
-    const domain = await ctx.api.createDomain(app.team, {
-      fqdn: args.fqdn,
-      app_id,
-      tls: args.tls
-    })
+    const domain = await ctx.api
+      .createDomain(app.team, { fqdn: args.fqdn, app_id, tls: args.tls })
+      .catch(async err => {
+        // Already in this project (an app deletion leaves its domains linked
+        // to no app): name the command that fixes it, not "another project".
+        throw (
+          (await add_conflict_hint(
+            ctx.api,
+            app.team,
+            args.fqdn,
+            app_id,
+            err
+          )) ?? err
+        )
+      })
 
     // Same shape as `domains check --json`: the record plus the CNAME to
     // create, which is the whole next step.

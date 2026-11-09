@@ -62,6 +62,13 @@ const cursor = z
 
 const scope = (a: Args) => (a.project ? ['--project', a.project] : [])
 const target = (a: Args) => ['--app', a.app, ...scope(a)]
+// Domains are the project's: a tool that finds one needs no app.
+const optional_app = app
+  .optional()
+  .describe(
+    'App id (app_…), name or slug. Optional: without it, the whole project'
+  )
+const app_or_project = (a: Args) => (a.app ? target(a) : scope(a))
 const opt = (flag: string, value: unknown) =>
   value === undefined || value === null || value === ''
     ? []
@@ -514,13 +521,15 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'list_domains',
     title: 'List custom domains',
-    description: 'Custom domains of an app and whether their DNS is verified.',
-    input: { app, project },
+    description:
+      'Custom domains of an app and whether their DNS is verified. Without `app`, every domain of the project with the app it serves: `app_id: null` is a domain linked to no app (its app was deleted), which answers DOMAIN_NOT_LINKED until attach_domain links it.',
+    input: { app: optional_app, project },
     command: ['deploy', 'domains', 'list'],
-    flags: target,
+    flags: app_or_project,
     shape: page((d: any) => ({
       id: d.id,
       fqdn: d.fqdn,
+      app_id: d.app_id ?? null,
       verified: d.verified,
       tls: d.tls,
       dns_message: d.status?.dns_message
@@ -534,14 +543,15 @@ export const TOOLS: ToolDef[] = [
     description:
       'DNS diagnostic of one custom domain: the CNAME it expects, what DNS answers today, and why it is not verified yet. `prevalidation_cname.ready` says whether the optional `_acme-challenge` record is in place, so the certificate is issued without waiting for the CNAME; `status.tls_state` is `ok` once the edge serves a valid certificate for the domain (`status.tls_expires_at`).',
     input: {
-      app,
+      app: optional_app,
       project,
       fqdn: z.string().describe('The domain, e.g. www.example.com')
     },
     command: ['deploy', 'domains', 'check'],
-    flags: a => [a.fqdn, ...target(a)],
+    flags: a => [a.fqdn, ...app_or_project(a)],
     shape: (d: any) => ({
       fqdn: d.fqdn,
+      app_id: d.app_id ?? null,
       verified: d.verified,
       expected_cname: d.expected_cname,
       observed: d.status?.dns_observed ?? [],
@@ -1103,7 +1113,7 @@ export const TOOLS: ToolDef[] = [
     name: 'add_domain',
     title: 'Add a custom domain',
     description:
-      "Attach a custom domain to an app. Returns the CNAME record the user must create at their DNS provider; Faable verifies it and issues the certificate on its own. If the domain already serves traffic somewhere else, tell the user to create `prevalidation_cname` (`_acme-challenge.<fqdn>` CNAME) FIRST and switch the main CNAME only once check_domain shows it ready: the certificate then exists before traffic moves, with no TLS gap.",
+      "Attach a custom domain to an app. Returns the CNAME record the user must create at their DNS provider; Faable verifies it and issues the certificate on its own. If the domain already serves traffic somewhere else, tell the user to create `prevalidation_cname` (`_acme-challenge.<fqdn>` CNAME) FIRST and switch the main CNAME only once check_domain shows it ready: the certificate then exists before traffic moves, with no TLS gap. If it says the domain is already in this project, use attach_domain instead: adding it again cannot work.",
     input: { app, project, fqdn: z.string().describe('e.g. www.example.com') },
     command: ['deploy', 'domains', 'add'],
     flags: a => [a.fqdn, ...target(a)],
@@ -1114,6 +1124,25 @@ export const TOOLS: ToolDef[] = [
       openWorldHint: true
     },
     example: { app: 'web', fqdn: 'www.example.com' }
+  },
+  {
+    name: 'attach_domain',
+    title: 'Link a domain to an app',
+    description:
+      "Link a custom domain of the project to an app: one left linked to no app (deleting an app leaves its domains in the project, answering DOMAIN_NOT_LINKED), or one moving from another of the project's apps. It keeps its id, its CNAME target and its certificate: nothing changes at the DNS provider. Use it instead of add_domain when add_domain says the domain is already in this project.",
+    input: { app, project, fqdn: z.string().describe('e.g. app.example.com') },
+    command: ['deploy', 'domains', 'attach'],
+    // --yes: the model was asked to move it; the CLI prompt has no one to ask.
+    flags: a => [a.fqdn, '--yes', ...target(a)],
+    write: true,
+    shape: (d: any) => ({ id: d.id, fqdn: d.fqdn, app_id: d.app_id ?? null }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true
+    },
+    example: { app: 'web', fqdn: 'app.example.com' }
   },
   {
     name: 'configure_repo',

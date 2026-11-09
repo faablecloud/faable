@@ -19,6 +19,8 @@ export type CliErrorCode =
   | 'name_taken' // creating an app with the name of one already in the project
   | 'operation_failed' // a queued operation (a volume backup, restore…) ended failed
   | 'usage' // bad invocation: unknown command, missing argument…
+  | 'domain_taken' // 409, the api's code: the hostname is already registered
+  | 'domain_unlinked' // 409, the api's code: already in this project, linked to no app
 
 export interface CliErrorFields {
   code?: string

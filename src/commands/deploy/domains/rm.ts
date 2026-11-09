@@ -1,10 +1,9 @@
 import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
+import { confirm } from '../../../lib/interactive'
 import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
-import { resolve_app_id } from '../resolve_app_id'
-import { find_by_fqdn } from './format'
-import { confirm } from '../../../lib/interactive'
+import { domain_scope, locate_domain } from './locate'
 
 interface DomainsRmArgs {
   fqdn: string
@@ -15,7 +14,7 @@ interface DomainsRmArgs {
 
 export const domains_rm: CommandModule<unknown, DomainsRmArgs> = {
   command: 'rm <fqdn>',
-  describe: 'Remove a custom domain from the app',
+  describe: 'Remove a custom domain (from its app, or one linked to no app)',
   builder: yargs =>
     json_option(yargs)
       .positional('fqdn', {
@@ -26,7 +25,8 @@ export const domains_rm: CommandModule<unknown, DomainsRmArgs> = {
       .option('app', {
         alias: 'a',
         type: 'string',
-        description: 'App id, name or slug (defaults to the linked app)'
+        description:
+          'App id, name or slug. Optional: the domain is looked up in the project'
       })
       .option('yes', {
         alias: 'y',
@@ -34,23 +34,34 @@ export const domains_rm: CommandModule<unknown, DomainsRmArgs> = {
         default: false,
         description: 'Skip the confirmation prompt'
       })
-      .example('$0 deploy domains rm www.example.com', 'Detach after confirmation')
+      .example(
+        '$0 deploy domains rm www.example.com',
+        'Detach after confirmation'
+      )
+      .example(
+        '$0 deploy domains rm app.example.com -p my-project -y',
+        'A domain linked to no app (its app was deleted). To keep it, link it instead: domains attach'
+      )
       .showHelpOnFail(false) as any,
   handler: async args => {
     const ctx = await requireApi()
-    const app_id = await resolve_app_id(args.app, ctx.appId, ctx.api)
-    const app = await ctx.api.getApp(app_id)
-    const domains = await ctx.api.listDomains(app_id, app.team)
-    const domain = find_by_fqdn(domains, args.fqdn)
-    if (!domain) {
-      throw new Error(
-        `Domain ${args.fqdn} is not attached to ${app_id}. List them with "faable deploy domains list".`
-      )
-    }
+    const scope = await domain_scope(ctx.api, args.app, ctx.appId)
+    const domain = await locate_domain(
+      ctx.api,
+      scope.team,
+      args.fqdn,
+      scope.explicit
+    )
+    const serves = domain.app_id
+      ? scope.app?.id === domain.app_id
+        ? `${scope.app.name} (${domain.app_id})`
+        : domain.app_id
+      : null
 
     const go = await confirm({
-      message:
-        `Remove domain "${domain.fqdn}" from ${app.name} (${app_id})? Traffic to it will stop being served.`,
+      message: serves
+        ? `Remove domain "${domain.fqdn}" from ${serves}? Traffic to it will stop being served.`
+        : `Remove domain "${domain.fqdn}"? It is linked to no app. To serve it again with the same CNAME and certificate, use "faable deploy domains attach" instead.`,
       yes: args.yes
     })
     if (!go) {
@@ -58,13 +69,13 @@ export const domains_rm: CommandModule<unknown, DomainsRmArgs> = {
       return
     }
 
-    await ctx.api.deleteDomain(domain.id, app.team)
+    await ctx.api.deleteDomain(domain.id, scope.team)
     if (args.json) {
       return print_json({ deleted: true, id: domain.id, fqdn: domain.fqdn })
     }
-    log.info(`🗑️ Removed domain ${domain.fqdn} from ${app_id}.`)
     log.info(
-      `The app stays live at https://${app.url}. Remember to delete the CNAME at your DNS provider.`
+      `🗑️ Removed domain ${domain.fqdn}${serves ? ` from ${serves}` : ''}.`
     )
+    log.info(`Remember to delete the CNAME at your DNS provider.`)
   }
 }
