@@ -23,6 +23,13 @@ export interface ApiRow {
   token_dialect?: string
   rbac?: boolean
   enforce_policies?: boolean
+  token_lifetime?: number
+  allow_offline_access?: boolean
+  skip_consent?: boolean
+  include_roles_in_access_token?: boolean
+  include_teams_in_access_token?: boolean
+  include_roles_in_id_token?: boolean
+  include_teams_in_id_token?: boolean
   permissions?: { value: string; description?: string }[]
 }
 

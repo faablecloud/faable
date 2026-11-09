@@ -28,7 +28,16 @@ export const apis_get: CommandModule<unknown, ApisGetArgs> = {
     log.info(`  Identifier:       ${a.identifier}`)
     log.info(`  Token dialect:    ${a.token_dialect ?? '-'}`)
     log.info(`  RBAC:             ${yes_no(a.rbac)}`)
+    log.info(`  Token lifetime:   ${a.token_lifetime ?? '-'} s`)
     log.info(`  Enforce policies: ${yes_no(a.enforce_policies)}`)
+    log.info(`  Offline access:   ${yes_no(a.allow_offline_access)}`)
+    log.info(`  Skip consent:     ${yes_no(a.skip_consent)}`)
+    log.info(
+      `  Roles claim:      access token ${yes_no(a.include_roles_in_access_token)}, id_token ${yes_no(a.include_roles_in_id_token)}`
+    )
+    log.info(
+      `  Teams claim:      access token ${yes_no(a.include_teams_in_access_token)}, id_token ${yes_no(a.include_teams_in_id_token)}`
+    )
     log.info(`  Permissions (${a.permissions?.length ?? 0}):`)
     for (const p of a.permissions ?? []) {
       log.info(`    ${p.value}${p.description ? `  — ${p.description}` : ''}`)

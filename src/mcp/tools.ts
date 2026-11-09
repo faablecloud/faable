@@ -169,6 +169,92 @@ const log_user = (l: any) =>
 
 const AUTH_READ = { ...READ } as const
 
+// ── Auth APIs: the settings create_auth_api and update_auth_api take ────────
+// Same names as the API fields; the CLI flag is the field in kebab case
+// (src/commands/auth/apis/settings.ts).
+const API_BOOLEANS = [
+  'allow_offline_access',
+  'skip_consent',
+  'include_roles_in_access_token',
+  'include_teams_in_access_token',
+  'include_roles_in_id_token',
+  'include_teams_in_id_token',
+  'enforce_policies'
+] as const
+const api_settings_input = {
+  token_lifetime: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60 * 24 * 30)
+    .optional()
+    .describe(
+      'Access token lifetime in seconds, 60–2592000 (30 days). A new API gets 86400'
+    ),
+  description: z.string().max(512).optional(),
+  rbac: z
+    .boolean()
+    .optional()
+    .describe(
+      'User tokens carry only the requested permissions their roles grant. On create it also sets the access_token_authz dialect'
+    ),
+  allow_offline_access: z
+    .boolean()
+    .optional()
+    .describe('Clients may request offline_access and get a refresh_token'),
+  skip_consent: z
+    .boolean()
+    .optional()
+    .describe('Skip the consent screen for first-party clients'),
+  include_roles_in_access_token: z
+    .boolean()
+    .optional()
+    .describe("Access tokens carry a `roles` claim with the user's role names"),
+  include_teams_in_access_token: z
+    .boolean()
+    .optional()
+    .describe("Access tokens carry a `teams` claim with the user's team slugs"),
+  include_roles_in_id_token: z
+    .boolean()
+    .optional()
+    .describe(
+      'id_tokens issued with an access token for this API carry `roles`'
+    ),
+  include_teams_in_id_token: z
+    .boolean()
+    .optional()
+    .describe(
+      'id_tokens issued with an access token for this API carry `teams`'
+    ),
+  enforce_policies: z
+    .boolean()
+    .optional()
+    .describe(
+      'Filter requested scopes against the permission catalog at issuance'
+    )
+}
+const api_settings_flags = (a: Args) => [
+  ...opt('--token-lifetime', a.token_lifetime),
+  ...optText('--description', a.description),
+  ...(a.rbac === undefined ? [] : [a.rbac ? '--rbac' : '--no-rbac']),
+  ...API_BOOLEANS.flatMap(f => {
+    const flag = f.replace(/_/g, '-')
+    return a[f] === undefined ? [] : [a[f] ? `--${flag}` : `--no-${flag}`]
+  })
+]
+const api_detail = (a: any) => ({
+  id: a.id,
+  name: a.name,
+  identifier: a.identifier,
+  description: a.description,
+  token_lifetime: a.token_lifetime,
+  token_dialect: a.token_dialect,
+  rbac: !!a.rbac,
+  ...Object.fromEntries(API_BOOLEANS.map(f => [f, !!a[f]])),
+  permissions: (a.permissions ?? []).map((p: any) => p.value)
+})
+
+
 // Which product a tool works on — /tools.json and the landing group by it.
 export const product_of = (tool: Pick<ToolDef, 'command'>): 'auth' | 'deploy' =>
   tool.command[0] === 'auth' ? 'auth' : 'deploy'
@@ -1214,6 +1300,76 @@ export const TOOLS: ToolDef[] = [
       api: 'https://api.example.com',
       add: ['tickets:write'],
       remove: ['tickets:admin']
+    }
+  },
+  {
+    name: 'create_auth_api',
+    title: 'Create an API',
+    description:
+      'Create an API (resource server) in the Auth tenant: the audience clients request tokens for. The identifier becomes the `aud` claim and cannot change later. Settings left out take the defaults (tokens last 86400 s, no roles or teams claims).',
+    input: {
+      identifier: z
+        .string()
+        .regex(/^[^-]/, 'cannot start with "-"')
+        .describe(
+          'Audience URL, e.g. https://api.example.com (cannot change later)'
+        ),
+      name: z
+        .string()
+        .max(120)
+        .optional()
+        .describe('Display name (defaults to the identifier)'),
+      permissions: z
+        .array(z.string())
+        .optional()
+        .describe('Its permission catalog, e.g. tickets:read'),
+      ...api_settings_input,
+      tenant,
+      project
+    },
+    command: ['auth', 'apis', 'create'],
+    flags: a => [
+      a.identifier,
+      ...optText('--name', a.name),
+      ...(a.permissions ?? []).flatMap((p: string) => [`--permission=${p}`]),
+      ...api_settings_flags(a),
+      ...auth_scope(a)
+    ],
+    shape: api_detail,
+    write: true,
+    // API writes change what every token of the tenant carries: never on the
+    // hosted server, whose token only reads APIs (api tenant_access.ts).
+    local_only: true,
+    annotations: { ...AUTH_WRITE, idempotentHint: false },
+    example: {
+      identifier: 'https://api.example.com',
+      permissions: ['tickets:read'],
+      token_lifetime: 3600,
+      include_roles_in_access_token: true
+    }
+  },
+  {
+    name: 'update_auth_api',
+    title: "Change an API's settings",
+    description:
+      "Change an API's token settings: token lifetime, RBAC, the roles and teams claims, offline access, consent, description. Only the settings passed change. Applies to tokens issued from now on; tokens already issued keep theirs until they expire. The identifier cannot change. The permission catalog is not edited here.",
+    input: {
+      api: z.string().describe('API id (api_…) or identifier (audience URL)'),
+      ...api_settings_input,
+      tenant,
+      project
+    },
+    command: ['auth', 'apis', 'update'],
+    flags: a => [a.api, ...api_settings_flags(a), ...auth_scope(a)],
+    shape: api_detail,
+    write: true,
+    // See create_auth_api.
+    local_only: true,
+    annotations: AUTH_WRITE,
+    example: {
+      api: 'https://api.example.com',
+      token_lifetime: 3600,
+      include_teams_in_access_token: true
     }
   },
   {
