@@ -7,6 +7,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse_env } from '../commands/deploy/secrets/parse_env'
 import { APP, start_api } from '../test/stub_api'
+// Faable Auth + the local-only deploy (2026-10-05).
+import { permission_of } from './oauth'
 import { portable_exec_argv } from './run_cli'
 import { as_untrusted, call_tool, error_text, tools_for } from './server'
 import { TOOLS, env_quote } from './tools'
@@ -259,9 +261,6 @@ test('loader flags are resolved before the child moves to the temp dir', t => {
   )
 })
 
-// Faable Auth + the local-only deploy (2026-10-05).
-import { permission_of } from './oauth'
-
 // Deleting an app: what `faable mcp --writes` on the user's machine can do,
 // never the hosted server (it promises nothing destructive), never by default.
 test('delete_app: only with --writes, never hosted, and always with --yes', t => {
@@ -276,23 +275,46 @@ test('delete_app: only with --writes, never hosted, and always with --yes', t =>
 
 test('deploy_directory works on the user disk: stdio with --writes only, never hosted', t => {
   t.true(tools_for({ writes: true }).some(x => x.name === 'deploy_directory'))
-  t.false(tools_for({ writes: true, hosted: true }).some(x => x.name === 'deploy_directory'))
+  t.false(
+    tools_for({ writes: true, hosted: true }).some(
+      x => x.name === 'deploy_directory'
+    )
+  )
   t.false(tools_for({}).some(x => x.name === 'deploy_directory'))
 })
 
 test('Auth reads are on by default; Auth writes need --writes', t => {
   const reads = tools_for({}).map(x => x.name)
-  for (const name of ['list_auth_logins', 'count_auth_users', 'get_auth_user']) {
+  for (const name of [
+    'list_auth_logins',
+    'count_auth_users',
+    'get_auth_user'
+  ]) {
     t.true(reads.includes(name), name)
   }
-  for (const name of ['suspend_auth_user', 'revoke_auth_sessions', 'send_password_setup', 'update_auth_client_fields', 'update_auth_client_login']) {
+  for (const name of [
+    'suspend_auth_user',
+    'revoke_auth_sessions',
+    'send_password_setup',
+    'update_auth_client_fields',
+    'update_auth_client_login'
+  ]) {
     t.false(reads.includes(name), name)
-    t.true(tools_for({ writes: true }).some(x => x.name === name), name)
+    t.true(
+      tools_for({ writes: true }).some(x => x.name === name),
+      name
+    )
   }
 })
 
 test('text end users type (names, user agents, log messages) comes back fenced', t => {
-  for (const name of ['list_auth_logins', 'list_auth_logs', 'list_auth_users', 'get_auth_user', 'list_auth_sessions']) {
+  for (const name of [
+    'list_auth_logins',
+    'list_auth_logs',
+    'list_auth_users',
+    'get_auth_user',
+    'list_auth_sessions'
+  ]) {
     t.true(!!TOOLS.find(x => x.name === name)?.untrusted, name)
   }
 })
@@ -311,10 +333,15 @@ test('Auth tools ask OAuth for auth:* — never a deploy permission', t => {
 // every tool; a missing one is a rejection, not a default.
 test('every tool declares readOnlyHint, destructiveHint and openWorldHint', t => {
   for (const tool of TOOLS) {
-    for (const hint of ['readOnlyHint', 'destructiveHint', 'openWorldHint'] as const) {
+    for (const hint of [
+      'readOnlyHint',
+      'destructiveHint',
+      'openWorldHint'
+    ] as const) {
       t.is(typeof tool.annotations[hint], 'boolean', `${tool.name}.${hint}`)
     }
-    if (tool.annotations.readOnlyHint) t.false(tool.annotations.destructiveHint, tool.name)
+    if (tool.annotations.readOnlyHint)
+      t.false(tool.annotations.destructiveHint, tool.name)
   }
 })
 
@@ -323,9 +350,22 @@ test('every tool declares readOnlyHint, destructiveHint and openWorldHint', t =>
 test('create_app and deploy_directory glue the name to its flag', t => {
   const create = TOOLS.find(x => x.name === 'create_app')!
   const dir = TOOLS.find(x => x.name === 'deploy_directory')!
-  t.true(create.flags({ repo: 'a/b', name: '--no-deploy' }).includes('--name=--no-deploy'))
   t.true(
-    dir.flags({ workdir: '/x', create: 'Felicitación 🎉' }).includes('--create=Felicitación 🎉')
+    create
+      .flags({ repo: 'a/b', name: '--no-deploy' })
+      .includes('--name=--no-deploy')
+  )
+  t.true(
+    dir
+      .flags({ workdir: '/x', create: 'Felicitación 🎉' })
+      .includes('--create=Felicitación 🎉')
   )
   t.false(create.flags({ repo: 'a/b' }).some(f => f.startsWith('--name')))
+})
+
+test('add_domain: www maps to --www, and nothing is sent without it', t => {
+  const def = TOOLS.find(d => d.name === 'add_domain')!
+  t.true(def.flags({ fqdn: 'example.com', www: true }).includes('--www'))
+  t.false(def.flags({ fqdn: 'example.com' }).includes('--www'))
+  t.false(def.flags({ fqdn: 'example.com', www: false }).includes('--www'))
 })

@@ -140,12 +140,8 @@ const tenant = z
     "Auth tenant id (account_…). Defaults to the project's tenant (list_auth_tenants when it has several)."
   )
 const auth_scope = (a: Args) => [...opt('--account', a.tenant), ...scope(a)]
-const user_ref = z
-  .string()
-  .describe('User id (user_…) or exact email')
-const time = z
-  .string()
-  .regex(/^(\d+[mhd]|\d{4}-\d{2}-\d{2}|\d{10,})$/)
+const user_ref = z.string().describe('User id (user_…) or exact email')
+const time = z.string().regex(/^(\d+[mhd]|\d{4}-\d{2}-\d{2}|\d{10,})$/)
 const limit_flag = (a: Args, d = 50) => ['--limit', String(a.limit ?? d)]
 const limit = z
   .number()
@@ -261,10 +257,10 @@ const api_detail = (a: any) => ({
   permissions: (a.permissions ?? []).map((p: any) => p.value)
 })
 
-
 // Which product a tool works on — /tools.json and the landing group by it.
-export const product_of = (tool: Pick<ToolDef, 'command'>): 'auth' | 'deploy' =>
-  tool.command[0] === 'auth' ? 'auth' : 'deploy'
+export const product_of = (
+  tool: Pick<ToolDef, 'command'>
+): 'auth' | 'deploy' => (tool.command[0] === 'auth' ? 'auth' : 'deploy')
 const AUTH_WRITE = {
   readOnlyHint: false,
   destructiveHint: false,
@@ -582,7 +578,7 @@ export const TOOLS: ToolDef[] = [
     name: 'list_auth_tenants',
     title: 'List Auth tenants',
     description:
-      "The Faable Auth tenants (user directories) of a project. Most projects have one and every Auth tool uses it; with several, pass the right one as `tenant`.",
+      'The Faable Auth tenants (user directories) of a project. Most projects have one and every Auth tool uses it; with several, pass the right one as `tenant`.',
     input: { project },
     command: ['auth', 'accounts', 'list'],
     flags: scope,
@@ -642,7 +638,9 @@ export const TOOLS: ToolDef[] = [
       last_login_since: time
         .optional()
         .describe('Logged in at or after: 24h, 7d, a date'),
-      created_since: time.optional().describe('Signed up at or after: 24h, 7d, a date'),
+      created_since: time
+        .optional()
+        .describe('Signed up at or after: 24h, 7d, a date'),
       created_until: time.optional().describe('Signed up at or before'),
       suspended: z.boolean().optional(),
       tenant,
@@ -654,7 +652,9 @@ export const TOOLS: ToolDef[] = [
       ...opt('--last-login-since', a.last_login_since),
       ...opt('--created-since', a.created_since),
       ...opt('--created-until', a.created_until),
-      ...(a.suspended === undefined ? [] : [a.suspended ? '--suspended' : '--no-suspended']),
+      ...(a.suspended === undefined
+        ? []
+        : [a.suspended ? '--suspended' : '--no-suspended']),
       ...auth_scope(a)
     ],
     annotations: AUTH_READ,
@@ -664,15 +664,23 @@ export const TOOLS: ToolDef[] = [
     name: 'list_auth_users',
     title: 'List users',
     description:
-      "Users of the Auth tenant. Find one by email or text, list the suspended ones, or sort: `-last_login` (most recent login first), `last_login` (longest without logging in), `-logins_count` (most active), `-createdAt` (newest sign-ups, the default). Sorting by last_login leaves out users who never logged in.",
+      'Users of the Auth tenant. Find one by email or text, list the suspended ones, or sort: `-last_login` (most recent login first), `last_login` (longest without logging in), `-logins_count` (most active), `-createdAt` (newest sign-ups, the default). Sorting by last_login leaves out users who never logged in.',
     input: {
       search: z.string().optional().describe('Text in name, email or phone'),
       email: z.string().optional().describe('Exact email'),
       suspended: z.boolean().optional(),
       sort: z
-        .enum(['-last_login', 'last_login', '-logins_count', '-createdAt', 'createdAt'])
+        .enum([
+          '-last_login',
+          'last_login',
+          '-logins_count',
+          '-createdAt',
+          'createdAt'
+        ])
         .optional(),
-      last_login_since: time.optional().describe('Logged in at or after: 24h, 7d, a date'),
+      last_login_since: time
+        .optional()
+        .describe('Logged in at or after: 24h, 7d, a date'),
       created_since: time.optional().describe('Signed up at or after'),
       limit,
       cursor,
@@ -683,7 +691,9 @@ export const TOOLS: ToolDef[] = [
     flags: a => [
       ...opt('-q', a.search),
       ...opt('--email', a.email),
-      ...(a.suspended === undefined ? [] : [a.suspended ? '--suspended' : '--no-suspended']),
+      ...(a.suspended === undefined
+        ? []
+        : [a.suspended ? '--suspended' : '--no-suspended']),
       // `--sort=-x`: as two words yargs would read `-last_login` as flags.
       ...(a.sort ? [`--sort=${a.sort}`] : []),
       ...opt('--last-login-since', a.last_login_since),
@@ -756,9 +766,15 @@ export const TOOLS: ToolDef[] = [
     description:
       "The Auth tenant's audit log, newest first: logins, failed logins (`status: failed`), sign-ups, password resets, admin changes (`type` prefix `admin.user`). Filter by user to answer 'why can't X log in?' — the failed attempts say why. On a failed login no user resolves, so each row also carries `attempted_identifier`: the email/username the person actually typed (diagnose_auth_login turns that into the account they should be using).",
     input: {
-      email: z.string().optional().describe("Only this user's events (exact email)"),
+      email: z
+        .string()
+        .optional()
+        .describe("Only this user's events (exact email)"),
       user: z.string().optional().describe('Only this user id (user_…)'),
-      type: z.string().optional().describe('Exact event type, e.g. user.login, user.signup'),
+      type: z
+        .string()
+        .optional()
+        .describe('Exact event type, e.g. user.login, user.signup'),
       origin: z.string().optional().describe('Type prefix, e.g. oauth, admin'),
       status: z.enum(['success', 'failed', 'skipped', 'info']).optional(),
       since: time.optional().describe('30m, 24h, 7d or a date (default 7d)'),
@@ -821,7 +837,10 @@ export const TOOLS: ToolDef[] = [
       'The devices a user is signed in on (one row per login session): IP, device, last activity and whether it is still active.',
     input: {
       user: user_ref,
-      active: z.boolean().optional().describe('Only active sessions (default true)'),
+      active: z
+        .boolean()
+        .optional()
+        .describe('Only active sessions (default true)'),
       tenant,
       project
     },
@@ -903,7 +922,10 @@ export const TOOLS: ToolDef[] = [
         .describe('Wait until live or failed, up to 5 minutes (default false)')
     },
     command: ['deploy', 'trigger'],
-    flags: a => [...target(a), ...(a.wait ? ['--wait', '--timeout', '300'] : [])],
+    flags: a => [
+      ...target(a),
+      ...(a.wait ? ['--wait', '--timeout', '300'] : [])
+    ],
     timeout_ms: 330_000,
     annotations: {
       readOnlyHint: false,
@@ -1113,10 +1135,20 @@ export const TOOLS: ToolDef[] = [
     name: 'add_domain',
     title: 'Add a custom domain',
     description:
-      "Attach a custom domain to an app. Returns the CNAME record the user must create at their DNS provider; Faable verifies it and issues the certificate on its own. If the domain already serves traffic somewhere else, tell the user to create `prevalidation_cname` (`_acme-challenge.<fqdn>` CNAME) FIRST and switch the main CNAME only once check_domain shows it ready: the certificate then exists before traffic moves, with no TLS gap. If it says the domain is already in this project, use attach_domain instead: adding it again cannot work.",
-    input: { app, project, fqdn: z.string().describe('e.g. www.example.com') },
+      'Attach a custom domain to an app. Returns the CNAME record the user must create at their DNS provider; Faable verifies it and issues the certificate on its own. If the domain already serves traffic somewhere else, tell the user to create `prevalidation_cname` (`_acme-challenge.<fqdn>` CNAME) FIRST and switch the main CNAME only once check_domain shows it ready: the certificate then exists before traffic moves, with no TLS gap. If it says the domain is already in this project, use attach_domain instead: adding it again cannot work.',
+    input: {
+      app,
+      project,
+      fqdn: z.string().describe('e.g. www.example.com'),
+      www: z
+        .boolean()
+        .optional()
+        .describe(
+          'Also add the www (or root) counterpart, redirecting to this domain: example.com and www.example.com. Only for a root domain or its www. Both need their DNS record.'
+        )
+    },
     command: ['deploy', 'domains', 'add'],
-    flags: a => [a.fqdn, ...target(a)],
+    flags: a => [a.fqdn, ...(a.www ? ['--www'] : []), ...target(a)],
     write: true,
     annotations: {
       readOnlyHint: false,
@@ -1181,7 +1213,7 @@ export const TOOLS: ToolDef[] = [
     name: 'link_repo',
     title: 'Link a repository to an app',
     description:
-      "Link a GitHub repository to an app that already exists, so a push deploys it (for a new app, create_app does both). What is live keeps serving until the next push — linking starts no deploy. Needs the Faable GitHub App installed on the repository; if not, the error says what to fix.",
+      'Link a GitHub repository to an app that already exists, so a push deploys it (for a new app, create_app does both). What is live keeps serving until the next push — linking starts no deploy. Needs the Faable GitHub App installed on the repository; if not, the error says what to fix.',
     input: {
       app,
       repo: z.string().describe('GitHub repository, owner/repo'),
@@ -1192,12 +1224,7 @@ export const TOOLS: ToolDef[] = [
       project
     },
     command: ['deploy', 'link'],
-    flags: a => [
-      '--repo',
-      a.repo,
-      ...opt('--branch', a.branch),
-      ...target(a)
-    ],
+    flags: a => ['--repo', a.repo, ...opt('--branch', a.branch), ...target(a)],
     write: true,
     annotations: {
       readOnlyHint: false,
@@ -1240,7 +1267,9 @@ export const TOOLS: ToolDef[] = [
       create: z
         .string()
         .optional()
-        .describe('Name of a NEW app to create and deploy to (instead of `app`)'),
+        .describe(
+          'Name of a NEW app to create and deploy to (instead of `app`)'
+        ),
       project
     },
     command: ['deploy', 'launch'],
@@ -1439,7 +1468,7 @@ export const TOOLS: ToolDef[] = [
     name: 'suspend_auth_user',
     title: 'Suspend a user',
     description:
-      "Suspend one user of the Auth tenant: they can no longer log in, and their sessions and refresh tokens stop working (access tokens already issued live until they expire). Reversible with reinstate_auth_user. Confirm with get_auth_user that it is the right person first, and say why in `reason` — it is recorded on the user.",
+      'Suspend one user of the Auth tenant: they can no longer log in, and their sessions and refresh tokens stop working (access tokens already issued live until they expire). Reversible with reinstate_auth_user. Confirm with get_auth_user that it is the right person first, and say why in `reason` — it is recorded on the user.',
     input: {
       user: user_ref,
       reason: z.string().max(512).describe('Why — recorded on the user'),
@@ -1529,7 +1558,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'update_auth_client_login',
-    title: "Change how users sign in to an app",
+    title: 'Change how users sign in to an app',
     description:
       "Choose which login methods one Auth application offers: which connections (by id or name, as list_auth_connections shows them) and whether the passkey button appears. `only` keeps exactly those connections and removes the rest; `disable`/`enable` change one at a time. A removed connection is refused at /authorize too, not just hidden. `passkey` needs the Pro plan. `inherit: true` drops the app's own settings and follows the tenant's again. Settings not mentioned keep their current value.",
     input: {
@@ -1600,7 +1629,12 @@ export const TOOLS: ToolDef[] = [
       project
     },
     command: ['auth', 'users', 'password-setup'],
-    flags: a => [a.user, ...opt('--channel', a.channel), '--yes', ...auth_scope(a)],
+    flags: a => [
+      a.user,
+      ...opt('--channel', a.channel),
+      '--yes',
+      ...auth_scope(a)
+    ],
     write: true,
     annotations: { ...AUTH_WRITE, idempotentHint: false },
     example: { user: 'ana@example.com', channel: 'email' }
@@ -1612,17 +1646,31 @@ export const TOOLS: ToolDef[] = [
       "Change a user's profile: `email`, `name`, `email_verified`. Changing `email` also moves their database login identifier (the email they type at the password login) so sign-in keeps working — pass `profile_only: true` to change only the profile email and leave the login identifier. Use this when someone cannot log in because the address they were given is not the one on their account. Confirm the person first with get_auth_user.",
     input: {
       user: user_ref,
-      email: z.string().optional().describe('New email — also the database login identifier unless profile_only'),
+      email: z
+        .string()
+        .optional()
+        .describe(
+          'New email — also the database login identifier unless profile_only'
+        ),
       name: z.string().optional(),
-      email_verified: z.boolean().optional().describe('Mark the email verified (true) or clear verification (false)'),
+      email_verified: z
+        .boolean()
+        .optional()
+        .describe(
+          'Mark the email verified (true) or clear verification (false)'
+        ),
       profile_only: z
         .boolean()
         .optional()
-        .describe('With email, change only the profile email, not the login identifier'),
+        .describe(
+          'With email, change only the profile email, not the login identifier'
+        ),
       connection: z
         .string()
         .optional()
-        .describe('Database connection id or name, when the user has more than one credential'),
+        .describe(
+          'Database connection id or name, when the user has more than one credential'
+        ),
       tenant,
       project
     },
@@ -1653,12 +1701,19 @@ export const TOOLS: ToolDef[] = [
       password: z
         .string()
         .optional()
-        .describe('The exact new password. Omit and set generate:true to have one made.'),
-      generate: z.boolean().optional().describe('Generate a strong password and return it once'),
+        .describe(
+          'The exact new password. Omit and set generate:true to have one made.'
+        ),
+      generate: z
+        .boolean()
+        .optional()
+        .describe('Generate a strong password and return it once'),
       connection: z
         .string()
         .optional()
-        .describe('Database connection id or name, when the user has more than one credential'),
+        .describe(
+          'Database connection id or name, when the user has more than one credential'
+        ),
       tenant,
       project
     },
@@ -1681,7 +1736,7 @@ export const TOOLS: ToolDef[] = [
     name: 'get_auth_recovery_link',
     title: 'Get a password-reset link',
     description:
-      "Mint a fresh password-reset link for a user and return it, so you can hand it over by another channel when the reset email will not reach them (e.g. the address on the account is not a real inbox). This ALSO sends the standard reset email. The link lets whoever holds it set the password, so treat it like a password; it works once, until used or expired. Returns `link` (email channel only), `ticket_id` and `channel`.",
+      'Mint a fresh password-reset link for a user and return it, so you can hand it over by another channel when the reset email will not reach them (e.g. the address on the account is not a real inbox). This ALSO sends the standard reset email. The link lets whoever holds it set the password, so treat it like a password; it works once, until used or expired. Returns `link` (email channel only), `ticket_id` and `channel`.',
     input: { user: user_ref, tenant, project },
     command: ['auth', 'users', 'password-setup'],
     flags: a => [a.user, '--print', '--yes', ...auth_scope(a)],
