@@ -3,13 +3,14 @@ import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
-import { acme_record, cname_target } from './format'
+import { acme_record, cname_target, pair_fqdn } from './format'
 import { add_conflict_hint } from './locate'
 
 interface DomainsAddArgs {
   fqdn: string
   app?: string
   tls?: boolean
+  www?: boolean
   json?: boolean
 }
 
@@ -33,9 +34,18 @@ export const domains_add: CommandModule<unknown, DomainsAddArgs> = {
         default: true,
         description: 'Provision a TLS certificate automatically (default)'
       })
+      .option('www', {
+        type: 'boolean',
+        description:
+          'Also add the www (or root) counterpart, redirecting to this domain: example.com and www.example.com'
+      })
       .example(
         '$0 deploy domains add www.example.com',
         'Attach www.example.com to the linked app'
+      )
+      .example(
+        '$0 deploy domains add example.com --www',
+        'Attach example.com, and www.example.com redirecting to it'
       )
       .showHelpOnFail(false) as any,
   handler: async args => {
@@ -44,7 +54,12 @@ export const domains_add: CommandModule<unknown, DomainsAddArgs> = {
     const app = await ctx.api.getApp(app_id)
 
     const domain = await ctx.api
-      .createDomain(app.team, { fqdn: args.fqdn, app_id, tls: args.tls })
+      .createDomain(app.team, {
+        fqdn: args.fqdn,
+        app_id,
+        tls: args.tls,
+        ...(args.www ? { www: true } : {})
+      })
       .catch(async err => {
         // Already in this project (an app deletion leaves its domains linked
         // to no app): name the command that fixes it, not "another project".
@@ -59,20 +74,43 @@ export const domains_add: CommandModule<unknown, DomainsAddArgs> = {
         )
       })
 
+    // The pair's other half was created by the api with the main one; its DNS
+    // is a second record to create, so it is shown too.
+    const pair = args.www
+      ? (await ctx.api.listDomains(app_id, app.team)).find(
+          d => d.fqdn === pair_fqdn(domain.fqdn)
+        )
+      : undefined
+
     // Same shape as `domains check --json`: the record plus the CNAME to
     // create, which is the whole next step.
     if (args.json) {
       return print_json({
         ...domain,
         expected_cname: cname_target(domain),
-        ...(args.tls ? { prevalidation_cname: acme_record(domain) } : {})
+        ...(args.tls ? { prevalidation_cname: acme_record(domain) } : {}),
+        ...(pair
+          ? {
+              pair: {
+                ...pair,
+                expected_cname: cname_target(pair),
+                ...(args.tls ? { prevalidation_cname: acme_record(pair) } : {})
+              }
+            }
+          : {})
       })
     }
 
     log.info(`🌐 Domain ${domain.fqdn} added to ${app.name} (${app_id}).`)
+    if (pair) {
+      log.info(`   ${pair.fqdn} added too, redirecting to ${domain.fqdn}.`)
+    }
     log.info(``)
-    log.info(`Now create a CNAME record at your DNS provider:`)
+    log.info(
+      `Now create ${pair ? 'these records' : 'a CNAME record'} at your DNS provider:`
+    )
     log.info(`  ${domain.fqdn} → ${cname_target(domain)}`)
+    if (pair) log.info(`  ${pair.fqdn} → ${cname_target(pair)}`)
     log.info(``)
     log.info(
       `Faable verifies the record automatically once DNS propagates${
@@ -86,6 +124,10 @@ export const domains_add: CommandModule<unknown, DomainsAddArgs> = {
         `Already serving ${domain.fqdn} somewhere else? Create this record FIRST and leave the CNAME above for later:`
       )
       log.info(`  ${acme.name} → ${acme.target}`)
+      if (pair) {
+        const pacme = acme_record(pair)
+        log.info(`  ${pacme.name} → ${pacme.target}`)
+      }
       log.info(
         `Faable then issues the certificate before any traffic moves, and switching the CNAME has no TLS gap.`
       )

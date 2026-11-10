@@ -5,6 +5,7 @@ import {
   cname_target,
   dns_badge,
   find_by_fqdn,
+  pair_fqdn,
   tls_line
 } from './format'
 
@@ -93,4 +94,10 @@ test('tls_line: served with its expiry, being issued, or waiting for DNS', t => 
   )
   t.regex(tls_line(domain({ status: { dns_state: 'pending' } })), /issued once/)
   t.is(tls_line(domain({ tls: false })), 'off (tls: false)')
+})
+
+test('pair_fqdn names the other half of an apex/www pair', t => {
+  t.is(pair_fqdn('example.com'), 'www.example.com')
+  t.is(pair_fqdn('www.example.com'), 'example.com')
+  t.is(pair_fqdn('example.co.uk'), 'www.example.co.uk')
 })

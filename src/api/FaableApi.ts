@@ -230,6 +230,12 @@ export interface FaableDomain {
   verified: boolean
   active: boolean
   team: string
+  // The non-canonical half of an apex/www pair: every request redirects to
+  // https://<redirect><path>. Null when the domain serves its app.
+  redirect?: string | null
+  redirect_status?: number
+  // False: search engines are told not to index it.
+  indexable?: boolean
   // Outcome of the DNS verification worker's latest check. `dns_expected`
   // carries the CNAME target(s) the user must configure — the same
   // `<domain.id>.faable.link` the dashboard instructions show.
@@ -675,15 +681,11 @@ export class FaableApi<T = any> {
   }
 
   async addOrganizationProject(id: string, project_id: string) {
-    return data(
-      this.client.post(`/organization/${id}/project`, { project_id })
-    )
+    return data(this.client.post(`/organization/${id}/project`, { project_id }))
   }
 
   async removeOrganizationProject(id: string, project_id: string) {
-    return data(
-      this.client.delete(`/organization/${id}/project/${project_id}`)
-    )
+    return data(this.client.delete(`/organization/${id}/project/${project_id}`))
   }
 
   async addOrganizationAdmin(id: string, user_id: string) {
@@ -1276,7 +1278,7 @@ export class FaableApi<T = any> {
 
   async createDomain(
     team: string,
-    params: { fqdn: string; app_id: string; tls?: boolean }
+    params: { fqdn: string; app_id: string; tls?: boolean; www?: boolean }
   ) {
     return data(
       this.client.post<FaableDomain>(`/domain`, params, {

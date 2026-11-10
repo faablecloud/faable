@@ -52,3 +52,11 @@ export const find_by_fqdn = (
   fqdn: string
 ): FaableDomain | undefined =>
   domains.find(d => d.fqdn.toLowerCase() === fqdn.toLowerCase())
+
+/**
+ * The other half of an apex/www pair created with `--www`. The api has already
+ * checked the name is an apex or its www (Public Suffix List); this only names
+ * the counterpart to look it up.
+ */
+export const pair_fqdn = (fqdn: string): string =>
+  fqdn.startsWith('www.') ? fqdn.slice(4) : `www.${fqdn}`
