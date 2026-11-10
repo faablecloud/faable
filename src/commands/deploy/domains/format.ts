@@ -60,3 +60,21 @@ export const find_by_fqdn = (
  */
 export const pair_fqdn = (fqdn: string): string =>
   fqdn.startsWith('www.') ? fqdn.slice(4) : `www.${fqdn}`
+
+/** ` ↪ example.com` for a domain that redirects, '' for one that serves. */
+export const redirect_badge = (domain: FaableDomain): string =>
+  domain.redirect ? `↪ ${domain.redirect}` : ''
+
+/**
+ * The domains of `all` that redirect to `domain`. They are part of it: deleting
+ * `domain` deletes them too (the api cascades; same project only).
+ */
+export const redirects_to = (
+  all: FaableDomain[],
+  domain: FaableDomain
+): FaableDomain[] =>
+  all.filter(
+    d =>
+      d.id !== domain.id &&
+      d.redirect?.toLowerCase() === domain.fqdn.toLowerCase()
+  )

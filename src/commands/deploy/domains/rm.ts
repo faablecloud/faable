@@ -3,7 +3,8 @@ import { requireApi } from '../../../api/context'
 import { confirm } from '../../../lib/interactive'
 import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
-import { domain_scope, locate_domain } from './locate'
+import { redirects_to } from './format'
+import { domain_scope, locate_domain, project_domains } from './locate'
 
 interface DomainsRmArgs {
   fqdn: string
@@ -58,10 +59,20 @@ export const domains_rm: CommandModule<unknown, DomainsRmArgs> = {
         : domain.app_id
       : null
 
+    // The domains that redirect to it go with it (the api cascades): say so
+    // before, not after.
+    const dependents = redirects_to(
+      await project_domains(ctx.api, scope.team),
+      domain
+    )
+    const also = dependents.length
+      ? ` ${dependents.map(d => d.fqdn).join(', ')} redirect${dependents.length === 1 ? 's' : ''} to it and will be removed too.`
+      : ''
+
     const go = await confirm({
       message: serves
-        ? `Remove domain "${domain.fqdn}" from ${serves}? Traffic to it will stop being served.`
-        : `Remove domain "${domain.fqdn}"? It is linked to no app. To serve it again with the same CNAME and certificate, use "faable deploy domains attach" instead.`,
+        ? `Remove domain "${domain.fqdn}" from ${serves}? Traffic to it will stop being served.${also}`
+        : `Remove domain "${domain.fqdn}"? It is linked to no app. To serve it again with the same CNAME and certificate, use "faable deploy domains attach" instead.${also}`,
       yes: args.yes
     })
     if (!go) {
@@ -71,11 +82,18 @@ export const domains_rm: CommandModule<unknown, DomainsRmArgs> = {
 
     await ctx.api.deleteDomain(domain.id, scope.team)
     if (args.json) {
-      return print_json({ deleted: true, id: domain.id, fqdn: domain.fqdn })
+      return print_json({
+        deleted: true,
+        id: domain.id,
+        fqdn: domain.fqdn,
+        also_deleted: dependents.map(d => ({ id: d.id, fqdn: d.fqdn }))
+      })
     }
     log.info(
-      `🗑️ Removed domain ${domain.fqdn}${serves ? ` from ${serves}` : ''}.`
+      `🗑️ Removed domain ${domain.fqdn}${serves ? ` from ${serves}` : ''}${dependents.length ? `, and ${dependents.map(d => d.fqdn).join(', ')} that redirected to it` : ''}.`
     )
-    log.info(`Remember to delete the CNAME at your DNS provider.`)
+    log.info(
+      `Remember to delete the CNAME${dependents.length ? 's' : ''} at your DNS provider.`
+    )
   }
 }

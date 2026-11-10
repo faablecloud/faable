@@ -3,6 +3,7 @@ import { domains_add } from './add'
 import { domains_attach } from './attach'
 import { domains_check } from './check'
 import { domains_list } from './list'
+import { domains_redirect } from './redirect'
 import { domains_rm } from './rm'
 
 export const domains: CommandModule = {
@@ -14,10 +15,11 @@ export const domains: CommandModule = {
       .command(domains_add)
       .command(domains_attach)
       .command(domains_check)
+      .command(domains_redirect)
       .command(domains_rm)
       .demandCommand(
         1,
-        'Specify a domains command: list, add, attach, check or rm'
+        'Specify a domains command: list, add, attach, check, redirect or rm'
       ),
   handler: () => {
     // Unreachable: demandCommand(1) either routes to a subcommand or fails

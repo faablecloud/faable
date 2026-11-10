@@ -230,8 +230,9 @@ export interface FaableDomain {
   verified: boolean
   active: boolean
   team: string
-  // The non-canonical half of an apex/www pair: every request redirects to
-  // https://<redirect><path>. Null when the domain serves its app.
+  // Another domain of the project this one sends every request to
+  // (https://<redirect><path>, query kept): the non-canonical half of an
+  // apex/www pair, or an alias. Null when the domain serves its app.
   redirect?: string | null
   redirect_status?: number
   // False: search engines are told not to index it.
@@ -1295,12 +1296,14 @@ export class FaableApi<T = any> {
     )
   }
 
-  // Relink a domain to another app of its project (or `null` to unlink it).
-  // Keeps the row: same id, same CNAME target, same certificate.
+  // Relink a domain to another app of its project (`app_id`, or `null` to
+  // unlink it), or make it redirect to another domain of the project
+  // (`redirect`, `null` to serve again). Keeps the row: same id, same CNAME
+  // target, same certificate.
   async updateDomain(
     domain_id: string,
     team: string,
-    params: { app_id: string | null }
+    params: { app_id?: string | null; redirect?: string | null }
   ) {
     return data(
       this.client.post<FaableDomain>(`/domain/${domain_id}`, params, {

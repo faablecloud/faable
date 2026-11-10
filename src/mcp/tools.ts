@@ -518,7 +518,7 @@ export const TOOLS: ToolDef[] = [
     name: 'list_domains',
     title: 'List custom domains',
     description:
-      'Custom domains of an app and whether their DNS is verified. Without `app`, every domain of the project with the app it serves: `app_id: null` is a domain linked to no app (its app was deleted), which answers DOMAIN_NOT_LINKED until attach_domain links it.',
+      'Custom domains of an app and whether their DNS is verified. Without `app`, every domain of the project with the app it serves: `app_id: null` is a domain linked to no app (its app was deleted), which answers DOMAIN_NOT_LINKED until attach_domain links it. `redirect` names the domain it sends every request to (the www half of a pair, or an alias); null when it serves its app.',
     input: { app: optional_app, project },
     command: ['deploy', 'domains', 'list'],
     flags: app_or_project,
@@ -528,6 +528,7 @@ export const TOOLS: ToolDef[] = [
       app_id: d.app_id ?? null,
       verified: d.verified,
       tls: d.tls,
+      redirect: d.redirect ?? null,
       dns_message: d.status?.dns_message
     })),
     annotations: READ,
@@ -549,6 +550,7 @@ export const TOOLS: ToolDef[] = [
       fqdn: d.fqdn,
       app_id: d.app_id ?? null,
       verified: d.verified,
+      redirect: d.redirect ?? null,
       expected_cname: d.expected_cname,
       observed: d.status?.dns_observed ?? [],
       diagnostic: d.status?.dns_message,
@@ -1175,6 +1177,41 @@ export const TOOLS: ToolDef[] = [
       openWorldHint: true
     },
     example: { app: 'web', fqdn: 'app.example.com' }
+  },
+  {
+    name: 'set_domain_redirect',
+    title: 'Redirect a domain to another',
+    description:
+      'Make a custom domain send every request to another domain of the same project (GET → 301, other methods → 308, path and query kept), e.g. www.example.com to example.com, or an old name to the new one. `target: null` stops it: the domain serves its app again. The target must be a domain of the project that serves (no chains). Deleting the target later deletes the domains that redirect to it. DNS and certificate do not change.',
+    input: {
+      app: optional_app,
+      project,
+      fqdn: z.string().describe('The domain that redirects, e.g. www.example.com'),
+      target: z
+        .string()
+        .nullable()
+        .describe('The domain it redirects to, e.g. example.com; null to stop redirecting')
+    },
+    command: ['deploy', 'domains', 'redirect'],
+    flags: a => [
+      a.fqdn,
+      ...(a.target ? [a.target] : ['--off']),
+      ...app_or_project(a)
+    ],
+    write: true,
+    shape: (d: any) => ({
+      id: d.id,
+      fqdn: d.fqdn,
+      app_id: d.app_id ?? null,
+      redirect: d.redirect ?? null
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true
+    },
+    example: { fqdn: 'www.example.com', target: 'example.com' }
   },
   {
     name: 'configure_repo',

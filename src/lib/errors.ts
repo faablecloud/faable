@@ -21,6 +21,7 @@ export type CliErrorCode =
   | 'usage' // bad invocation: unknown command, missing argument…
   | 'domain_taken' // 409, the api's code: the hostname is already registered
   | 'domain_unlinked' // 409, the api's code: already in this project, linked to no app
+  | 'domain_redirect_invalid' // 422, the api's code: the redirect target is not a serving domain of the project
 
 export interface CliErrorFields {
   code?: string

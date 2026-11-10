@@ -54,6 +54,11 @@ export const domains_check: CommandModule<unknown, DomainsCheckArgs> = {
         `  Linked to no app: it answers DOMAIN_NOT_LINKED. Serve it with: faable deploy domains attach ${domain.fqdn} --app <app>`
       )
     }
+    if (domain.redirect) {
+      log.info(
+        `  Redirects to:   https://${domain.redirect} (path and query kept). Serve it again with: faable deploy domains redirect ${domain.fqdn} --off`
+      )
+    }
     log.info(`  Expected CNAME: ${domain.fqdn} → ${cname_target(domain)}`)
     if (status?.dns_observed?.length) {
       log.info(`  Observed:       ${status.dns_observed.join(', ')}`)

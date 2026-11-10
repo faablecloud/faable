@@ -6,6 +6,8 @@ import {
   dns_badge,
   find_by_fqdn,
   pair_fqdn,
+  redirect_badge,
+  redirects_to,
   tls_line
 } from './format'
 
@@ -100,4 +102,31 @@ test('pair_fqdn names the other half of an apex/www pair', t => {
   t.is(pair_fqdn('example.com'), 'www.example.com')
   t.is(pair_fqdn('www.example.com'), 'example.com')
   t.is(pair_fqdn('example.co.uk'), 'www.example.co.uk')
+})
+
+test('redirect_badge: only for a domain that redirects', t => {
+  t.is(redirect_badge(domain({ redirect: 'example.com' })), '↪ example.com')
+  t.is(redirect_badge(domain({ redirect: null })), '')
+  t.is(redirect_badge(domain()), '')
+})
+
+test('redirects_to: the domains a delete takes with it, and only those', t => {
+  const apex = domain({ id: 'domain_apex', fqdn: 'example.com' })
+  const www = domain({ id: 'domain_www', redirect: 'Example.com' })
+  const alias = domain({
+    id: 'domain_alias',
+    fqdn: 'example.net',
+    redirect: 'example.com'
+  })
+  const other = domain({ id: 'domain_other', fqdn: 'shop.example.com' })
+  const elsewhere = domain({
+    id: 'domain_x',
+    fqdn: 'm.example.com',
+    redirect: 'www.example.com'
+  })
+  t.deepEqual(
+    redirects_to([apex, www, alias, other, elsewhere], apex).map(d => d.id),
+    ['domain_www', 'domain_alias']
+  )
+  t.deepEqual(redirects_to([apex, other], apex), [])
 })

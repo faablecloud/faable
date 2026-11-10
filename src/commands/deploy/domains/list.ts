@@ -12,7 +12,7 @@ import {
 import { log } from '../../../log'
 import { requireProject } from '../../../api/project'
 import { find_app_id } from '../resolve_app_id'
-import { cname_target, dns_badge } from './format'
+import { cname_target, dns_badge, redirect_badge } from './format'
 
 interface DomainsListArgs extends ListArgs {
   app?: string
@@ -57,7 +57,9 @@ export const domains_list: CommandModule<unknown, DomainsListArgs> = {
     const width = Math.max(...domains.map(d => d.fqdn.length))
     for (const domain of domains) {
       const tls = domain.tls ? 'tls' : 'no-tls'
-      print(`  ${domain.fqdn.padEnd(width)}  ${dns_badge(domain)}  (${tls})`)
+      print(
+        `  ${domain.fqdn.padEnd(width)}  ${dns_badge(domain)}  (${tls})  ${redirect_badge(domain)}`.trimEnd()
+      )
     }
     const hint = more_hint(page)
     if (hint) log.info(hint)
@@ -107,7 +109,7 @@ const list_project_domains = async (
   for (const domain of domains) {
     const tls = domain.tls ? 'tls' : 'no-tls'
     print(
-      `  ${domain.fqdn.padEnd(width)}  ${label(domain).padEnd(app_width)}  ${dns_badge(domain)}  (${tls})`
+      `  ${domain.fqdn.padEnd(width)}  ${label(domain).padEnd(app_width)}  ${dns_badge(domain)}  (${tls})  ${redirect_badge(domain)}`.trimEnd()
     )
   }
   const hint = more_hint(page)
