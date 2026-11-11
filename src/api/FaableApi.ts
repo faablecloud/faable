@@ -82,6 +82,10 @@ export interface FaableApp {
   // What the platform build detected (buildpack/framework/runtime), reported
   // by the builder before building — present on failed builds too.
   detected?: DeploymentDetected | null
+  // Set while moderation holds the app (a takedown, or a kind of app that
+  // needs a paid plan): it does not run, and its in-flight builds are
+  // CANCELED with this reason.
+  disabled_reason?: string | null
   status?: {
     phase: string
     deployment: string | null

@@ -271,9 +271,21 @@ export const launch: CommandModule<unknown, DeployCommandArgs> = {
             failure = { phase, reason: dep.status?.reason }
             break
           }
-          // CANCELED: the platform superseded this build before it produced a
-          // runnable (a sibling deployment of the app won the promotion).
           if (phase === 'CANCELED') {
+            // A moderation hold cancels the build too, and then nothing is
+            // live: it is a failure, not a supersede. Read on the app, not
+            // the deployment, whose reason is free text (2026-11-11: a
+            // plan-held app was told "The app is live" and answered 410).
+            // Re-read: `current` predates the deployment read, and the hold
+            // may have landed between the two.
+            const after = await api.getApp(app.id).catch(() => current)
+            const held = after.disabled_reason ?? null
+            if (held) {
+              failure = { phase, reason: dep.status?.reason ?? held }
+              break
+            }
+            // Otherwise the platform superseded this build before it produced
+            // a runnable (a sibling deployment of the app won the promotion).
             superseded = dep.status?.reason ?? 'canceled'
             break
           }
