@@ -1,8 +1,8 @@
 import { CommandModule } from 'yargs'
 import { requireAuthAdmin, withAuthHints } from '../../../api/auth_admin'
+import { fetch_page, from_paginator } from '../../../lib/listing'
 import { log } from '../../../log'
 import { TenantArgs, json_option, tenant_options } from '../options'
-import { fetch_page, from_paginator } from '../../../lib/listing'
 import { print_json, when, yes_no } from '../render'
 import { resolve_user_ref } from './resolve'
 
@@ -20,6 +20,25 @@ const sanitize_identity = (i: Record<string, unknown>) => {
     ...safe
   } = i
   return safe
+}
+
+// An expanded `connection` ({ id, connection_name, … }) — or a bare id when
+// the server did not expand it — as the id plus a readable name.
+const connection_ref = (c: unknown) => {
+  if (c && typeof c === 'object') {
+    const o = c as {
+      id?: string
+      connection_name?: string
+      connection_type?: string
+    }
+    const id = String(o.id ?? '')
+    return {
+      connection: id,
+      connection_name: o.connection_name ?? o.connection_type ?? id
+    }
+  }
+  const id = String(c ?? '')
+  return { connection: id, connection_name: id }
 }
 
 type ProfileData = {
@@ -51,13 +70,24 @@ export const users_get: CommandModule<unknown, UsersGetArgs> = {
     // Federated identities (GitHub, Google…): who this user IS at the
     // provider — the piece the abuse playbook keeps needing (a Faable email
     // rarely matches the GitHub handle that owns the deployed repos).
+    // `expand=connection` brings the connection's name in the same call.
     // Best-effort: a tenant where the session can't read /identity still
     // renders the user card.
     const identities = await fetch_page(
-      from_paginator(api.identityList({ query: `user:${user_id}` })),
+      from_paginator(
+        api.identityList({ query: `user:${user_id}`, expand: ['connection'] })
+      ),
       { limit: 200, all: true }
     )
-      .then(r => r.data.map(i => sanitize_identity(i as never)))
+      .then(r =>
+        r.data.map(i => {
+          const safe = sanitize_identity(i as never)
+          return {
+            ...safe,
+            ...connection_ref(safe.connection)
+          } as Record<string, unknown>
+        })
+      )
       .catch(() => [] as Record<string, unknown>[])
 
     // Database-connection credentials: the email/username the user actually
@@ -65,13 +95,15 @@ export const users_get: CommandModule<unknown, UsersGetArgs> = {
     // is NOT what the password login matches — the gap that otherwise sends
     // you to the dashboard to find out why a login keeps failing. Best-effort.
     const credentials = await fetch_page(
-      from_paginator(api.credentialsList({ user: user_id })),
+      from_paginator(
+        api.credentialsList({ user: user_id, expand: ['connection'] })
+      ),
       { limit: 200, all: true }
     )
       .then(r =>
         r.data.map(c => ({
           id: String((c as { id?: unknown }).id ?? ''),
-          connection: String((c as { connection?: unknown }).connection ?? ''),
+          ...connection_ref((c as { connection?: unknown }).connection),
           email: (c as { email?: string }).email,
           username: (c as { username?: string }).username
         }))
@@ -81,49 +113,25 @@ export const users_get: CommandModule<unknown, UsersGetArgs> = {
           [] as {
             id: string
             connection: string
+            connection_name: string
             email?: string
             username?: string
           }[]
       )
 
-    // Resolve connection ids to names ("github", "default") once per distinct
-    // id — identities and credentials alike.
-    const connection_names = new Map<string, string>()
-    for (const id of new Set(
-      [
-        ...identities.map(i => String(i.connection ?? '')),
-        ...credentials.map(c => c.connection)
-      ].filter(Boolean)
-    )) {
-      const conn = (await api.connectionGet(id).catch(() => null)) as {
-        connection_name?: string
-        connection_type?: string
-      } | null
-      connection_names.set(
-        id,
-        conn?.connection_name ?? conn?.connection_type ?? id
-      )
-    }
-
-    if (args.json)
-      return print_json({
-        ...user,
-        identities,
-        credentials: credentials.map(c => ({
-          ...c,
-          connection_name: connection_names.get(c.connection) ?? c.connection
-        }))
-      })
+    if (args.json) return print_json({ ...user, identities, credentials })
 
     log.info(`👤 ${user.id}`)
-    log.info(`  Email:      ${user.email ?? '-'} (verified: ${yes_no(user.email_verified)})`)
+    log.info(
+      `  Email:      ${user.email ?? '-'} (verified: ${yes_no(user.email_verified)})`
+    )
     log.info(`  Name:       ${user.name ?? '-'}`)
     if (credentials.length > 0) {
       // What the user types at the password login — may differ from the
       // profile email above, in which case that mismatch is the bug.
       const ids = credentials
         .map(c => {
-          const conn = connection_names.get(c.connection) ?? (c.connection || 'default')
+          const conn = c.connection_name || 'default'
           return `${c.email ?? c.username ?? '-'} (${conn})`
         })
         .join(', ')
@@ -138,7 +146,8 @@ export const users_get: CommandModule<unknown, UsersGetArgs> = {
     log.info(`  Logins:     ${user.logins_count ?? 0}`)
     if (user.suspended) {
       log.info(`  Suspended:  🔴 yes (${user.suspended_at ?? 'unknown date'})`)
-      if (user.suspended_reason) log.info(`  Reason:     ${user.suspended_reason}`)
+      if (user.suspended_reason)
+        log.info(`  Reason:     ${user.suspended_reason}`)
     } else {
       log.info('  Suspended:  no')
     }
@@ -146,8 +155,7 @@ export const users_get: CommandModule<unknown, UsersGetArgs> = {
     if (identities.length > 0) {
       log.info(`  Identities:`)
       for (const identity of identities) {
-        const conn =
-          connection_names.get(String(identity.connection ?? '')) ?? '-'
+        const conn = String(identity.connection_name ?? '-')
         const pd = (identity.profile_data ?? {}) as ProfileData
         const bits = [
           pd.login ?? String(identity.identity_id ?? '-'),
@@ -155,7 +163,9 @@ export const users_get: CommandModule<unknown, UsersGetArgs> = {
           // Provider-account age is triage gold: a repo pushed from a
           // years-old GitHub account reads differently than one created
           // this morning.
-          pd.created_at ? `account since ${String(pd.created_at).slice(0, 10)}` : undefined,
+          pd.created_at
+            ? `account since ${String(pd.created_at).slice(0, 10)}`
+            : undefined,
           pd.email && pd.email !== user.email ? `email ${pd.email}` : undefined,
           pd.location ? `location ${pd.location}` : undefined
         ].filter(Boolean)

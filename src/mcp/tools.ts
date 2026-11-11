@@ -732,9 +732,15 @@ export const TOOLS: ToolDef[] = [
       ...user_row(u),
       phone: u.phone,
       last_ip: u.last_ip,
+      // `auth users get --json` rows: { connection, connection_name,
+      // identity_id, profile_data } — the provider account behind the user.
       identities: (u.identities ?? []).map((i: any) => ({
-        provider: i.provider ?? i.connection_type,
-        user_id: i.user_id ?? i.provider_user_id
+        connection: i.connection_name ?? i.connection,
+        identity_id: i.identity_id,
+        login: i.profile_data?.login,
+        profile_url: i.profile_data?.html_url,
+        account_created_at: i.profile_data?.created_at,
+        provider_email: i.profile_data?.email
       })),
       credentials: (u.credentials ?? []).map((c: any) => ({
         connection: c.connection_name ?? c.connection,

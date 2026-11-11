@@ -53,6 +53,38 @@ test('get_auth_user shape: surfaces the database login identifier', t => {
   t.deepEqual(out.credentials, [{ connection: 'default', identifier: 'ana@login.com' }])
 })
 
+test('get_auth_user shape: a federated identity says who the user is at the provider', t => {
+  const out = shape('get_auth_user', {
+    id: 'user_1',
+    email: 'ana@profile.com',
+    identities: [
+      {
+        id: 'identity_1',
+        connection: 'connection_1',
+        connection_name: 'github',
+        identity_id: '350715250',
+        profile_data: {
+          login: 'ana-gh',
+          html_url: 'https://github.com/ana-gh',
+          created_at: '2026-10-31T00:00:00Z',
+          email: 'ana@profile.com'
+        }
+      }
+    ],
+    credentials: []
+  })
+  t.deepEqual(out.identities, [
+    {
+      connection: 'github',
+      identity_id: '350715250',
+      login: 'ana-gh',
+      profile_url: 'https://github.com/ana-gh',
+      account_created_at: '2026-10-31T00:00:00Z',
+      provider_email: 'ana@profile.com'
+    }
+  ])
+})
+
 test('list_auth_logs shape: a failed login carries the attempted identifier', t => {
   const out = shape('list_auth_logs', {
     data: [
