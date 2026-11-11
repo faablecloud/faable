@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { version } from '../config'
 
 // The tool catalog of `faable mcp` — catalog v1 of
 // arch/deploy/mcp-server-faable.md. Each tool is one CLI command (run_cli.ts);
@@ -273,10 +274,11 @@ export const TOOLS: ToolDef[] = [
     name: 'whoami',
     title: 'Who is logged in',
     description:
-      'The Faable account this server acts as, the active project and its Auth tenant. Use it first when unsure whether the user is logged in or which project is active.',
+      'The Faable account this server acts as, the active project and its Auth tenant, and `server_version` — the Faable CLI version this MCP server runs. Use it first when unsure whether the user is logged in or which project is active, or to check which version is serving.',
     input: {},
     command: ['whoami'],
     flags: () => [],
+    shape: (d: any) => ({ ...d, server_version: version }),
     annotations: READ,
     example: {}
   },
