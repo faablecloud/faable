@@ -46,6 +46,10 @@ export const upload_missing_blobs = async (
             headers: {
               ...upload.headers,
               "content-type": "application/octet-stream",
+              // Who uploads, for the artifact store's log line and its
+              // `client` label (api backlog §524). Unsigned: not part of the
+              // presign.
+              "x-faable-client": "cli",
             },
             maxBodyLength: Infinity,
             timeout: 120_000,
