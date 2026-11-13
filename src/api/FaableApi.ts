@@ -199,6 +199,17 @@ export interface FaableWafRule {
   action: string
   match?: string
   description?: string
+  /** Only on 'limit' rules: `average` requests per `period`, `burst` at once. */
+  rate?: FaableWafRate
+  /** Only on 'limit' rules: one bucket per client IP, or one for the rule. */
+  per?: 'ip' | 'rule'
+}
+
+export interface FaableWafRate {
+  average: number
+  /** '1s' or '1m' */
+  period: string
+  burst: number
 }
 
 /**
@@ -1433,9 +1444,11 @@ export class FaableApi<T = any> {
       pattern?: string
       user_agent?: string
       query?: string
-      action: 'deny' | 'sink' | 'allow' | 'monitor'
+      action: 'deny' | 'sink' | 'allow' | 'monitor' | 'limit'
       description?: string
       force?: boolean
+      rate?: { average: number; period: string; burst?: number }
+      per?: 'ip' | 'rule'
     }
   ) {
     return data(
@@ -1475,7 +1488,7 @@ export class FaableApi<T = any> {
       pattern?: string
       user_agent?: string
       query?: string
-      action?: 'deny' | 'sink' | 'allow' | 'monitor'
+      action?: 'deny' | 'sink' | 'allow' | 'monitor' | 'limit'
     }
   ) {
     return data(

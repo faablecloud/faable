@@ -1,5 +1,6 @@
 import { FaableApi, FaableAppWaf, FaableWafRule } from '../../../api/FaableApi'
 import { log } from '../../../log'
+import { limit_label } from './format'
 
 export type RuleSelector = {
   pattern?: string
@@ -44,9 +45,12 @@ export const add_rule = async (opts: {
   pattern?: string
   user_agent?: string
   query?: string
-  action: 'deny' | 'sink' | 'allow' | 'monitor'
+  action: 'deny' | 'sink' | 'allow' | 'monitor' | 'limit'
   description?: string
   force?: boolean
+  /** Only for 'limit'. */
+  rate?: { average: number; period: '1s' | '1m'; burst?: number }
+  per?: 'ip' | 'rule'
   // --json: the WAF as it is after the write, and no prose.
   json?: boolean
 }): Promise<FaableAppWaf> => {
@@ -61,7 +65,9 @@ export const add_rule = async (opts: {
     action,
     description,
     force,
-    json
+    json,
+    rate,
+    per
   } = opts
 
   const want: RuleSelector = { pattern, user_agent, query }
@@ -71,7 +77,8 @@ export const add_rule = async (opts: {
     query,
     action,
     description,
-    force
+    force,
+    ...(action === 'limit' ? { rate, per } : {})
   })
 
   // Read the rule back before telling the user it worked.
@@ -105,6 +112,40 @@ export const add_rule = async (opts: {
   }
 
   if (json) return waf
+
+  if (action === 'limit') {
+    const stored = waf.rules.find(r => rule_matches_request(r, want, 'limit'))
+    const label = stored?.rate
+      ? limit_label(stored.rate, stored.per)
+      : 'rate limited'
+    log.info(`⏱️  ${describe_selector(want)} → ${label}`)
+    log.info(`   for ${app_name} (${app_id}).`)
+    log.info(``)
+    log.info(
+      `Over the limit, Faable answers 429 at the edge: those requests do not reach or wake your app.`
+    )
+    if (stored?.per === 'rule') {
+      log.info(
+        `The count is shared by every client of each of the app's domains, not kept per IP.`
+      )
+    }
+    if (user_agent && !pattern) {
+      log.info(``)
+      log.info(
+        `⚠️  A user-agent rule has no path restriction: it counts every request from that client.`
+      )
+    }
+    log.info(``)
+    log.info(`It takes about 20s to reach the edge. Then check it with:`)
+    log.info(
+      `  for i in $(seq 1 ${(stored?.rate?.burst ?? 10) + 5}); do curl -s -o /dev/null -w '%{http_code} ' ${user_agent ? `-A '${user_agent}' ` : ''}https://${app_url}<path>; done; echo`
+    )
+    log.info(``)
+    log.info(
+      `Undo: faable deploy waf rm ${undo_args(want)} --action limit -a ${app_id}`
+    )
+    return waf
+  }
 
   if (action === 'allow') {
     // The one rule that opens instead of closing: say exactly what it opens.

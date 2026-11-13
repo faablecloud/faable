@@ -12,7 +12,9 @@ export const action_label = (action: string): string =>
           ? 'allowed (reaches your app where Faable blocks it for every app)'
           : action === 'monitor'
             ? 'monitor only (nothing blocked; the Firewall tab shows what it would stop)'
-            : action
+            : action === 'limit'
+              ? 'rate limited (429 at the edge over the limit)'
+              : action
 
 /**
  * Render the effective WAF of an app.
@@ -62,7 +64,9 @@ export const format_waf = (waf: FaableAppWaf): string[] => {
     out.push('  (none)')
   }
   for (const r of waf.rules) {
-    out.push(`  • ${rule_subject(r)} → ${action_label(r.action)}`)
+    out.push(
+      `  • ${rule_subject(r)} → ${r.action === 'limit' && r.rate ? limit_label(r.rate, r.per) : action_label(r.action)}`
+    )
     if (r.description) out.push(`      ${r.description}`)
   }
 
@@ -86,4 +90,15 @@ export const rule_subject = (r: FaableWafRule): string => {
   if (r.user_agent) return `UA ~ ${r.user_agent} (any path)`
   if (r.query) return `?${r.query} (any path)`
   return r.pattern ?? '(unknown)'
+}
+
+/** `10/min per IP (burst 20), then 429` — what a limit rule lets through. */
+export const limit_label = (
+  rate: { average: number; period: string; burst: number },
+  per?: string
+): string => {
+  const unit = rate.period === '1s' ? 's' : 'min'
+  const who = per === 'rule' ? 'shared by all clients' : 'per IP'
+  const burst = rate.burst !== rate.average ? ` (burst ${rate.burst})` : ''
+  return `${rate.average}/${unit} ${who}${burst}, then 429`
 }
