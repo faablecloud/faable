@@ -1,6 +1,6 @@
 import { FaableApi, FaableAppWaf, FaableWafRule } from '../../../api/FaableApi'
 import { log } from '../../../log'
-import { limit_label } from './format'
+import { example_path, limit_label } from './format'
 
 export type RuleSelector = {
   pattern?: string
@@ -138,7 +138,7 @@ export const add_rule = async (opts: {
     log.info(``)
     log.info(`It takes about 20s to reach the edge. Then check it with:`)
     log.info(
-      `  for i in $(seq 1 ${(stored?.rate?.burst ?? 10) + 5}); do curl -s -o /dev/null -w '%{http_code} ' ${user_agent ? `-A '${user_agent}' ` : ''}https://${app_url}<path>; done; echo`
+      `  for i in $(seq 1 ${(stored?.rate?.burst ?? 10) + 5}); do curl -s -o /dev/null -w '%{http_code} ' ${user_agent ? `-A '${user_agent}' ` : ''}'https://${app_url}${example_path(pattern, query)}'; done; echo`
     )
     log.info(``)
     log.info(

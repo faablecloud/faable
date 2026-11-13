@@ -102,3 +102,19 @@ export const limit_label = (
   const burst = rate.burst !== rate.average ? ` (burst ${rate.burst})` : ''
   return `${rate.average}/${unit} ${who}${burst}, then 429`
 }
+
+/**
+ * A request path a rule matches, for the example `curl`: `^/api/login$` →
+ * `/api/login`. Only a plain literal path qualifies (escaped dots allowed);
+ * anything with regex syntax left gives `<path>`, the user's to fill in.
+ * A query rule gets its parameter, so the example actually matches.
+ */
+export const example_path = (pattern?: string, query?: string): string => {
+  const qs = query ? `?${query}=1` : ''
+  if (!pattern) return `/${qs}`
+  const literal = pattern
+    .replace(/^\^/, '')
+    .replace(/\$$/, '')
+    .replace(/\\\./g, '.')
+  return /^\/[A-Za-z0-9/_.~-]*$/.test(literal) ? `${literal}${qs}` : '<path>'
+}

@@ -1,5 +1,5 @@
 import test from 'ava'
-import { action_label, format_waf, rule_subject } from './format'
+import { action_label, example_path, format_waf, rule_subject } from './format'
 
 test('action labels explain what the caller will actually see', t => {
   t.is(action_label('deny'), '403 (blocked at the edge)')
@@ -137,4 +137,14 @@ test('a path+query rule shows both halves, and the parameter reads as one', t =>
     rule_subject({ pattern: '^/$', query: 'rest_route', action: 'deny' }),
     '^/$ + ?rest_route'
   )
+})
+
+test('example_path: a literal pattern becomes the path to curl', t => {
+  t.is(example_path('^/api/login$'), '/api/login')
+  t.is(example_path('^/robots\\.txt$'), '/robots.txt')
+  t.is(example_path('^/search'), '/search')
+  t.is(example_path('^/(a|b)'), '<path>', 'regex syntax: the user fills it in')
+  t.is(example_path(undefined), '/', 'a user-agent rule, any path')
+  t.is(example_path(undefined, 'rest_route'), '/?rest_route=1')
+  t.is(example_path('^/$', 'author'), '/?author=1')
 })
