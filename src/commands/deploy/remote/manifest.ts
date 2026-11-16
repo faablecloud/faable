@@ -46,6 +46,11 @@ export const collect_manifest = async (
       )
     : await list_without_repo(workdir);
 
+  if (in_repo) {
+    const warning = committed_venv_warning(rel_paths);
+    if (warning) log.warn(warning);
+  }
+
   if (rel_paths.length === 0) {
     throw new Error(
       in_repo
@@ -116,8 +121,62 @@ const split_z = (out: unknown) =>
 const shell_quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 
 // Out of an upload even when no .gitignore says so — a plain folder has none,
-// and these are the files a repository would have ignored anyway.
-export const NO_REPO_EXCLUDES = ["node_modules/", ".env", ".env.*", ".DS_Store"];
+// and these are the files a repository would have ignored anyway. Python
+// virtualenvs and bytecode: the buildpack recreates the venv (`uv venv`) and
+// compiles its own bytecode, so uploading them only bloats the artifact
+// (arch/abuse/keepalive-interno-free-24h.md). Not excluded on purpose: hidden
+// paths in general (`.well-known/`, `.npmrc`, `.python-version` are content or
+// build input) and `dist/`, `build/`, `out/` (a plain folder is often an
+// already-built site uploaded as is).
+export const NO_REPO_EXCLUDES = [
+  "node_modules/",
+  ".env",
+  ".env.*",
+  ".DS_Store",
+  ".venv/",
+  "venv/",
+  "__pycache__/",
+  "*.pyc",
+  ".git/",
+];
+
+const PYVENV_CFG = "pyvenv.cfg";
+
+// A virtualenv under any other name (`env/`, `.python/`…) is still a
+// virtualenv: it is the folder that holds a pyvenv.cfg. Matched on the listing
+// instead of with a git pattern so that an `env/` of config files stays in.
+const without_virtualenvs = (paths: string[]): string[] => {
+  const venv_dirs = paths
+    .filter((p) => p.endsWith(`/${PYVENV_CFG}`))
+    .map((p) => p.slice(0, -PYVENV_CFG.length));
+  if (venv_dirs.length === 0) return paths;
+  return paths.filter((p) => !venv_dirs.some((d) => p.startsWith(d)));
+};
+
+// More files than this under site-packages/ is an installed environment, not a
+// vendored module or two.
+const SITE_PACKAGES_WARN_THRESHOLD = 200;
+
+/**
+ * In a repository git decides what is uploaded, a committed virtualenv
+ * included — but the build recreates it, so say so (and keep going).
+ */
+export const committed_venv_warning = (paths: string[]): string | undefined => {
+  const cfg = paths.find(
+    (p) => p === PYVENV_CFG || p.endsWith(`/${PYVENV_CFG}`)
+  );
+  const site_packages = paths.filter((p) =>
+    `/${p}`.includes("/site-packages/")
+  ).length;
+  if (!cfg && site_packages <= SITE_PACKAGES_WARN_THRESHOLD) return undefined;
+  const dir = cfg?.slice(0, -PYVENV_CFG.length);
+  const found = dir
+    ? `${dir} is a Python virtualenv`
+    : cfg
+      ? "the repository root is a Python virtualenv"
+      : `${site_packages} files under site-packages/ look like a Python virtualenv`;
+  return `⚠️ ${found} committed to the repository. The build recreates it, so it only makes the upload bigger: add ${dir || "it"} to .gitignore.`;
+};
 
 /**
  * The files of a folder that is not a git repository. Git still lists them:
@@ -134,14 +193,14 @@ const list_without_repo = async (workdir: string): Promise<string[]> => {
       );
     });
     log.info(
-      `📂 ${workdir} is not a git repository: uploading the folder (its .gitignore files apply; ${NO_REPO_EXCLUDES.join(", ")} stay out)`
+      `📂 ${workdir} is not a git repository: uploading the folder (its .gitignore files apply; ${NO_REPO_EXCLUDES.join(", ")} and Python virtualenvs stay out)`
     );
     const excludes = NO_REPO_EXCLUDES.map((p) => `-x ${shell_quote(p)}`).join(" ");
     const out = await cmd(
       `git --git-dir=${shell_quote(path.join(git_dir, ".git"))} --work-tree=${shell_quote(workdir)} ls-files -o --exclude-standard ${excludes} -z`,
       { cwd: workdir }
     );
-    return split_z(out.stdout);
+    return without_virtualenvs(split_z(out.stdout));
   } finally {
     rmSync(git_dir, { recursive: true, force: true });
   }

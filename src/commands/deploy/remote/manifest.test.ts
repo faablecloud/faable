@@ -10,7 +10,7 @@ import {
 } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { collect_manifest } from "./manifest";
+import { collect_manifest, committed_venv_warning } from "./manifest";
 
 const git_fixture = (): string => {
   const dir = mkdtempSync(join(tmpdir(), "faable-manifest-"));
@@ -86,4 +86,65 @@ test("an empty folder that is not a repository says there is nothing to upload",
   await t.throwsAsync(() => collect_manifest(dir), {
     message: /No files to upload/,
   });
+});
+
+// Python junk in a plain folder: the build recreates the virtualenv and the
+// bytecode, so they stay out. Hidden content (.well-known/) and a built site
+// (dist/) are what such a folder is for, so they go up.
+test("a folder that is not a repository leaves Python virtualenvs and bytecode out", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "faable-nogit-"));
+  const files: Record<string, string> = {
+    ".venv/lib/x.py": "venv",
+    "venv/bin/python": "venv",
+    "__pycache__/a.pyc": "bytecode",
+    "app.pyc": "bytecode",
+    // Any folder with a pyvenv.cfg is a virtualenv, whatever its name…
+    "env/pyvenv.cfg": "home = /usr/bin",
+    "env/lib/site.py": "venv",
+    // …and one without is not.
+    "config/env/settings.py": "X = 1",
+    ".well-known/foo": "verification",
+    ".python-version": "3.12",
+    "dist/index.html": "<!doctype html>",
+    "main.py": "print(1)",
+  };
+  for (const [rel, body] of Object.entries(files)) {
+    mkdirSync(join(dir, rel, ".."), { recursive: true });
+    writeFileSync(join(dir, rel), body);
+  }
+
+  const paths = (await collect_manifest(dir)).map((f) => f.path).sort();
+  t.deepEqual(paths, [
+    ".python-version",
+    ".well-known/foo",
+    "config/env/settings.py",
+    "dist/index.html",
+    "main.py",
+  ]);
+});
+
+test("a committed virtualenv is uploaded, with a warning", async (t) => {
+  const dir = git_fixture();
+  mkdirSync(join(dir, ".venv/lib/python3.12/site-packages/pkg"), {
+    recursive: true,
+  });
+  writeFileSync(join(dir, ".venv/pyvenv.cfg"), "home = /usr/bin");
+  writeFileSync(
+    join(dir, ".venv/lib/python3.12/site-packages/pkg/__init__.py"),
+    ""
+  );
+
+  // In a repository git decides: the venv goes up.
+  const paths = (await collect_manifest(dir)).map((f) => f.path);
+  t.true(paths.includes(".venv/pyvenv.cfg"));
+
+  t.regex(committed_venv_warning(paths)!, /add \.venv\/ to \.gitignore/);
+  t.is(committed_venv_warning(["main.py", "requirements.txt"]), undefined);
+  // No pyvenv.cfg, but an installed environment's worth of site-packages.
+  const site = Array.from(
+    { length: 201 },
+    (_, i) => `lib/site-packages/p${i}.py`
+  );
+  t.regex(committed_venv_warning(site)!, /201 files under site-packages/);
+  t.is(committed_venv_warning(site.slice(0, 200)), undefined);
 });
