@@ -14,6 +14,7 @@ import { run } from './inspect/run'
 import { status } from './inspect/status'
 import { traffic } from './inspect/traffic'
 import { trigger } from './inspect/trigger'
+import { install } from './install'
 import { launch } from './launch'
 import { quota, usage } from './project_usage'
 import { schedule } from './schedule'
@@ -46,6 +47,7 @@ export const deploy: CommandModule = {
       yargs
         .command(launch)
         .command(apps)
+        .command(install)
         .command(github)
         .command(secrets)
         .command(domains)

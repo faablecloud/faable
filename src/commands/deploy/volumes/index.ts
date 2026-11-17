@@ -9,13 +9,13 @@ import { volumes_restore } from './restore'
 import { volumes_rm } from './rm'
 
 // The volumes of an app (api `/volume`, `/volume-operation`): today the ones
-// a blueprint defines (WordPress: `site` at /faable/app). Hidden until the
-// blueprints are published, like the api endpoints (x-internal); then the
-// describe below. Arch: deploy/volumenes-cli-comparativa.md (backlog §460).
+// a blueprint defines (WordPress: `site` at /faable/app). Public since the
+// catalogue opened (`faable deploy install`, 2026-11-17), like the api
+// endpoints. Arch: deploy/volumenes-cli-comparativa.md (backlog §460).
 export const volumes: CommandModule = {
   command: 'volumes <command>',
-  // 'Manage the volumes of an app: usage, files (ls, get, put, rm), backups, restore, export and import'
-  describe: false,
+  describe:
+    'Manage the volumes of an app: usage, files (ls, get, put, rm), backups, restore, export and import',
   builder: yargs =>
     yargs
       .command(volumes_list)

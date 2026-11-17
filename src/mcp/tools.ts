@@ -323,6 +323,17 @@ export const TOOLS: ToolDef[] = [
     example: { project: 'p', cursor: 'abc' }
   },
   {
+    name: 'list_blueprints',
+    title: 'List the apps Faable can install',
+    description:
+      'The Faable catalogue: apps Faable installs and runs for you (WordPress…), each with the plans that may install it (Hobby, Pro), its database tiers and the inputs it asks for. Use it before install_blueprint.',
+    input: {},
+    command: ['deploy', 'install'],
+    flags: () => [],
+    annotations: READ,
+    example: {}
+  },
+  {
     name: 'get_app',
     title: 'Get an app',
     description:
@@ -1105,6 +1116,61 @@ export const TOOLS: ToolDef[] = [
       openWorldHint: true
     },
     example: { repo: 'acme/web', name: 'web', branch: 'main', wait: true }
+  },
+  {
+    name: 'install_blueprint',
+    title: 'Install an app from the catalogue',
+    description:
+      "Install an app of the Faable catalogue (WordPress…) in a project: its app, a volume for its files and a database with daily backups, with sign-in through Faable Auth (the dashboard's Install an app). Needs a Hobby or Pro project; the database is billed per month. list_blueprints says what each app asks for in `inputs`.",
+    input: {
+      blueprint: z.string().describe('Catalogue app, e.g. wordpress'),
+      name: z
+        .string()
+        .describe(
+          'Name of the app it creates: lowercase letters, digits and dashes'
+        ),
+      inputs: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe(
+          'What the app asks for (list_blueprints), e.g. { "title": "My blog", "admin_email": "me@example.com" }'
+        ),
+      tier: z
+        .string()
+        .optional()
+        .describe("Database tier (db-s, db-m); defaults to the plan's"),
+      wait: z
+        .boolean()
+        .optional()
+        .describe(
+          'Wait until the installation is ready (returns the URL) or fails, up to 10 minutes'
+        ),
+      project
+    },
+    command: ['deploy', 'install'],
+    flags: a => [
+      a.blueprint,
+      ...optText('--name', a.name),
+      ...Object.entries((a.inputs ?? {}) as Record<string, string>).map(
+        ([k, v]) => `--input=${k}=${v}`
+      ),
+      ...opt('--tier', a.tier),
+      ...(a.wait ? ['--wait', '--timeout', '600'] : []),
+      ...scope(a)
+    ],
+    timeout_ms: 630_000,
+    write: true,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: true
+    },
+    example: {
+      blueprint: 'wordpress',
+      name: 'blog',
+      inputs: { title: 'My blog', admin_email: 'me@example.com' },
+      wait: true
+    }
   },
   {
     name: 'redeploy',

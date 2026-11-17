@@ -478,6 +478,38 @@ export type FaableOrganization = {
   admins?: string[]
 }
 
+// A published blueprint of the catalogue (api GET /catalog/blueprints).
+export interface FaableCatalogBlueprint {
+  slug: string
+  name: string
+  description: string | null
+  icon: string | null
+  version: number
+  plans: string[]
+  create_form: {
+    name: string
+    label: string
+    type: string
+    required: boolean
+  }[]
+  database: { engine: string; tiers: string[] } | null
+}
+
+// An app installed from the catalogue (api Installation).
+export interface FaableInstallation {
+  id: string
+  team: string
+  blueprint_slug: string
+  name: string
+  state:
+    'installing' | 'ready' | 'failed' | 'uninstalling' | 'retained' | string
+  error: string | null
+  app_id: string | null
+  database_id?: string | null
+  volume_ids?: string[]
+  auth_admin_invite?: string | null
+}
+
 const data = async <T, Q extends Promise<AxiosResponse<T>>>(
   res: Q
 ): Promise<Awaited<Q>['data']> => {
@@ -1336,6 +1368,43 @@ export class FaableApi<T = any> {
   async deleteDomain(domain_id: string, team: string) {
     return data(
       this.client.delete(`/domain/${domain_id}`, {
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  // ── catalogue: apps Faable installs and runs (WordPress…) ────────────────
+
+  // The published blueprints any signed-in user may list (GET /catalog/blueprints).
+  async listBlueprints() {
+    const res = await data(
+      this.client.get<{ results: FaableCatalogBlueprint[] }>(
+        `/catalog/blueprints`
+      )
+    )
+    return res.results
+  }
+
+  // Installs one in a project: its App, Volume and Database (Hobby and Pro).
+  async createInstallation(
+    project: string,
+    params: {
+      blueprint: string
+      name: string
+      tier?: string
+      inputs?: Record<string, string>
+    }
+  ) {
+    return data(
+      this.client.post<FaableInstallation>(`/installation`, params, {
+        headers: projectHeader(project)
+      })
+    )
+  }
+
+  async getInstallation(id: string, team: string) {
+    return data(
+      this.client.get<FaableInstallation>(`/installation/${id}`, {
         headers: projectHeader(team)
       })
     )
