@@ -9,6 +9,13 @@ import {
   client_type_patch,
   is_public_client
 } from './client_type'
+import {
+  SIGNUP_PROTECTION_HELP,
+  SIGNUP_PROTECTION_MODES,
+  SignupProtection,
+  effective_signup_protection,
+  signup_protection_patch
+} from './signup_protection'
 
 interface ClientsCreateArgs extends TenantArgs {
   name: string
@@ -17,6 +24,7 @@ interface ClientsCreateArgs extends TenantArgs {
   logoutUrl?: string[]
   webOrigin?: string[]
   type: ClientType
+  signupProtection?: SignupProtection
 }
 
 export const clients_create: CommandModule<unknown, ClientsCreateArgs> = {
@@ -57,6 +65,10 @@ export const clients_create: CommandModule<unknown, ClientsCreateArgs> = {
         array: true,
         description: 'Allowed web origin (CORS) — repeatable'
       })
+      .option('signup-protection', {
+        choices: SIGNUP_PROTECTION_MODES,
+        description: `${SIGNUP_PROTECTION_HELP}. Default: on_risk`
+      })
       .example(
         '$0 auth clients create -n my-app --callback https://app.example.com/callback',
         'Create a client with one redirect URL'
@@ -73,8 +85,9 @@ export const clients_create: CommandModule<unknown, ClientsCreateArgs> = {
       ...(args.description ? { description: args.description } : {}),
       ...(args.callback?.length ? { callbacks: args.callback } : {}),
       ...(args.logoutUrl?.length ? { logout_urls: args.logoutUrl } : {}),
-      ...(args.webOrigin?.length ? { web_origins: args.webOrigin } : {})
-    })
+      ...(args.webOrigin?.length ? { web_origins: args.webOrigin } : {}),
+      ...signup_protection_patch(args.signupProtection)
+    } as any)
     const patch = client_type_patch(args.type)
     const client = patch
       ? { ...created, ...(await api.clientUpdate(created.id, patch as any)) }
@@ -91,6 +104,7 @@ export const clients_create: CommandModule<unknown, ClientsCreateArgs> = {
 
     log.info(`✅ Created client "${client.name}" (${client.id})`)
     log.info(`  Client ID:     ${client.client_id}`)
+    log.info(`  Signup protection: ${effective_signup_protection(client)}`)
     if (public_client) {
       log.info(
         `  Type:          ${args.type} — public client: PKCE, no secret (safe to ship in the app)`

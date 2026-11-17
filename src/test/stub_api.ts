@@ -40,6 +40,23 @@ export const ANA = {
   logins_count: 7
 }
 
+// Two OAuth clients of the tenant: one from before signup protection existed
+// (no field: off) and one created with it.
+export const CLIENT_OLD = {
+  id: 'client_aaaaaaaaaaaaaaaaaaaaaaaa',
+  client_id: 'oldclientid',
+  name: 'old-app',
+  callbacks: ['https://old.example.com/cb']
+}
+export const CLIENT_NEW = {
+  id: 'client_bbbbbbbbbbbbbbbbbbbbbbbb',
+  client_id: 'newclientid',
+  name: 'new-app',
+  callbacks: [],
+  signup_protection: 'on_risk'
+}
+const CLIENTS = [CLIENT_OLD, CLIENT_NEW]
+
 // The deployment of a `faable deploy` run, and a line of its build log: it
 // must reach stderr, never the JSON on stdout.
 export const DIR_DEPLOYMENT = 'deployment_dir'
@@ -143,6 +160,19 @@ export const start_api = async () => {
             deploy_trigger: 'webhook'
           })
         }
+        // Auth management: clients (create takes the server default).
+        if (url.pathname === '/client') {
+          const sent = JSON.parse(body || '{}')
+          return json({
+            id: 'client_created',
+            client_id: 'createdclientid',
+            client_secret: 'secret',
+            signup_protection: 'on_risk',
+            ...sent
+          })
+        }
+        const client = CLIENTS.find(c => url.pathname === `/client/${c.id}`)
+        if (client) return json({ ...client, ...JSON.parse(body || '{}') })
         // Auth management: suspend/reinstate (update) and session revoke.
         if (url.pathname === `/user/${ANA.id}`) {
           return json({ ...ANA, ...JSON.parse(body || '{}') })
@@ -250,6 +280,11 @@ export const start_api = async () => {
       }
       return json({ results: [ANA], next: null })
     }
+    if (url.pathname === '/client') {
+      return json({ results: CLIENTS, next: null })
+    }
+    const client = CLIENTS.find(c => url.pathname === `/client/${c.id}`)
+    if (client) return json(client)
     if (url.pathname === '/session') {
       return json({
         results: [{ id: 'session_1', user: ANA.id, status: 'active' }],

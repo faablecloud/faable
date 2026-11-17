@@ -17,6 +17,8 @@ import {
   ANA,
   APP,
   BUILD_LOG_LINE,
+  CLIENT_NEW,
+  CLIENT_OLD,
   NEW_APP,
   ORGANIZATION,
   PROJECT,
@@ -858,6 +860,99 @@ test('build logs skip a cancelled redeploy that never built (§374)', async t =>
     )
     t.is(out.code, 0, out.stderr)
     t.is(JSON.parse(out.stdout).deployment_id, 'deployment_1')
+  } finally {
+    api.close()
+  }
+})
+
+// Signup protection (auth SignupProtection): one field on the client.
+const last_body = (api: { bodies: string[] }) =>
+  JSON.parse(api.bodies[api.bodies.length - 1])
+
+test('auth clients create --signup-protection: the mode goes in the create body', async t => {
+  const api = await start_api()
+  try {
+    const out = await run(
+      ['auth', 'clients', 'create', '-n', 'my-app', '--signup-protection', 'always'],
+      auth_env(api.url)
+    )
+    t.is(out.code, 0, out.stderr)
+    t.deepEqual(auth_writes(api.writes), ['POST /client'])
+    t.deepEqual(last_body(api), { name: 'my-app', signup_protection: 'always' })
+    t.regex(out.stdout + out.stderr, /Signup protection: always/)
+  } finally {
+    api.close()
+  }
+})
+
+test('auth clients create without the option: nothing sent, the server default shown', async t => {
+  const api = await start_api()
+  try {
+    const out = await run(
+      ['auth', 'clients', 'create', '-n', 'my-app'],
+      auth_env(api.url)
+    )
+    t.is(out.code, 0, out.stderr)
+    t.false('signup_protection' in last_body(api))
+    t.regex(out.stdout + out.stderr, /Signup protection: on_risk/)
+  } finally {
+    api.close()
+  }
+})
+
+test('auth clients update --signup-protection: a patch with only the mode', async t => {
+  const api = await start_api()
+  try {
+    const out = await run(
+      ['auth', 'clients', 'update', CLIENT_OLD.id, '--signup-protection', 'on_risk', '--json'],
+      auth_env(api.url)
+    )
+    t.is(out.code, 0, out.stderr)
+    t.deepEqual(auth_writes(api.writes), [`POST /client/${CLIENT_OLD.id}`])
+    t.deepEqual(last_body(api), { signup_protection: 'on_risk' })
+    t.is(JSON.parse(out.stdout).signup_protection, 'on_risk')
+  } finally {
+    api.close()
+  }
+})
+
+test('auth clients update --signup-protection with a bad mode: usage error, nothing written', async t => {
+  const api = await start_api()
+  try {
+    const out = await run(
+      ['auth', 'clients', 'update', CLIENT_OLD.id, '--signup-protection', 'strict'],
+      auth_env(api.url)
+    )
+    t.is(out.code, 1)
+    t.is(error_of(out.stderr).code, 'usage')
+    t.deepEqual(auth_writes(api.writes), [])
+  } finally {
+    api.close()
+  }
+})
+
+test('auth clients get / list: an old client without the field reads off', async t => {
+  const api = await start_api()
+  try {
+    const get = await run(['auth', 'clients', 'get', CLIENT_OLD.id], auth_env(api.url))
+    t.is(get.code, 0, get.stderr)
+    t.regex(get.stdout + get.stderr, /Signup protection: off/)
+
+    const get_json = await run(
+      ['auth', 'clients', 'get', CLIENT_NEW.id, '--json'],
+      auth_env(api.url)
+    )
+    t.is(JSON.parse(get_json.stdout).signup_protection, 'on_risk')
+
+    const list = await run(['auth', 'clients', 'list'], auth_env(api.url))
+    t.is(list.code, 0, list.stderr)
+    t.regex(list.stdout, /SIGNUP_PROTECTION/)
+    t.regex(list.stdout, /oldclientid\s.*\boff\b/)
+    t.regex(list.stdout, /newclientid\s.*\bon_risk\b/)
+
+    const list_json = await run(['auth', 'clients', 'list', '--json'], auth_env(api.url))
+    const rows = JSON.parse(list_json.stdout).data
+    t.is(rows.find((c: any) => c.id === CLIENT_NEW.id).signup_protection, 'on_risk')
   } finally {
     api.close()
   }

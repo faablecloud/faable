@@ -18,6 +18,13 @@ import {
   has_login_method_changes
 } from './login_methods'
 import { resolve_client } from './resolve'
+import {
+  SIGNUP_PROTECTION_HELP,
+  SIGNUP_PROTECTION_MODES,
+  SignupProtection,
+  effective_signup_protection,
+  signup_protection_patch
+} from './signup_protection'
 
 interface ClientsUpdateArgs extends TenantArgs {
   client_id: string
@@ -38,6 +45,7 @@ interface ClientsUpdateArgs extends TenantArgs {
   enableConnection?: string[]
   passkeyLogin?: PasskeyChoice
   inheritLoginMethods?: boolean
+  signupProtection?: SignupProtection
 }
 
 // The update route replaces each list whole, so every list change here is a
@@ -56,7 +64,8 @@ const edit_list = (
 
 export const clients_update: CommandModule<unknown, ClientsUpdateArgs> = {
   command: 'update <client_id>',
-  describe: 'Update an OAuth client (name, URLs, profile fields, login methods)',
+  describe:
+    'Update an OAuth client (name, URLs, profile fields, login methods, signup protection)',
   builder: yargs =>
     json_option(tenant_options(yargs))
       .positional('client_id', {
@@ -152,6 +161,10 @@ export const clients_update: CommandModule<unknown, ClientsUpdateArgs> = {
         description:
           "Drop this client's own login methods and follow the tenant's again"
       })
+      .option('signup-protection', {
+        choices: SIGNUP_PROTECTION_MODES,
+        description: SIGNUP_PROTECTION_HELP
+      })
       .conflicts('fields-json', ['add-field', 'remove-field', 'inherit-fields'])
       .conflicts('inherit-fields', ['add-field', 'remove-field'])
       .conflicts('inherit-login-methods', [
@@ -172,6 +185,10 @@ export const clients_update: CommandModule<unknown, ClientsUpdateArgs> = {
       .example(
         '$0 auth clients update my-app --remove-field school',
         'Stop accepting a field'
+      )
+      .example(
+        '$0 auth clients update my-app --signup-protection always',
+        'Make every signup of my-app solve the proof-of-work challenge'
       )
       .example(
         '$0 auth clients update my-app --add-callback https://app.example.com/cb',
@@ -251,11 +268,12 @@ export const clients_update: CommandModule<unknown, ClientsUpdateArgs> = {
       ...(logout_urls ? { logout_urls } : {}),
       ...(web_origins ? { web_origins } : {}),
       ...(profile_fields !== undefined ? { profile_fields } : {}),
-      ...(login_methods !== undefined ? { login_methods } : {})
+      ...(login_methods !== undefined ? { login_methods } : {}),
+      ...signup_protection_patch(args.signupProtection)
     }
     if (Object.keys(patch).length === 0) {
       throw new Error(
-        'Nothing to update — pass a --name, --description, an --add-*/--remove-* option, --fields-json, --inherit-fields or a login-method option'
+        'Nothing to update — pass a --name, --description, an --add-*/--remove-* option, --fields-json, --inherit-fields, a login-method option or --signup-protection'
       )
     }
 
@@ -263,6 +281,9 @@ export const clients_update: CommandModule<unknown, ClientsUpdateArgs> = {
     if (args.json) return print_json(updated)
 
     log.info(`✅ Updated client "${updated.name}" (${updated.client_id})`)
+    if (args.signupProtection !== undefined) {
+      log.info(`  Signup protection: ${effective_signup_protection(updated)}`)
+    }
     if (login_methods !== undefined) {
       const now = effective_login_methods(
         (updated as { login_methods?: LoginMethodsConfig | null })

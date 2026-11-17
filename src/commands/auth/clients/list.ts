@@ -4,6 +4,7 @@ import { log } from '../../../log'
 import { fetch_page, from_paginator, more_hint, print } from '../../../lib/listing'
 import { AuthListArgs, list_options, tenant_options } from '../options'
 import { print_json, table_lines, truncate, when } from '../render'
+import { effective_signup_protection } from './signup_protection'
 
 interface ClientsListArgs extends AuthListArgs {
   q?: string
@@ -37,10 +38,11 @@ export const clients_list: CommandModule<unknown, ClientsListArgs> = {
       c.client_id ?? '-',
       truncate(c.name, 28),
       String(c.callbacks?.length ?? 0),
+      effective_signup_protection(c),
       when(c.createdAt)
     ])
     for (const line of table_lines(
-      ['CLIENT_ID', 'NAME', 'CALLBACKS', 'CREATED'],
+      ['CLIENT_ID', 'NAME', 'CALLBACKS', 'SIGNUP_PROTECTION', 'CREATED'],
       rows
     )) {
       print(line)

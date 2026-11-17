@@ -5,6 +5,7 @@ import { TenantArgs, json_option, tenant_options } from '../options'
 import { print_json } from '../render'
 import { ProfileFieldDeclaration, format_field } from './profile_fields'
 import { resolve_client } from './resolve'
+import { effective_signup_protection } from './signup_protection'
 
 interface ClientsGetArgs extends TenantArgs {
   client_id: string
@@ -55,6 +56,7 @@ export const clients_get: CommandModule<unknown, ClientsGetArgs> = {
     log.info(
       `  Fields:      ${fields ? (fields.length ? fields.map(format_field).join(', ') : 'none') : 'inherited from the tenant'}`
     )
+    log.info(`  Signup protection: ${effective_signup_protection(client)}`)
     log.info(`  Created:     ${client.createdAt ?? '-'}`)
   })
 }
