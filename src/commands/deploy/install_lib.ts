@@ -47,6 +47,9 @@ export interface InstallWaitResult {
   done: boolean
   ok: boolean
   error?: string | null
+  // Ready and its URL answers (not the edge's APP_NOT_FOUND, cached 120 s):
+  // false when the route was still not out at the end of the wait.
+  reachable?: boolean
 }
 
 /**

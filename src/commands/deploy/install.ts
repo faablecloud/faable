@@ -5,6 +5,7 @@ import { requireProject } from '../../api/project'
 import { CliError } from '../../lib/errors'
 import { json_option, print_json } from '../../lib/listing'
 import { log } from '../../log'
+import { reachable_timeout_ms, wait_reachable } from './reachable'
 import {
   InstallWaitResult,
   catalog_lines,
@@ -144,10 +145,20 @@ export const install: CommandModule<unknown, InstallArgs> = {
           .then(a => (a.url ? `https://${a.url}` : undefined))
           .catch(() => undefined)
       }
+      // Ready on the platform is not yet a URL that answers: the edge takes
+      // a minute or two to route a new app, and its "app not found" is
+      // cached for 120 s — the URL right away would look broken (17-11,
+      // wp-catalog-canary). Same check as a deploy's (reachable.ts, F9).
+      if (waited.ok && url) {
+        const timeout = reachable_timeout_ms()
+        if (timeout > 0) waited.reachable = await wait_reachable(url, timeout)
+      }
       if (!args.json) {
         log.info(
           waited.ok
-            ? `✅ Ready${url ? `: ${url}` : ''}`
+            ? waited.reachable === false
+              ? `✅ Ready${url ? `: ${url}` : ''} — the address may take another minute to answer`
+              : `✅ Ready${url ? `: ${url}` : ''}`
             : waited.done
               ? `❌ The installation failed: ${waited.error ?? 'see the dashboard'}`
               : `⏳ Still ${waited.state} after ${args.timeout}s — it goes on; check it in the dashboard`
