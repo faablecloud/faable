@@ -914,7 +914,7 @@ export const TOOLS: ToolDef[] = [
     name: 'list_auth_clients',
     title: 'List Auth applications',
     description:
-      'The applications (OAuth clients) of the Auth tenant: web apps, SPAs, native apps and machine-to-machine clients.',
+      'The applications (OAuth clients) of the Auth tenant: web apps, SPAs, native apps and machine-to-machine clients, with the signup bot protection each one applies (`signup_protection`).',
     input: { search: z.string().optional(), tenant, project },
     command: ['auth', 'clients', 'list'],
     flags: a => [...opt('-q', a.search), '--limit', '100', ...auth_scope(a)],
@@ -923,7 +923,9 @@ export const TOOLS: ToolDef[] = [
       client_id: c.client_id,
       name: c.name,
       application_type: c.application_type,
-      grant_types: c.grant_types
+      grant_types: c.grant_types,
+      // Absent on clients created before the setting existed: those are off.
+      signup_protection: c.signup_protection ?? 'off'
     })),
     annotations: AUTH_READ,
     example: { search: 'web', tenant: 'account_1' }
@@ -1797,6 +1799,40 @@ export const TOOLS: ToolDef[] = [
       only: ['OTP'],
       passkey: 'on'
     }
+  },
+  {
+    name: 'update_auth_client_signup_protection',
+    title: "Change an app's signup bot protection",
+    description:
+      "Set how one Auth application protects its signups and passwordless codes from bots: `off` relies on Actions only; `on_risk` asks for a proof-of-work challenge when the request looks automated (Tor, datacenter, odd user agent); `always` makes every signup and code to a new address solve it, and refuses client libraries older than @faable/auth-js 3.4.0 — check the app's auth-js version before choosing it. Nothing else on the app changes.",
+    input: {
+      client: z
+        .string()
+        .describe(
+          'The application: client resource id (client_…) or OAuth client_id'
+        ),
+      mode: z
+        .enum(['off', 'on_risk', 'always'])
+        .describe('off, on_risk (new apps start here) or always'),
+      tenant,
+      project
+    },
+    command: ['auth', 'clients', 'update'],
+    flags: a => [
+      a.client,
+      '--signup-protection',
+      a.mode,
+      ...auth_scope(a)
+    ],
+    shape: (c: any) => ({
+      id: c.id,
+      client_id: c.client_id,
+      name: c.name,
+      signup_protection: c.signup_protection ?? 'off'
+    }),
+    write: true,
+    annotations: AUTH_WRITE,
+    example: { client: 'client_1', mode: 'always' }
   },
   {
     name: 'send_password_setup',

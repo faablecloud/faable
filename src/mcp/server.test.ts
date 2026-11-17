@@ -297,7 +297,8 @@ test('Auth reads are on by default; Auth writes need --writes', t => {
     'revoke_auth_sessions',
     'send_password_setup',
     'update_auth_client_fields',
-    'update_auth_client_login'
+    'update_auth_client_login',
+    'update_auth_client_signup_protection'
   ]) {
     t.false(reads.includes(name), name)
     t.true(
@@ -325,6 +326,7 @@ test('Auth tools ask OAuth for auth:* — never a deploy permission', t => {
   t.is(by('suspend_auth_user'), 'auth:write')
   t.is(by('update_auth_client_fields'), 'auth:write')
   t.is(by('update_auth_client_login'), 'auth:write')
+  t.is(by('update_auth_client_signup_protection'), 'auth:write')
   t.is(by('list_apps'), 'deploy:read')
   t.is(by('deploy_app'), 'deploy:deploy')
 })
