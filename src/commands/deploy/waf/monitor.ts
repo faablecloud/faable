@@ -2,12 +2,13 @@ import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
 import { resolve_app_id } from '../resolve_app_id'
-import { add_rule } from './add_rule'
+import { IP_OPTION, add_rule, check_selector } from './add_rule'
 
 interface WafMonitorArgs {
   pattern?: string
   userAgent?: string
   query?: string
+  ip?: string
   app?: string
   description?: string
   force?: boolean
@@ -37,6 +38,7 @@ export const waf_monitor: CommandModule<unknown, WafMonitorArgs> = {
         description:
           'Literal query parameter name, e.g. rest_route (not a regex). With a path, BOTH must match.'
       })
+      .option('ip', IP_OPTION)
       .option('app', {
         alias: 'a',
         type: 'string',
@@ -53,22 +55,7 @@ export const waf_monitor: CommandModule<unknown, WafMonitorArgs> = {
         description:
           'Accept a user-agent that also matches a known search/AI crawler or uptime monitor, or a query parameter that carries an auth flow'
       })
-      .check(({ pattern, userAgent, query }: any) => {
-        if (userAgent && query) {
-          throw new Error(
-            'A rule can combine a path with --user-agent OR with --query, not both.'
-          )
-        }
-        if (!pattern && !userAgent && !query) {
-          throw new Error(
-            'Give a path pattern, --user-agent, --query, or a path with one of them.\n' +
-              "  e.g. faable deploy waf monitor '^/admin'\n" +
-              '       faable deploy waf monitor --user-agent YisouSpider\n' +
-              '       faable deploy waf monitor --query rest_route'
-          )
-        }
-        return true
-      })
+      .check((a: any) => check_selector('monitor', a))
       .example(
         "$0 deploy waf monitor '^/admin'",
         'See which requests a block on /admin would refuse, before refusing any'
@@ -76,6 +63,10 @@ export const waf_monitor: CommandModule<unknown, WafMonitorArgs> = {
       .example(
         '$0 deploy waf monitor --user-agent python-requests',
         'Check that a user-agent rule would only catch the clients you mean'
+      )
+      .example(
+        '$0 deploy waf monitor --ip 203.0.113.0/24',
+        'See what a block on that network would refuse, before refusing it'
       )
       .epilogue(
         'A monitor rule blocks nothing: every request still reaches your app. ' +
@@ -98,6 +89,7 @@ export const waf_monitor: CommandModule<unknown, WafMonitorArgs> = {
       pattern: args.pattern,
       user_agent: args.userAgent,
       query: args.query,
+      ip: args.ip,
       action: 'monitor',
       description: args.description,
       force: args.force,

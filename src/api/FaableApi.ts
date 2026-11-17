@@ -187,14 +187,20 @@ export interface GithubInstallation {
  * One WAF rule an app's owners authored (GET/POST /app/:id/waf).
  *
  * `match` says which fields are meaningful: 'path' → `pattern`, 'user_agent' →
- * `user_agent`, 'query' → `query`, and the combined 'path_user_agent' /
- * 'path_query' → both, where BOTH must match for the rule to fire.
+ * `user_agent`, 'query' → `query`, 'client_ip' → `client_ip`, and the combined
+ * 'path_user_agent' / 'path_query' / 'path_client_ip' → both, where BOTH must
+ * match for the rule to fire.
  */
 export interface FaableWafRule {
   pattern?: string
   user_agent?: string
   /** Literal query parameter name (never a regex). */
   query?: string
+  /**
+   * Client IP or CIDR, as the server normalized it (`1.2.3.4/32` reads back
+   * as `1.2.3.4`). Matched against the connecting peer, never X-Forwarded-For.
+   */
+  client_ip?: string
   /** 'deny' → 403 at the edge; 'sink' → synthetic 404, the app is not woken. */
   action: string
   match?: string
@@ -1444,6 +1450,7 @@ export class FaableApi<T = any> {
       pattern?: string
       user_agent?: string
       query?: string
+      client_ip?: string
       action: 'deny' | 'sink' | 'allow' | 'monitor' | 'limit'
       description?: string
       force?: boolean
@@ -1474,6 +1481,7 @@ export class FaableApi<T = any> {
           pattern?: string
           user_agent?: string
           query?: string
+          client_ip?: string
         }>
       }>(`/app/${app_id}/waf/activity`, {
         params: { from, to, interval: 86400 }
@@ -1488,6 +1496,7 @@ export class FaableApi<T = any> {
       pattern?: string
       user_agent?: string
       query?: string
+      client_ip?: string
       action?: 'deny' | 'sink' | 'allow' | 'monitor' | 'limit'
     }
   ) {

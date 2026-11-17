@@ -3,12 +3,13 @@ import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { resolve_app_id } from '../resolve_app_id'
-import { describe_selector } from './add_rule'
+import { IP_OPTION, describe_selector } from './add_rule'
 
 interface WafRmArgs {
   pattern?: string
   userAgent?: string
   query?: string
+  ip?: string
   action?: 'deny' | 'sink' | 'allow' | 'monitor' | 'limit'
   app?: string
   json?: boolean
@@ -37,6 +38,11 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
         type: 'string',
         description: 'The query parameter of the rule to remove'
       })
+      .option('ip', {
+        ...IP_OPTION,
+        description:
+          'The IP or CIDR of the rule to remove (203.0.113.7/32 finds 203.0.113.7)'
+      })
       .option('action', {
         type: 'string',
         choices: ['deny', 'sink', 'allow', 'monitor', 'limit'] as const,
@@ -47,10 +53,10 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
         type: 'string',
         description: 'App id, name or slug (defaults to the linked app)'
       })
-      .check(({ pattern, userAgent, query }: any) => {
-        if (!pattern && !userAgent && !query) {
+      .check(({ pattern, userAgent, query, ip }: any) => {
+        if (!pattern && !userAgent && !query && !ip) {
           throw new Error(
-            'Give the path pattern, --user-agent, --query, or a path with one of them.'
+            'Give the path pattern, --user-agent, --query, --ip, or a path with one of them.'
           )
         }
         return true
@@ -63,6 +69,10 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
         '$0 deploy waf rm --user-agent YisouSpider',
         'Stop blocking that crawler'
       )
+      .example(
+        '$0 deploy waf rm --ip 203.0.113.7',
+        'Let that address through again'
+      )
       .showHelpOnFail(false) as any,
   handler: async args => {
     const ctx = await requireApi()
@@ -73,6 +83,7 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
       pattern: args.pattern,
       user_agent: args.userAgent,
       query: args.query,
+      ...(args.ip ? { client_ip: args.ip } : {}),
       action: args.action
     })
     if (args.json) return print_json(waf)
@@ -81,7 +92,8 @@ export const waf_rm: CommandModule<unknown, WafRmArgs> = {
       `🗑️  Removed ${describe_selector({
         pattern: args.pattern,
         user_agent: args.userAgent,
-        query: args.query
+        query: args.query,
+        ip: args.ip
       })} from ${app.name} (${app_id}).`
     )
     log.info(

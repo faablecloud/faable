@@ -2,7 +2,7 @@ import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
 import { resolve_app_id } from '../resolve_app_id'
-import { add_rule } from './add_rule'
+import { add_rule, refuse_ip } from './add_rule'
 
 interface WafAllowArgs {
   pattern: string
@@ -39,6 +39,7 @@ export const waf_allow: CommandModule<unknown, WafAllowArgs> = {
         type: 'string',
         description: 'Why this rule exists (shown in `waf list`)'
       })
+      .check((a: any) => refuse_ip('allow', a.ip))
       .example(
         "$0 deploy waf allow '^/downloads/.*\\.zip$'",
         'Serve the .zip files under /downloads that Faable would otherwise refuse'

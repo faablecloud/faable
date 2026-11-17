@@ -2,8 +2,11 @@ import test from 'ava'
 import { log } from '../../../log'
 import {
   add_rule,
+  check_selector,
   describe_selector,
+  refuse_ip,
   rule_matches_request,
+  same_ip,
   undo_args
 } from './add_rule'
 
@@ -143,5 +146,167 @@ test.serial(
     t.regex(out, /faable deploy waf block '\^\/admin' -a app_1/)
     t.regex(out, /--action monitor/)
     t.notRegex(out, /at the edge/)
+  }
+)
+
+test('describe_selector and undo_args name an IP rule', t => {
+  t.is(describe_selector({ ip: '203.0.113.7' }), 'requests from 203.0.113.7')
+  t.is(
+    describe_selector({ pattern: '^/$', ip: '203.0.113.0/24' }),
+    'requests for ^/$ from 203.0.113.0/24'
+  )
+  t.is(undo_args({ ip: '203.0.113.7' }), "--ip '203.0.113.7'")
+  t.is(
+    undo_args({ pattern: '^/$', ip: '203.0.113.7' }),
+    "'^/$' --ip '203.0.113.7'"
+  )
+})
+
+test('check_selector refuses what the api refuses, with its words', t => {
+  t.regex(
+    t.throws(() => check_selector('block', { ip: '1.2.3.4', userAgent: 'x' }))!
+      .message,
+    /An IP rule can be combined with a path, not with a user-agent or a query parameter/
+  )
+  t.throws(() => check_selector('block', { ip: '1.2.3.4', query: 'q' }))
+  t.regex(
+    t.throws(() => check_selector('sink', {}))!.message,
+    /--ip 203\.0\.113\.7/
+  )
+  t.true(check_selector('sink', { ip: '1.2.3.4' }))
+  t.true(check_selector('block', { pattern: '^/$', ip: '1.2.3.4' }))
+  // allow and limit have no --ip: refused, never silently dropped.
+  t.regex(t.throws(() => refuse_ip('allow', '1.2.3.4'))!.message, /no IP/)
+  t.regex(
+    t.throws(() => refuse_ip('limit', '1.2.3.4'))!.message,
+    /cannot target an IP/
+  )
+  t.true(refuse_ip('limit', undefined))
+})
+
+test('same_ip compares networks, not strings', t => {
+  // What the server does to an ip: drops /32, clears host bits, compresses
+  // and lowercases IPv6. None of that is a dropped field.
+  t.true(same_ip('203.0.113.7', '203.0.113.7/32'))
+  t.true(same_ip('203.0.113.0/24', '203.0.113.7/24'))
+  t.true(same_ip('2001:db8::/48', '2001:DB8:0:0::1/48'))
+  t.true(same_ip('2001:db8::1', '2001:db8::1/128'))
+  t.false(same_ip('203.0.113.7', '203.0.113.8'))
+  t.false(same_ip('203.0.113.0/24', '203.0.113.0/25'))
+  t.false(same_ip(undefined, '203.0.113.7'))
+  t.true(same_ip(undefined, undefined))
+})
+
+test('rule_matches_request catches a server that dropped the ip', t => {
+  // `^/$` with an ip is legal without --force; stored without it, it is the
+  // site root for every visitor.
+  const want = { pattern: '^/$', ip: '203.0.113.7/32' }
+  t.false(
+    rule_matches_request(
+      { pattern: '^/$', action: 'deny', match: 'path' },
+      want,
+      'deny'
+    )
+  )
+  t.true(
+    rule_matches_request(
+      {
+        pattern: '^/$',
+        client_ip: '203.0.113.7',
+        action: 'deny',
+        match: 'path_client_ip'
+      },
+      want,
+      'deny'
+    )
+  )
+  t.true(
+    rule_matches_request(
+      { client_ip: '203.0.113.7', action: 'sink', match: 'client_ip' },
+      { ip: '203.0.113.7' },
+      'sink'
+    )
+  )
+  // A path rule asked for is not satisfied by a path+ip rule.
+  t.false(
+    rule_matches_request(
+      {
+        pattern: '^/$',
+        client_ip: '203.0.113.7',
+        action: 'deny',
+        match: 'path_client_ip'
+      },
+      { pattern: '^/$' },
+      'deny'
+    )
+  )
+})
+
+test.serial('an ip rule that comes back without its ip is undone', async t => {
+  const removed: any[] = []
+  const api: any = {
+    addAppWafRule: async () => ({
+      enabled: true,
+      platform_profiles: [],
+      rules: [{ pattern: '^/$', action: 'deny', match: 'path' }]
+    }),
+    removeAppWafRule: async (_: string, body: any) => {
+      removed.push(body)
+      return { enabled: true, platform_profiles: [], rules: [] }
+    }
+  }
+  const e = await t.throwsAsync(
+    add_rule({
+      api,
+      app_id: 'app_1',
+      app_name: 'shop',
+      app_url: 'shop.faable.link',
+      pattern: '^/$',
+      ip: '203.0.113.7',
+      action: 'deny'
+    })
+  )
+  t.regex(e!.message, /does not support IP rules/)
+  t.deepEqual(removed[0], {
+    pattern: '^/$',
+    user_agent: undefined,
+    query: undefined,
+    client_ip: '203.0.113.7',
+    action: 'deny'
+  })
+})
+
+test.serial(
+  'an ip rule is reported and undone as the server stored it',
+  async t => {
+    const lines: string[] = []
+    const orig = log.info
+    ;(log as any).info = (m: string) => lines.push(m)
+    const api: any = {
+      addAppWafRule: async () => ({
+        enabled: true,
+        platform_profiles: [],
+        rules: [
+          { client_ip: '203.0.113.7', action: 'sink', match: 'client_ip' }
+        ]
+      })
+    }
+    try {
+      await add_rule({
+        api,
+        app_id: 'app_1',
+        app_name: 'shop',
+        app_url: 'shop.faable.link',
+        ip: '203.0.113.7/32',
+        action: 'sink'
+      })
+    } finally {
+      ;(log as any).info = orig
+    }
+    const out = lines.join('\n')
+    t.regex(out, /requests from 203\.0\.113\.7 → 404 at the edge/)
+    t.regex(out, /never X-Forwarded-For/)
+    t.regex(out, /faable deploy waf rm --ip '203\.0\.113\.7' -a app_1/)
+    t.notRegex(out, /\/32/)
   }
 )

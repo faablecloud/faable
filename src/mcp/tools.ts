@@ -463,7 +463,7 @@ export const TOOLS: ToolDef[] = [
     name: 'get_app_traffic',
     title: 'Read app traffic',
     description:
-      'Requests the app served: status codes, busiest paths and failing paths. Trails reality by up to 15 minutes.',
+      'Requests the app served: status codes, busiest paths, failing paths and `top_ips` — the client addresses that sent the most (with the user-agent each sent most, how many distinct paths, last_seen in unix seconds). One IP hitting one path thousands of times is usually a keepalive pinger keeping the app awake: add_waf_rule with action sink and that `client_ip` stops it. `blockable: false` is a platform-internal address no rule can name. Trails reality by up to 15 minutes.',
     input: {
       app,
       project,
@@ -489,10 +489,34 @@ export const TOOLS: ToolDef[] = [
       status_codes: t.status_codes,
       top_endpoints: t.top_endpoints?.slice(0, 15),
       error_endpoints: t.error_endpoints?.slice(0, 15),
+      top_ips: t.top_ips?.slice(0, 10),
       degraded: t.degraded
     }),
     annotations: READ,
     example: { app: 'web', since: '7d', deployment: 'deployment_1' }
+  },
+  {
+    name: 'list_waf_rules',
+    title: 'List firewall rules',
+    description:
+      "The app's own WAF rules (what each matches — path `pattern`, `user_agent`, `query` or `client_ip` — and its action: deny = 403 at the edge, sink = 404 from Faable without waking the app, monitor = blocks nothing, limit = 429 over `rate`, allow = a path Faable blocks for every app reaches this one) and the names of the platform rulesets protecting it. `enabled: false` means none of them is enforced.",
+    input: { app, project },
+    command: ['deploy', 'waf', 'list'],
+    flags: target,
+    // Patterns and descriptions are free text the app's owners wrote.
+    untrusted: true,
+    shape: (w: any) => ({
+      enabled: w.enabled,
+      rules: w.rules ?? [],
+      platform_profiles: (w.platform_profiles ?? []).map((p: any) => ({
+        name: p.name,
+        action: p.action,
+        match: p.match,
+        rule_count: p.rule_count
+      }))
+    }),
+    annotations: READ,
+    example: { app: 'web' }
   },
   {
     name: 'get_usage',
@@ -1220,6 +1244,118 @@ export const TOOLS: ToolDef[] = [
       openWorldHint: true
     },
     example: { fqdn: 'www.example.com', target: 'example.com' }
+  },
+  {
+    name: 'add_waf_rule',
+    title: 'Add a firewall rule',
+    description:
+      "Stop requests to an app at Faable's edge, before they reach (or wake) it. `action`: deny → 403 at the edge; sink → 404 answered by Faable without waking the app — use it to stop a keepalive pinger (find its IP with get_app_traffic `top_ips`) from keeping a free app awake, or for paths the app would 404 anyway; monitor → blocks nothing and reports what the rule would have stopped (list_waf_rules, the dashboard's Firewall tab), the safe first step; limit → requests over `rate` get a 429; allow → a path Faable blocks for every app (e.g. *.zip) reaches this app (path only). Select by `pattern` (anchored path regex), `user_agent`, `query` (a parameter name) or `client_ip` (address or CIDR, at most a /16 or an IPv6 /48), or a pattern AND one of them. `client_ip` is the connecting address, never X-Forwarded-For; when a custom domain sits behind the user's own proxy (Cloudflare's orange cloud) that address is the proxy's, and blocking it blocks part of every visitor. `client_ip` is not for limit or allow, nor with user_agent or query. Takes ~20 s to reach the edge. Returns the app's rules after the write.",
+    input: {
+      app,
+      project,
+      action: z.enum(['deny', 'sink', 'monitor', 'limit', 'allow']),
+      pattern: z
+        .string()
+        .optional()
+        .describe('Anchored path regex, e.g. ^/wp-admin or ^/$'),
+      user_agent: z
+        .string()
+        .optional()
+        .describe('RE2 fragment matched against User-Agent, e.g. YisouSpider'),
+      query: z
+        .string()
+        .optional()
+        .describe('Literal query parameter name, e.g. rest_route'),
+      client_ip: z
+        .string()
+        .optional()
+        .describe('IPv4/IPv6 address or CIDR, e.g. 203.0.113.7 or 203.0.113.0/24'),
+      rate: z
+        .string()
+        .regex(/^\d+\/[a-z]+$/i)
+        .optional()
+        .describe('limit only (required there): requests per second or minute, e.g. 10/m or 5/s'),
+      per: z
+        .enum(['ip', 'rule'])
+        .optional()
+        .describe('limit only: one count per client IP (default) or one shared by all clients'),
+      description: z
+        .string()
+        .max(500)
+        .optional()
+        .describe('Why the rule exists'),
+      force: z
+        .boolean()
+        .optional()
+        .describe(
+          'Accept a user_agent that also matches a known search/AI crawler or uptime monitor, or a query parameter that carries an auth flow. Only when the user confirmed it.'
+        )
+    },
+    command: ['deploy', 'waf', 'add'],
+    flags: a => [
+      '--action',
+      a.action,
+      ...optText('--pattern', a.pattern),
+      ...optText('--user-agent', a.user_agent),
+      ...optText('--query', a.query),
+      ...optText('--ip', a.client_ip),
+      ...opt('--rate', a.rate),
+      ...opt('--per', a.per),
+      ...optText('--description', a.description),
+      ...(a.force ? ['--force'] : []),
+      ...target(a)
+    ],
+    write: true,
+    untrusted: true,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true
+    },
+    example: {
+      app: 'web',
+      action: 'sink',
+      pattern: '^/$',
+      client_ip: '203.0.113.7',
+      description: 'keepalive pinger'
+    }
+  },
+  {
+    name: 'remove_waf_rule',
+    title: 'Remove a firewall rule',
+    description:
+      "Remove one of the app's own WAF rules, addressed by everything that defines it: the same `pattern`, `user_agent`, `query` and `client_ip` it has in list_waf_rules (an address may be given as typed: 203.0.113.7/32 finds 203.0.113.7). `action` only when the same selector exists with two actions. Matching requests reach the app again within ~20 s.",
+    input: {
+      app,
+      project,
+      pattern: z
+        .string()
+        .regex(/^[^-]/, 'cannot start with "-"')
+        .optional()
+        .describe('The exact pattern of the rule'),
+      user_agent: z.string().optional(),
+      query: z.string().optional(),
+      client_ip: z.string().optional(),
+      action: z.enum(['deny', 'sink', 'monitor', 'limit', 'allow']).optional()
+    },
+    command: ['deploy', 'waf', 'rm'],
+    flags: a => [
+      ...(a.pattern ? [a.pattern] : []),
+      ...optText('--user-agent', a.user_agent),
+      ...optText('--query', a.query),
+      ...optText('--ip', a.client_ip),
+      ...opt('--action', a.action),
+      ...target(a)
+    ],
+    write: true,
+    untrusted: true,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: true
+    },
+    example: { app: 'web', pattern: '^/$', client_ip: '203.0.113.7' }
   },
   {
     name: 'configure_repo',

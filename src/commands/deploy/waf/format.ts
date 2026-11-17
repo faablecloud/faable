@@ -43,7 +43,9 @@ export const format_waf = (waf: FaableAppWaf): string[] => {
         ? ' by user-agent'
         : p.match === 'query'
           ? ' by query parameter'
-          : ''
+          : p.match === 'client_ip' || p.match === 'path_client_ip'
+            ? ' by IP'
+            : ''
     out.push(
       `  • ${p.name} — ${p.rule_count} rule(s)${on}, ${action_label(p.action)}`
     )
@@ -76,17 +78,20 @@ export const format_waf = (waf: FaableAppWaf): string[] => {
 /**
  * What a rule selects, in one line.
  *
- * The five shapes have to be visibly different here: a user-agent or query rule
+ * The seven shapes have to be visibly different here: a user-agent or query rule
  * has no path restriction (it applies to the whole app) and the combined ones
  * are ANDs, so printing any of them as a bare pattern would misrepresent its
  * reach. The `?` prefix marks a query parameter — `rest_route` on its own would
- * read like a path.
+ * read like a path; `ip` marks an address, which on its own would read like
+ * nothing at all.
  */
 export const rule_subject = (r: FaableWafRule): string => {
   if (r.pattern && r.user_agent) {
     return `${r.pattern} + UA ~ ${r.user_agent}`
   }
   if (r.pattern && r.query) return `${r.pattern} + ?${r.query}`
+  if (r.pattern && r.client_ip) return `${r.pattern} + ip ${r.client_ip}`
+  if (r.client_ip) return `ip ${r.client_ip} (any path)`
   if (r.user_agent) return `UA ~ ${r.user_agent} (any path)`
   if (r.query) return `?${r.query} (any path)`
   return r.pattern ?? '(unknown)'

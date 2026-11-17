@@ -1,4 +1,5 @@
 import { CommandModule } from 'yargs'
+import { waf_add } from './add'
 import { waf_allow } from './allow'
 import { waf_block } from './block'
 import { waf_limit } from './limit'
@@ -20,6 +21,8 @@ export const waf: CommandModule = {
       .command(waf_allow)
       .command(waf_limit)
       .command(waf_rm)
+      // Hidden: the MCP's add_waf_rule (one action flag instead of a verb).
+      .command(waf_add)
       .demandCommand(
         1,
         'Specify a waf command: list, block, sink, monitor, allow, limit or rm'

@@ -2,7 +2,7 @@ import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
 import { resolve_app_id } from '../resolve_app_id'
-import { add_rule } from './add_rule'
+import { add_rule, refuse_ip } from './add_rule'
 import { parse_rate } from './rate'
 
 interface WafLimitArgs {
@@ -76,7 +76,8 @@ export const waf_limit: CommandModule<unknown, WafLimitArgs> = {
         description:
           'Accept a user-agent that also matches a known search/AI crawler or uptime monitor, or a query parameter that carries an auth flow'
       })
-      .check(({ pattern, userAgent, query, rate, burst }: any) => {
+      .check(({ pattern, userAgent, query, rate, burst, ip }: any) => {
+        refuse_ip('limit', ip)
         if (userAgent && query) {
           throw new Error(
             'A rule can combine a path with --user-agent OR with --query, not both.'

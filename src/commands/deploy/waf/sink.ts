@@ -2,12 +2,13 @@ import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
 import { resolve_app_id } from '../resolve_app_id'
-import { add_rule } from './add_rule'
+import { IP_OPTION, add_rule, check_selector } from './add_rule'
 
 interface WafSinkArgs {
   pattern?: string
   userAgent?: string
   query?: string
+  ip?: string
   app?: string
   description?: string
   force?: boolean
@@ -36,6 +37,7 @@ export const waf_sink: CommandModule<unknown, WafSinkArgs> = {
         description:
           'Literal query parameter name, e.g. rest_route (not a regex). With a path, BOTH must match.'
       })
+      .option('ip', IP_OPTION)
       .option('app', {
         alias: 'a',
         type: 'string',
@@ -52,22 +54,7 @@ export const waf_sink: CommandModule<unknown, WafSinkArgs> = {
         description:
           'Accept a user-agent that also matches a known search/AI crawler or uptime monitor, or a query parameter that carries an auth flow'
       })
-      .check(({ pattern, userAgent, query }: any) => {
-        if (userAgent && query) {
-          throw new Error(
-            'A rule can combine a path with --user-agent OR with --query, not both.'
-          )
-        }
-        if (!pattern && !userAgent && !query) {
-          throw new Error(
-            'Give a path pattern, --user-agent, --query, or a path with one of them.\n' +
-              "  e.g. faable deploy waf sink '^/wp-admin'\n" +
-              '       faable deploy waf sink --user-agent YisouSpider\n' +
-              '       faable deploy waf sink --query rest_route'
-          )
-        }
-        return true
-      })
+      .check((a: any) => check_selector('sink', a))
       .example(
         "$0 deploy waf sink '^/robots\\.txt$'",
         'Let Faable answer /robots.txt with a 404 instead of starting your app'
@@ -76,10 +63,16 @@ export const waf_sink: CommandModule<unknown, WafSinkArgs> = {
         '$0 deploy waf sink --user-agent SemrushBot',
         'Answer one crawler with a 404 instead of waking the app for it'
       )
+      .example(
+        '$0 deploy waf sink --ip 198.51.100.23',
+        'Stop a keepalive pinger from keeping a free app awake'
+      )
       .epilogue(
         'Use `sink` for requests your app would 404 anyway: Faable replies ' +
           'with the same 404, without the cold start. Use `block` instead ' +
-          'when you want the request refused outright.'
+          'when you want the request refused outright. --ip matches the address ' +
+          'that connects to Faable, never X-Forwarded-For: behind your own proxy ' +
+          "(Cloudflare's orange cloud) it is the proxy's address."
       )
       .showHelpOnFail(false) as any,
   handler: async args => {
@@ -95,6 +88,7 @@ export const waf_sink: CommandModule<unknown, WafSinkArgs> = {
       pattern: args.pattern,
       user_agent: args.userAgent,
       query: args.query,
+      ip: args.ip,
       action: 'sink',
       description: args.description,
       force: args.force,

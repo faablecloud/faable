@@ -148,3 +148,29 @@ test('example_path: a literal pattern becomes the path to curl', t => {
   t.is(example_path(undefined, 'rest_route'), '/?rest_route=1')
   t.is(example_path('^/$', 'author'), '/?author=1')
 })
+
+test('ip rules read as an address, alone or ANDed with a path', t => {
+  t.is(
+    rule_subject({
+      client_ip: '203.0.113.7',
+      action: 'sink',
+      match: 'client_ip'
+    }),
+    'ip 203.0.113.7 (any path)'
+  )
+  t.is(
+    rule_subject({
+      pattern: '^/$',
+      client_ip: '203.0.113.0/24',
+      action: 'deny',
+      match: 'path_client_ip'
+    }),
+    '^/$ + ip 203.0.113.0/24'
+  )
+  const out = format_waf({
+    enabled: true,
+    platform_profiles: [],
+    rules: [{ client_ip: '2001:db8::/48', action: 'deny', match: 'client_ip' }]
+  }).join('\n')
+  t.regex(out, /ip 2001:db8::\/48 \(any path\) → 403/)
+})

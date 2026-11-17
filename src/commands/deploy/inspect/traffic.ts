@@ -22,6 +22,16 @@ type Traffic = {
   top_endpoints?: { path: string; requests: number; resp_bytes: number }[]
   error_endpoints?: { path: string; status: number; errors: number }[]
   status_codes?: { status: number; requests: number }[]
+  // The addresses that sent the most served requests. `blockable: false` is a
+  // platform-internal range a WAF rule cannot name.
+  top_ips?: {
+    ip: string
+    requests: number
+    user_agent: string
+    paths: number
+    last_seen: number
+    blockable: boolean
+  }[]
   // Panels whose query failed: what follows is partial, not zero.
   degraded?: string[]
 }
@@ -41,10 +51,11 @@ export const parse_since = (since: string): number => {
 }
 
 // `faable deploy traffic` — what the edge saw for the app: busiest paths,
-// failing paths and status codes. Trails reality by up to 15 minutes.
+// failing paths, status codes and the busiest client IPs. Trails reality by up to 15 minutes.
 export const traffic: CommandModule<unknown, TrafficArgs> = {
   command: 'traffic',
-  describe: 'Requests the app served: top paths, errors and status codes',
+  describe:
+    'Requests the app served: top paths, errors, status codes and client IPs',
   builder: yargs =>
     json_option(yargs)
       .option('app', {
@@ -120,5 +131,34 @@ export const traffic: CommandModule<unknown, TrafficArgs> = {
         print(line)
       }
     }
+    if (data.top_ips?.length) {
+      print('')
+      print('Top client IPs')
+      for (const line of top_ip_lines(data.top_ips)) print(line)
+      if (data.top_ips.some(i => i.blockable)) {
+        print('')
+        print(
+          `To stop one address from waking the app: faable deploy waf sink --ip <ip> -a ${app_id}`
+        )
+      }
+    }
   }
 }
+
+// One row per IP: what it sent, how many paths it touched and the user-agent
+// it sent most — enough to tell a keepalive pinger (one path, thousands of
+// requests) from a visitor. `(platform)` marks an address no rule can name.
+export const top_ip_lines = (rows: NonNullable<Traffic['top_ips']>) =>
+  table_lines(
+    ['  REQUESTS', 'IP', 'PATHS', 'USER-AGENT'],
+    rows
+      .slice(0, 10)
+      .map(r => [
+        `  ${r.requests}`,
+        r.blockable ? r.ip : `${r.ip} (platform)`,
+        String(r.paths),
+        r.user_agent.length > 60
+          ? `${r.user_agent.slice(0, 59)}…`
+          : r.user_agent || '-'
+      ])
+  )

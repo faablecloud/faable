@@ -2,12 +2,13 @@ import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
 import { json_option, print_json } from '../../../lib/listing'
 import { resolve_app_id } from '../resolve_app_id'
-import { add_rule } from './add_rule'
+import { IP_OPTION, add_rule, check_selector } from './add_rule'
 
 interface WafBlockArgs {
   pattern?: string
   userAgent?: string
   query?: string
+  ip?: string
   app?: string
   description?: string
   force?: boolean
@@ -36,6 +37,7 @@ export const waf_block: CommandModule<unknown, WafBlockArgs> = {
         description:
           'Literal query parameter name, e.g. rest_route (not a regex). With a path, BOTH must match.'
       })
+      .option('ip', IP_OPTION)
       .option('app', {
         alias: 'a',
         type: 'string',
@@ -52,22 +54,7 @@ export const waf_block: CommandModule<unknown, WafBlockArgs> = {
         description:
           'Accept a user-agent that also matches a known search/AI crawler or uptime monitor, or a query parameter that carries an auth flow'
       })
-      .check(({ pattern, userAgent, query }: any) => {
-        if (userAgent && query) {
-          throw new Error(
-            'A rule can combine a path with --user-agent OR with --query, not both.'
-          )
-        }
-        if (!pattern && !userAgent && !query) {
-          throw new Error(
-            'Give a path pattern, --user-agent, --query, or a path with one of them.\n' +
-              "  e.g. faable deploy waf block '^/wp-admin'\n" +
-              '       faable deploy waf block --user-agent YisouSpider\n' +
-              '       faable deploy waf block --query rest_route'
-          )
-        }
-        return true
-      })
+      .check((a: any) => check_selector('block', a))
       .example(
         "$0 deploy waf block '^/\\.well-known/'",
         'Stop scanner probes under /.well-known from waking the app'
@@ -84,6 +71,19 @@ export const waf_block: CommandModule<unknown, WafBlockArgs> = {
         '$0 deploy waf block --query rest_route',
         'Stop WordPress REST probes, whose payload rides in the query string'
       )
+      .example(
+        '$0 deploy waf block --ip 203.0.113.7',
+        'Refuse every request from one address (see `faable deploy traffic`)'
+      )
+      .example(
+        "$0 deploy waf block '^/wp-login\\.php$' --ip 203.0.113.0/24",
+        'Refuse one path to one network, leaving everyone else untouched'
+      )
+      .epilogue(
+        '--ip matches the address that connects to Faable, never X-Forwarded-For. ' +
+          "If a custom domain is behind your own proxy (Cloudflare's orange cloud), " +
+          "that address is the proxy's: blocking it blocks part of every visitor."
+      )
       .showHelpOnFail(false) as any,
   handler: async args => {
     const ctx = await requireApi()
@@ -98,6 +98,7 @@ export const waf_block: CommandModule<unknown, WafBlockArgs> = {
       pattern: args.pattern,
       user_agent: args.userAgent,
       query: args.query,
+      ip: args.ip,
       action: 'deny',
       description: args.description,
       force: args.force,
