@@ -22,7 +22,7 @@ export const check_selector = (
 ): true => {
   if (a.ip && (a.userAgent || a.query)) {
     throw new Error(
-      'An IP rule can be combined with a path, not with a user-agent or a query parameter.'
+      'A client_ip rule can be combined with a path, not with a user-agent or a query parameter'
     )
   }
   if (a.userAgent && a.query) {
@@ -51,8 +51,8 @@ export const refuse_ip = (action: 'allow' | 'limit', ip: unknown): true => {
   if (ip !== undefined) {
     throw new Error(
       action === 'allow'
-        ? 'An allow rule is a path pattern only (no IP).'
-        : 'A limit rule cannot target an IP. Use block or sink to stop that IP, or a limit per IP on a path.'
+        ? 'An allow rule is a path pattern only (no client_ip)'
+        : 'A limit rule cannot target a client_ip. Use deny or sink to stop that address, or a limit per IP on a path.'
     )
   }
   return true

@@ -166,7 +166,7 @@ test('check_selector refuses what the api refuses, with its words', t => {
   t.regex(
     t.throws(() => check_selector('block', { ip: '1.2.3.4', userAgent: 'x' }))!
       .message,
-    /An IP rule can be combined with a path, not with a user-agent or a query parameter/
+    /A client_ip rule can be combined with a path, not with a user-agent or a query parameter/
   )
   t.throws(() => check_selector('block', { ip: '1.2.3.4', query: 'q' }))
   t.regex(
@@ -176,10 +176,13 @@ test('check_selector refuses what the api refuses, with its words', t => {
   t.true(check_selector('sink', { ip: '1.2.3.4' }))
   t.true(check_selector('block', { pattern: '^/$', ip: '1.2.3.4' }))
   // allow and limit have no --ip: refused, never silently dropped.
-  t.regex(t.throws(() => refuse_ip('allow', '1.2.3.4'))!.message, /no IP/)
+  t.regex(
+    t.throws(() => refuse_ip('allow', '1.2.3.4'))!.message,
+    /no client_ip/
+  )
   t.regex(
     t.throws(() => refuse_ip('limit', '1.2.3.4'))!.message,
-    /cannot target an IP/
+    /cannot target a client_ip/
   )
   t.true(refuse_ip('limit', undefined))
 })
