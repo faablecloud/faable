@@ -11,14 +11,18 @@ import {
   app_name_from_title,
   catalog_lines,
   domain_problem,
+  find_restorable,
   missing_fields,
   parse_inputs,
+  restorable,
+  restorable_lines,
   wait_for_installation
 } from './install_lib'
 import { reachable_timeout_ms, wait_reachable } from './reachable'
 
 interface InstallArgs {
   app?: string
+  installation?: string
   name?: string
   input?: string[]
   tier?: string
@@ -33,14 +37,20 @@ interface InstallArgs {
 // for its files and a Database with daily backups; Hobby and Pro). Without
 // an app, lists the catalogue: what can be installed and what each asks for.
 export const install: CommandModule<unknown, InstallArgs> = {
-  command: 'install [app]',
+  command: 'install [app] [installation]',
   describe:
     'Install an app from the Faable catalogue (WordPress…); without one, list the catalogue',
   builder: yargs =>
     json_option(yargs)
       .positional('app', {
         type: 'string',
-        description: 'Catalogue app to install (e.g. wordpress)'
+        description:
+          'Catalogue app to install (e.g. wordpress), or `restore` to bring back an uninstalled one'
+      })
+      .positional('installation', {
+        type: 'string',
+        description:
+          'With restore: the uninstalled installation, by name or id; without it, list what can be restored'
       })
       .option('name', {
         alias: 'n',
@@ -83,8 +93,13 @@ export const install: CommandModule<unknown, InstallArgs> = {
         '$0 deploy install wordpress --input title="My blog" --domain www.example.com',
         'Install it on your own domain; it prints the DNS record to create'
       )
+      .example(
+        '$0 deploy install restore my-blog --wait',
+        'Bring back a WordPress you uninstalled (within 30 days, if its database was kept)'
+      )
       .showHelpOnFail(false) as any,
   handler: async args => {
+    if (args.app === 'restore') return restoreInstallation(args)
     const { api } = await requireApi()
     const catalog = await api.listBlueprints()
 
@@ -234,5 +249,85 @@ export const install: CommandModule<unknown, InstallArgs> = {
         `⏳ It takes a few minutes. Follow it in the dashboard (Deploy › Installations), or run again with --wait.`
       )
     }
+  }
+}
+
+// `faable deploy install restore [installation]` (§550): the dashboard's
+// Restore. A new app with the uninstalled one's files, a copy of its
+// database, its Auth tenant and its own domain; on faable.link, a new
+// address with its links moved. Without an installation, the list.
+const restoreInstallation = async (args: InstallArgs) => {
+  const { api } = await requireApi()
+  const { id: project } = await requireProject(api)
+  const list = await api.listInstallations(project)
+
+  if (!args.installation) {
+    const can = restorable(list)
+    if (args.json) return print_json(can)
+    if (!can.length) {
+      log.info(
+        'Nothing to restore: no uninstalled installation in this project.'
+      )
+      return
+    }
+    log.info(
+      'Uninstalled, and restorable while their data is kept (30 days, if the database was not deleted with them):'
+    )
+    for (const line of restorable_lines(list)) log.info(`  ${line}`)
+    log.info('Restore one with: faable deploy install restore <name> --wait')
+    return
+  }
+
+  const found = find_restorable(list, args.installation)
+  if ('problem' in found) throw new CliError('usage', found.problem)
+  let inst: FaableInstallation
+  try {
+    inst = await api.restoreInstallation(found.inst.id, project)
+  } catch (err) {
+    const e = err as Error & { code?: string }
+    if (e.code === 'plan_required') {
+      const failed = new CliError(
+        'usage',
+        `Restoring it needs a Hobby or Pro project (it comes back with a volume and a database). Upgrade it from the dashboard: project settings › Plan.`,
+        { cause: err }
+      )
+      failed.code = 'plan_required'
+      throw failed
+    }
+    throw err
+  }
+  log.info(`♻️  Restoring ${inst.name} (${inst.id}) as a new app`)
+
+  let waited: InstallWaitResult | undefined
+  let url: string | undefined
+  if (args.wait) {
+    waited = await wait_for_installation(api, inst, {
+      timeout_s: args.timeout ?? 900
+    })
+    if (waited.ok) {
+      const now = await api.getInstallation(inst.id, project).catch(() => inst)
+      url = now.site_url ?? undefined
+      inst = now
+    }
+    if (!args.json) {
+      log.info(
+        waited.ok
+          ? `✅ Restored${url ? `: ${url}` : ''}`
+          : waited.done
+            ? `❌ The restore failed: ${waited.error ?? 'see the dashboard'} — resume it from the dashboard (Deploy › Installations)`
+            : `⏳ Still ${waited.state} after ${args.timeout}s — it goes on; check it in the dashboard`
+      )
+    }
+  }
+  if (args.json) {
+    return print_json({
+      installation: inst,
+      ...(waited ? { result: { ...waited, ...(url ? { url } : {}) } } : {})
+    })
+  }
+  if (!args.wait) {
+    log.info(
+      `⏳ Copying its database takes a few minutes. Follow it in the dashboard (Deploy › Installations), or run again with --wait.`
+    )
   }
 }

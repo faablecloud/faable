@@ -511,6 +511,12 @@ export interface FaableInstallation {
   // The production domain given at install (`--domain`), and its Domain.
   domain?: string | null
   domain_id?: string | null
+  // Its address (the domain's, or faable.link), and what a restore came from.
+  site_url?: string | null
+  restore_from?: { app_id: string; site_url: string | null } | null
+  // An uninstalled one: whether it can still come back, and until when.
+  restorable?: boolean
+  restorable_until?: string | null
 }
 
 const data = async <T, Q extends Promise<AxiosResponse<T>>>(
@@ -1412,6 +1418,26 @@ export class FaableApi<T = any> {
       this.client.get<FaableInstallation>(`/installation/${id}`, {
         headers: projectHeader(team)
       })
+    )
+  }
+
+  async listInstallations(team: string) {
+    return data(
+      this.client.get<{ results: FaableInstallation[] }>(`/installation`, {
+        headers: projectHeader(team)
+      })
+    ).then(res => res.results)
+  }
+
+  // Brings an uninstalled one back as a new app (§550): its files, a copy of
+  // its database, its Auth tenant and its own domain. Answers at once.
+  async restoreInstallation(id: string, team: string) {
+    return data(
+      this.client.post<FaableInstallation>(
+        `/installation/${id}/restore`,
+        {},
+        { headers: projectHeader(team) }
+      )
     )
   }
 

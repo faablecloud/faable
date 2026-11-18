@@ -1242,6 +1242,41 @@ export const TOOLS: ToolDef[] = [
     }
   },
   {
+    name: 'restore_installation',
+    title: 'Restore an uninstalled app',
+    description:
+      'Bring back an app installed from the catalogue (WordPress…) that the user uninstalled, while its data is kept: 30 days, and only if its database was not deleted with it. It comes back as a new app with its files, a copy of its database, sign-in in the same Faable Auth tenant (same users) and its own domain if it had one (same DNS record). Without its own domain it gets a new faable.link address and the links in its content move there. Without `installation`, lists the uninstalled ones that can be restored. Needs a Hobby or Pro project.',
+    input: {
+      installation: z
+        .string()
+        .optional()
+        .describe(
+          'The uninstalled installation, by name or id; omit it to list what can be restored'
+        ),
+      wait: z
+        .boolean()
+        .optional()
+        .describe(
+          'Wait until it is restored (returns the URL) or fails, up to 10 minutes'
+        ),
+      project
+    },
+    command: ['deploy', 'install', 'restore'],
+    flags: a => [
+      ...(a.installation ? [String(a.installation)] : []),
+      ...(a.wait && a.installation ? ['--wait', '--timeout', '600'] : []),
+      ...scope(a)
+    ],
+    timeout_ms: 630_000,
+    write: true,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: true
+    },
+    example: { installation: 'my-blog', wait: true }
+  },
+  {
     name: 'redeploy',
     title: 'Retry a failed deployment',
     description:

@@ -1,11 +1,16 @@
 import test from 'ava'
-import type { FaableCatalogBlueprint } from '../../api/FaableApi'
+import type {
+  FaableCatalogBlueprint,
+  FaableInstallation
+} from '../../api/FaableApi'
 import {
   app_name_from_title,
   catalog_lines,
   domain_problem,
+  find_restorable,
   missing_fields,
   parse_inputs,
+  restorable_lines,
   wait_for_installation
 } from './install_lib'
 
@@ -148,4 +153,67 @@ test('domain: a bare hostname, not one of faable.link or faable.com', t => {
   t.regex(domain_problem('blog.faable.link')!, /assigned by Faable/)
   t.regex(domain_problem('faable.com')!, /assigned by Faable/)
   t.is(domain_problem('notfaable.com'), null)
+})
+
+// `faable deploy install restore` (§550).
+const inst = (o: Partial<FaableInstallation>): FaableInstallation => ({
+  id: 'installation_1',
+  team: 'project_1',
+  blueprint_slug: 'wordpress',
+  name: 'blog',
+  state: 'retained',
+  error: null,
+  app_id: 'app_1',
+  ...o
+})
+
+test('restore: only the uninstalled ones are listed, with their address', t => {
+  const lines = restorable_lines([
+    inst({ site_url: 'https://blog-x.faable.link' }),
+    inst({ id: 'installation_2', name: 'live', state: 'ready' }),
+    inst({
+      id: 'installation_3',
+      name: 'shop',
+      domain: 'www.shop.es',
+      restorable: true,
+      restorable_until: '2026-12-18T10:00:00.000Z'
+    }),
+    inst({ id: 'installation_4', name: 'purged', restorable: false })
+  ])
+  t.is(lines.length, 2, 'not the live one, nor the one whose data is gone')
+  t.regex(lines[0], /^blog .*installation_1 .*blog-x\.faable\.link/)
+  t.regex(lines[1], /www\.shop\.es {2}until 2026-12-18$/)
+})
+
+test('restore: by name or id; a name reused by a live app means the uninstalled one', t => {
+  const list = [
+    inst({}),
+    inst({ id: 'installation_2', state: 'ready' }),
+    inst({ id: 'installation_3', name: 'live', state: 'ready' })
+  ]
+  t.like(find_restorable(list, 'blog'), { inst: { id: 'installation_1' } })
+  t.like(find_restorable(list, 'installation_1'), {
+    inst: { id: 'installation_1' }
+  })
+  t.regex(
+    (find_restorable(list, 'live') as { problem: string }).problem,
+    /is ready: only an uninstalled/
+  )
+  t.regex(
+    (find_restorable(list, 'nope') as { problem: string }).problem,
+    /No installation "nope"/
+  )
+  t.regex(
+    (
+      find_restorable([inst({ name: 'gone', restorable: false })], 'gone') as {
+        problem: string
+      }
+    ).problem,
+    /can't be restored any more/
+  )
+  const two = [...list, inst({ id: 'installation_4' })]
+  t.regex(
+    (find_restorable(two, 'blog') as { problem: string }).problem,
+    /by id \(installation_1, installation_4\)/
+  )
 })

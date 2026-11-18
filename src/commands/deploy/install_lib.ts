@@ -119,3 +119,58 @@ export const domain_problem = (fqdn: string): string | null => {
   }
   return null
 }
+
+/**
+ * `faable deploy install restore`: what can come back — the uninstalled
+ * installations whose files and database are still kept. An api without
+ * `restorable` (older) leaves every uninstalled one in; the restore says.
+ */
+export const restorable = (list: FaableInstallation[]) =>
+  list.filter(i => i.state === 'retained' && i.restorable !== false)
+
+export const restorable_lines = (list: FaableInstallation[]): string[] =>
+  restorable(list).map(i => {
+    const where = i.domain ?? i.site_url
+    const until = i.restorable_until
+      ? `until ${i.restorable_until.slice(0, 10)}`
+      : ''
+    return [i.name, i.blueprint_slug, i.id, where, until]
+      .filter(Boolean)
+      .join('  ')
+  })
+
+/**
+ * The installation to restore, by id or by name. A name may repeat (an app
+ * name is reused after an uninstall): the uninstalled one is the one meant,
+ * and two uninstalled ones need the id. A reason when none fits.
+ */
+export const find_restorable = (
+  list: FaableInstallation[],
+  ref: string
+): { inst: FaableInstallation } | { problem: string } => {
+  const byId = list.find(
+    i => i.id === ref || i.id.replace(/^[a-z]+_/, '') === ref
+  )
+  const matches = byId ? [byId] : list.filter(i => i.name === ref)
+  if (!matches.length) {
+    return {
+      problem: `No installation "${ref}" in this project. See what can be restored with: faable deploy install restore`
+    }
+  }
+  const retained = restorable(matches)
+  if (retained.length === 1) return { inst: retained[0] }
+  if (retained.length > 1) {
+    return {
+      problem: `More than one uninstalled "${ref}": restore it by id (${retained.map(i => i.id).join(', ')}).`
+    }
+  }
+  const gone = matches.find(i => i.state === 'retained')
+  if (gone) {
+    return {
+      problem: `"${ref}" can't be restored any more: its files or its database were deleted (uninstalled with its database, or past its 30 days).`
+    }
+  }
+  return {
+    problem: `"${ref}" is ${matches[0].state}: only an uninstalled installation can be restored.`
+  }
+}

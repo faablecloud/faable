@@ -13,6 +13,7 @@ const INSTRUCTIONS = `Faable Deploy (apps, deployments, logs, domains, secrets) 
 - "Why did my deploy fail?": list_deployments → get_deployment (full failure reason, and \`fault\`: \`user\` = their code or config, \`platform\` = Faable's side) → get_build_logs (the cause is at the end).
 - "Deploy this repository and give me the URL": list_github_repos → create_app with \`wait\` (or deploy_app with \`wait\` for an existing app). A local directory that is not on GitHub: deploy_directory.
 - "Install WordPress": list_blueprints (what it asks for) → install_blueprint with \`wait\` (Hobby or Pro; it comes with a volume and a billed database).
+- "Bring back the WordPress I uninstalled": restore_installation without \`installation\` (what can be restored), then with it and \`wait\`.
 - Faable Auth: "who logged in recently?" → list_auth_logins; "how many logged in today / signed up this week?" → count_auth_users; "why can't X log in?" → get_auth_user + list_auth_logs (status failed).
 - Roles (RBAC): "what can X do?" → get_auth_user_access; "who has role R / what does it grant?" → get_auth_role. A role grants permissions of one API to the users it is assigned to (update_auth_user_roles); team roles grant none.
 - "Something keeps my app awake / hammers it": get_app_traffic (\`top_ips\`, \`top_endpoints\`) → add_waf_rule (sink answers 404 without waking the app; monitor first when unsure what a rule would catch) → list_waf_rules.
