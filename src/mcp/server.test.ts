@@ -66,8 +66,14 @@ test('by default: reads and deploy_app; the writes only with --writes', t => {
       write
     )
   }
-  // Only reads are marked read-only, and the one destructive tool is
-  // delete_app — a write, and local only.
+  // Only reads are marked read-only, and the destructive tools — deleting an
+  // app or a Challenge site, rotating a Challenge secret — are writes, and
+  // local only.
+  const destructive = [
+    'delete_app',
+    'delete_challenge_site',
+    'rotate_challenge_secret'
+  ]
   for (const t2 of TOOLS) {
     t.is(
       t2.annotations.readOnlyHint,
@@ -76,9 +82,12 @@ test('by default: reads and deploy_app; the writes only with --writes', t => {
     )
     t.is(
       t2.annotations.destructiveHint === true,
-      t2.name === 'delete_app',
+      destructive.includes(t2.name),
       t2.name
     )
+    if (t2.annotations.destructiveHint) {
+      t.true(t2.write && t2.local_only, t2.name)
+    }
   }
 })
 

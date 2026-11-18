@@ -269,6 +269,26 @@ const AUTH_WRITE = {
   openWorldHint: true
 } as const
 
+// ── Faable Challenge (the `challenge` service, not api.faable.com) ─────────
+const challenge_site = z
+  .string()
+  .regex(/^[^-]/, 'cannot start with "-"')
+  .describe(
+    'Site id (site_…), site key (fcs_pk_…) or name — list_challenge_sites shows them'
+  )
+const challenge_domains = z
+  .array(z.string())
+  .min(1)
+  .max(10)
+  .describe(
+    'Hostnames the widget runs on, e.g. ["example.com"]; a domain also covers its subdomains. At most 10.'
+  )
+const domain_flags = (domains?: string[]) =>
+  (domains ?? []).flatMap(d => optText('--domain', d))
+const SECRET_NOTE =
+  'This is the only time the secret is shown: tell the user to store it now as an environment variable of the server that verifies tokens (e.g. set_secrets FAABLE_CHALLENGE_SECRET). It cannot be read again, only rotated. Never put it in browser code.'
+const with_secret_note = (s: any) => ({ ...s, note: SECRET_NOTE })
+
 export const TOOLS: ToolDef[] = [
   {
     name: 'whoami',
@@ -548,6 +568,46 @@ export const TOOLS: ToolDef[] = [
     input: { project },
     command: ['deploy', 'quota'],
     flags: scope,
+    annotations: READ,
+    example: { project: 'p' }
+  },
+  {
+    name: 'list_challenge_sites',
+    title: 'List Challenge sites',
+    description:
+      "The project's Faable Challenge sites (bot protection for forms): each one's id, name, domains and public `site_key` (what the widget embeds). The secret is never listed — it is shown once, by create_challenge_site or rotate_challenge_secret.",
+    input: { project },
+    command: ['challenge', 'sites', 'list'],
+    flags: scope,
+    shape: page((s: any) => ({
+      id: s.id,
+      name: s.name,
+      domains: s.domains,
+      site_key: s.site_key,
+      secret_rotated_at: s.secret_rotated_at,
+      created_at: s.created_at
+    })),
+    annotations: READ,
+    example: { project: 'p' }
+  },
+  {
+    name: 'get_challenge_usage',
+    title: 'Read Challenge usage',
+    description:
+      "This month's Faable Challenge usage of a project against its plan: `verified` (successful server-side verifications — what the quota counts) vs `plan.verifications_month`, and `sites` vs `plan.sites` (null = unlimited). Also challenges issued and solved, and failed verifications. Free: 1 site, 1,000 verifications/month; Hobby: 5 and 10,000; Pro: unlimited sites, 100,000.",
+    input: { project },
+    command: ['challenge', 'usage'],
+    flags: scope,
+    shape: (u: any) => ({
+      project: u.project,
+      month: u.month,
+      verified: u.verified,
+      issued: u.issued,
+      answered: u.answered,
+      verify_failed: u.verify_failed,
+      sites: u.sites,
+      plan: u.plan ?? null
+    }),
     annotations: READ,
     example: { project: 'p' }
   },
@@ -1443,6 +1503,102 @@ export const TOOLS: ToolDef[] = [
       openWorldHint: true
     },
     example: { app: 'web', pattern: '^/$', client_ip: '203.0.113.7' }
+  },
+  {
+    name: 'create_challenge_site',
+    title: 'Create a Challenge site',
+    description:
+      "Register a site for Faable Challenge (bot protection for the user's forms). Returns its public `site_key` (for the widget) and its `secret` (for the server-side verify), the secret only this once. Fails with plan_required when the plan's site limit is reached (Free 1, Hobby 5, Pro unlimited) — tell the user to upgrade the project.",
+    input: {
+      project,
+      name: z
+        .string()
+        .max(100)
+        .describe('A name for the site, e.g. "Contact form"'),
+      domains: challenge_domains
+    },
+    command: ['challenge', 'sites', 'create'],
+    flags: a => [
+      ...optText('--name', a.name),
+      ...domain_flags(a.domains),
+      ...scope(a)
+    ],
+    shape: with_secret_note,
+    write: true,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true
+    },
+    example: { name: 'web', domains: ['example.com'] }
+  },
+  {
+    name: 'update_challenge_site',
+    title: 'Update a Challenge site',
+    description:
+      'Rename a Faable Challenge site or replace its domains. `domains` is the FULL new list (read it with list_challenge_sites and add or drop entries). The site key and secret do not change.',
+    input: {
+      project,
+      site: challenge_site,
+      name: z.string().max(100).optional().describe('New name'),
+      domains: challenge_domains.optional()
+    },
+    command: ['challenge', 'sites', 'update'],
+    flags: a => [
+      a.site,
+      ...optText('--name', a.name),
+      ...domain_flags(a.domains),
+      ...scope(a)
+    ],
+    write: true,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true
+    },
+    example: { site: 'site_1', domains: ['example.com', 'example.org'] }
+  },
+  {
+    name: 'rotate_challenge_secret',
+    title: 'Rotate a Challenge secret',
+    description:
+      "Issue a new secret for a Faable Challenge site, e.g. when the old one leaked. The old secret stops working AT ONCE: until the user's server has the new one, its verifications fail. Confirm with the user first. Returns the new `secret`, only this once. Only on the local server with `faable mcp --writes`.",
+    input: { project, site: challenge_site },
+    command: ['challenge', 'sites', 'rotate-secret'],
+    // --yes: the model was asked to rotate; the CLI prompt has no one to ask.
+    flags: a => [a.site, '--yes', ...scope(a)],
+    shape: with_secret_note,
+    write: true,
+    // It breaks the user's verify until their server has the new secret: not
+    // on the hosted server, which promises nothing destructive.
+    local_only: true,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: true
+    },
+    example: { site: 'site_1' }
+  },
+  {
+    name: 'delete_challenge_site',
+    title: 'Delete a Challenge site',
+    description:
+      'Delete a Faable Challenge site: its site key and secret stop working at once, so forms that verify against it start failing. It cannot be undone (a new site gets new keys) — confirm with the user which site (list_challenge_sites) before calling it. Only on the local server with `faable mcp --writes`.',
+    input: { project, site: challenge_site },
+    command: ['challenge', 'sites', 'delete'],
+    flags: a => [a.site, '--yes', ...scope(a)],
+    write: true,
+    // Like delete_app: the hosted server promises nothing destructive.
+    local_only: true,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: true
+    },
+    example: { site: 'site_1' }
   },
   {
     name: 'configure_repo',

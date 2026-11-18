@@ -46,6 +46,7 @@ faable deploy status
 | `faable deploy secrets` | Environment variables: `list`, `set` (`KEY=VALUE`, `--env-file`, or `-f -` from stdin), `rm` | [Secrets](https://faable.com/docs/cli#secrets) |
 | `faable deploy domains` | Custom domains: `add` (prints the CNAME), `list`, `check`, `rm` | [Domains](https://faable.com/docs/cli#domains) |
 | `faable deploy waf` | Edge rules: `block` (403), `sink` (404 without waking the app), `list`, `rm` | [Edge rules](https://faable.com/docs/cli#edge-rules-waf) |
+| `faable challenge` | [Faable Challenge](https://faable.com/docs/challenge) bot protection: `sites list`, `sites create` (prints the site key and, once, the secret), `sites update`, `sites delete`, `sites rotate-secret`, `usage` (verifications vs the plan's quota) | [Faable Challenge](https://faable.com/docs/cli#faable-challenge) |
 | `faable auth users` | `list` (FaableQL filters), `get` (federated identities included), `suspend`, `reinstate` | [Users](https://faable.com/docs/cli#users) |
 | `faable auth actions` | Login-flow hooks: `list`, `get --code`, `create`, `update`, `rm` | [Actions](https://faable.com/docs/cli#actions) |
 | `faable auth clients` | OAuth clients: `list`, `get --secret`, `create`, `update` (URLs, profile fields, login methods, `--signup-protection off\|on_risk\|always`), `rm` | [OAuth clients](https://faable.com/docs/cli#oauth-clients) |

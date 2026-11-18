@@ -1,6 +1,7 @@
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import { auth } from './commands/auth'
+import { challenge } from './commands/challenge'
 import { deploy } from './commands/deploy'
 import { link_deprecated } from './commands/link'
 import { login } from './commands/login'
@@ -100,6 +101,7 @@ yg.scriptName('faable')
   }, true)
   .command(deploy)
   .command(auth)
+  .command(challenge)
   .command(project)
   .command(organization)
   .command(login)
