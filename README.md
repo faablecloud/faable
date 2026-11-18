@@ -70,7 +70,8 @@ claude mcp add faable -- npx -y @faable/faable mcp
 By default it exposes reads plus `deploy_app` (build the latest commit server-side).
 `faable mcp --writes` adds the reversible writes: create an app from a repository,
 set environment variables, add a domain, retry or cancel a build, change deploy
-settings. Nothing destructive is exposed. Secret values are never returned, and
+settings, rotate a Challenge secret. `delete_app` and `delete_challenge_site`
+are the local server's only deletions. Secret values are never returned, and
 logs come back marked as data, not instructions.
 
 ### Scripting and agents

@@ -6,7 +6,8 @@ import { TOOLS, ToolDef } from './tools'
 
 // `faable mcp` — the Faable MCP server over stdio (Fase 1 of
 // arch/deploy/mcp-server-faable.md). Reads plus `deploy_app` by default;
-// the reversible writes only with --writes. Nothing destructive, ever, here.
+// the reversible writes only with --writes. The destructive tools are writes,
+// and all but rotate_challenge_secret are local only.
 
 const INSTRUCTIONS = `Faable Deploy (apps, deployments, logs, domains, secrets) and Faable Auth (the users who log in to the user's apps) of the user's Faable projects.
 - Orient with list_apps (or list_projects when the user has several projects); pass \`project\` to scope a call.
@@ -57,7 +58,7 @@ const NEXT_STEP: Record<string, string> = {
   not_found:
     'Check the id or name — list_apps / list_deployments show what exists.',
   forbidden:
-    'This session has no access there — check the project (list_projects). With an API key, Auth tools only reach the tenants of the key\'s own project.',
+    "This session has no access there — check the project (list_projects). With an API key, Auth tools only reach the tenants of the key's own project.",
   github_installation_missing:
     'The Faable GitHub App is not installed on that repository. Give the user the install link (list_github_repos returns it as install_url); it is a step in their browser.',
   github_identity_missing:

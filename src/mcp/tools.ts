@@ -1599,16 +1599,16 @@ export const TOOLS: ToolDef[] = [
     name: 'rotate_challenge_secret',
     title: 'Rotate a Challenge secret',
     description:
-      "Issue a new secret for a Faable Challenge site, e.g. when the old one leaked. The old secret stops working AT ONCE: until the user's server has the new one, its verifications fail. Confirm with the user first. Returns the new `secret`, only this once. Only on the local server with `faable mcp --writes`.",
+      "Issue a new secret for a Faable Challenge site, e.g. when the old one leaked. The old secret stops working AT ONCE: until the user's server has the new one, its verifications fail. Confirm with the user first. Returns the new `secret`, only this once.",
     input: { project, site: challenge_site },
     command: ['challenge', 'sites', 'rotate-secret'],
     // --yes: the model was asked to rotate; the CLI prompt has no one to ask.
     flags: a => [a.site, '--yes', ...scope(a)],
     shape: with_secret_note,
     write: true,
-    // It breaks the user's verify until their server has the new secret: not
-    // on the hosted server, which promises nothing destructive.
-    local_only: true,
+    // The one destructive tool on the hosted server (Marc, 18-11): a leaked
+    // secret is urgent and deletes nothing. It breaks the user's verify until
+    // their server has the new one, so destructiveHint makes the client ask.
     annotations: {
       readOnlyHint: false,
       destructiveHint: true,
@@ -1626,7 +1626,7 @@ export const TOOLS: ToolDef[] = [
     command: ['challenge', 'sites', 'delete'],
     flags: a => [a.site, '--yes', ...scope(a)],
     write: true,
-    // Like delete_app: the hosted server promises nothing destructive.
+    // Like delete_app: the hosted server deletes nothing.
     local_only: true,
     annotations: {
       readOnlyHint: false,
@@ -1701,9 +1701,9 @@ export const TOOLS: ToolDef[] = [
     command: ['deploy', 'apps', 'rm'],
     flags: a => ['--yes', ...target(a)],
     write: true,
-    // The hosted server promises its users nothing destructive (the consent
-    // screen and docs/cli.md say so): deleting stays with whoever runs the
-    // MCP on their own machine and passed --writes.
+    // The hosted server deletes nothing (docs/cli.md and the landing say so):
+    // deleting stays with whoever runs the MCP on their own machine and
+    // passed --writes.
     local_only: true,
     annotations: {
       readOnlyHint: false,

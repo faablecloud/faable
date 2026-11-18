@@ -240,7 +240,7 @@ export const llms_txt = (base = PUBLIC_URL) =>
       : `Endpoint: ${base}/mcp (Streamable HTTP). Authenticate with a Faable API key: \`Authorization: Bearer <key>\` (create one in the dashboard, project settings → API keys). The key belongs to one project and only acts there.`,
     '',
     `- \`${base}/mcp/<project>\` pins every call to one project.`,
-    '- `?mode=write` adds the reversible writes (create apps, set secrets, add domains, retry or cancel builds, change deploy settings). Nothing destructive is exposed.',
+    '- `?mode=write` adds the reversible writes (create apps, set secrets, add domains, retry or cancel builds, change deploy settings, rotate a Challenge secret). Nothing is ever deleted.',
     '- `?readonly=1` exposes reads only.',
     '- Local alternative, no key: `npx -y @faable/faable mcp` (uses `faable login`).',
     '',

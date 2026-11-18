@@ -25,11 +25,12 @@ test('Challenge: list and usage are reads; create/update/rotate/delete need --wr
   }
 })
 
-test('Challenge: create and update are hosted; rotate and delete only local', t => {
+test('Challenge: create, update and rotate are hosted; delete only local', t => {
   const hosted = tools_for({ writes: true, hosted: true }).map(x => x.name)
   t.true(hosted.includes('create_challenge_site'))
   t.true(hosted.includes('update_challenge_site'))
-  t.false(hosted.includes('rotate_challenge_secret'))
+  t.true(hosted.includes('rotate_challenge_secret'))
+  t.true(tool('rotate_challenge_secret').annotations.destructiveHint)
   t.false(hosted.includes('delete_challenge_site'))
 })
 

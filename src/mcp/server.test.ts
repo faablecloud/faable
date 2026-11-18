@@ -67,8 +67,9 @@ test('by default: reads and deploy_app; the writes only with --writes', t => {
     )
   }
   // Only reads are marked read-only, and the destructive tools — deleting an
-  // app or a Challenge site, rotating a Challenge secret — are writes, and
-  // local only.
+  // app or a Challenge site, rotating a Challenge secret — are writes, local
+  // only except the rotation (Marc, 18-11: a leaked secret is urgent and the
+  // hosted server still deletes nothing).
   const destructive = [
     'delete_app',
     'delete_challenge_site',
@@ -86,7 +87,8 @@ test('by default: reads and deploy_app; the writes only with --writes', t => {
       t2.name
     )
     if (t2.annotations.destructiveHint) {
-      t.true(t2.write && t2.local_only, t2.name)
+      t.true(t2.write, t2.name)
+      t.is(!!t2.local_only, t2.name !== 'rotate_challenge_secret', t2.name)
     }
   }
 })
@@ -271,7 +273,7 @@ test('loader flags are resolved before the child moves to the temp dir', t => {
 })
 
 // Deleting an app: what `faable mcp --writes` on the user's machine can do,
-// never the hosted server (it promises nothing destructive), never by default.
+// never the hosted server (it deletes nothing), never by default.
 test('delete_app: only with --writes, never hosted, and always with --yes', t => {
   t.true(tools_for({ writes: true }).some(x => x.name === 'delete_app'))
   t.false(tools_for({}).some(x => x.name === 'delete_app'))
