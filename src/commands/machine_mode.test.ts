@@ -463,6 +463,29 @@ test('auth users suspend / reinstate / import / export without --yes: refused be
   }
 })
 
+test('auth connections create / update: a bad invocation is refused before any request', async t => {
+  for (const args of [
+    // An email code has no provider to hand a client id to.
+    [
+      'auth',
+      'connections',
+      'create',
+      '-n',
+      'email',
+      '-t',
+      'passwordless_email',
+      '--client-id',
+      'abc'
+    ],
+    ['auth', 'connections', 'create', '-n', 'x', '-t', 'not_a_type'],
+    ['auth', 'connections', 'update', 'email']
+  ]) {
+    const { code, stderr } = await run(args, NONINTERACTIVE)
+    t.is(code, 1, args.join(' '))
+    t.is(error_of(stderr).code, 'usage', args.join(' '))
+  }
+})
+
 test('a deploy never infers its target or its go-ahead', async t => {
   for (const [args, code] of [
     [['deploy'], 'usage'],
