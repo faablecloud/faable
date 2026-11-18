@@ -83,3 +83,39 @@ export const wait_for_installation = async (
     await sleep(opts.poll_ms ?? 5000)
   }
 }
+
+/**
+ * The app's name when `--name` is not given: the site title as a slug, as the
+ * dashboard derives it ("Café & Co." → cafe-co). The app's address adds a
+ * random suffix, so two sites with the same title do not clash.
+ */
+export const app_name_from_title = (title: string): string => {
+  const slug = title
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .slice(0, 50)
+    .replace(/-+$/, '')
+  if (slug.length >= 3) return slug
+  return slug ? `${slug}-site` : 'site'
+}
+
+// Same rule as the api's (deploy/domain/Domain.model.ts isValidFqdn).
+const FQDN = /^(?=.{4,253}$)((?!-)[a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,}$/i
+const RESERVED = ['faable.link', 'faable.com']
+
+/**
+ * What is wrong with `--domain`, before anything is created; null when it is
+ * fine. The api checks it again (and that no other project has it).
+ */
+export const domain_problem = (fqdn: string): string | null => {
+  if (!FQDN.test(fqdn)) {
+    return `--domain ${fqdn}: give the hostname on its own, like www.example.com — no https:// or path.`
+  }
+  if (RESERVED.some(r => fqdn === r || fqdn.endsWith(`.${r}`))) {
+    return `--domain ${fqdn}: addresses under faable.link and faable.com are assigned by Faable — the site gets one anyway.`
+  }
+  return null
+}

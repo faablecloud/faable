@@ -508,6 +508,9 @@ export interface FaableInstallation {
   database_id?: string | null
   volume_ids?: string[]
   auth_admin_invite?: string | null
+  // The production domain given at install (`--domain`), and its Domain.
+  domain?: string | null
+  domain_id?: string | null
 }
 
 const data = async <T, Q extends Promise<AxiosResponse<T>>>(
@@ -1393,6 +1396,8 @@ export class FaableApi<T = any> {
       name: string
       tier?: string
       inputs?: Record<string, string>
+      // The site's production domain (not faable.link); its DNS is the user's.
+      domain?: string
     }
   ) {
     return data(

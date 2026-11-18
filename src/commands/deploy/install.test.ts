@@ -1,7 +1,9 @@
 import test from 'ava'
 import type { FaableCatalogBlueprint } from '../../api/FaableApi'
 import {
+  app_name_from_title,
   catalog_lines,
+  domain_problem,
   missing_fields,
   parse_inputs,
   wait_for_installation
@@ -128,4 +130,22 @@ test('wait: gives up at the timeout, the install goes on', async t => {
     }
   )
   t.deepEqual(r, { state: 'installing', done: false, ok: false })
+})
+
+test('name from the title: accents out, a slug of at least 3', t => {
+  t.is(app_name_from_title('Café & Co.'), 'cafe-co')
+  t.is(app_name_from_title('  My   Blog!! '), 'my-blog')
+  t.is(app_name_from_title('Yo'), 'yo-site')
+  t.is(app_name_from_title('¡¡!!'), 'site')
+  t.true(app_name_from_title('a'.repeat(80)).length <= 50)
+})
+
+test('domain: a bare hostname, not one of faable.link or faable.com', t => {
+  t.is(domain_problem('www.example.com'), null)
+  t.is(domain_problem('example.co.uk'), null)
+  t.regex(domain_problem('https://www.example.com')!, /hostname on its own/)
+  t.regex(domain_problem('www.example.com/blog')!, /hostname on its own/)
+  t.regex(domain_problem('blog.faable.link')!, /assigned by Faable/)
+  t.regex(domain_problem('faable.com')!, /assigned by Faable/)
+  t.is(domain_problem('notfaable.com'), null)
 })

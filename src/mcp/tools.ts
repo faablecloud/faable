@@ -1121,19 +1121,26 @@ export const TOOLS: ToolDef[] = [
     name: 'install_blueprint',
     title: 'Install an app from the catalogue',
     description:
-      "Install an app of the Faable catalogue (WordPress…) in a project: its app, a volume for its files and a database with daily backups, with sign-in through Faable Auth (the dashboard's Install an app). Needs a Hobby or Pro project; the database is billed per month. list_blueprints says what each app asks for in `inputs`.",
+      "Install an app of the Faable catalogue (WordPress…) in a project: its app, a volume for its files and a database with daily backups, with sign-in through Faable Auth (the dashboard's Install an app). Needs a Hobby or Pro project; the database is billed per month. list_blueprints says what each app asks for in `inputs`. The user installing it is the site's admin, by their verified email. With `domain`, the site lives on that domain: the result's `dns` is the record the user must create at their DNS provider — tell them, the site does not load there until it points at Faable.",
     input: {
       blueprint: z.string().describe('Catalogue app, e.g. wordpress'),
       name: z
         .string()
+        .optional()
         .describe(
-          'Name of the app it creates: lowercase letters, digits and dashes'
+          'Name of the app it creates: lowercase letters, digits and dashes. Defaults to the site title as a slug'
         ),
       inputs: z
         .record(z.string(), z.string())
         .optional()
         .describe(
-          'What the app asks for (list_blueprints), e.g. { "title": "My blog", "admin_email": "me@example.com" }'
+          'What the app asks for (list_blueprints), e.g. { "title": "My blog", "locale": "es_ES" }'
+        ),
+      domain: z
+        .string()
+        .optional()
+        .describe(
+          "The site's production domain, e.g. www.example.com (not under faable.link). The user configures its DNS"
         ),
       tier: z
         .string()
@@ -1155,6 +1162,7 @@ export const TOOLS: ToolDef[] = [
         ([k, v]) => `--input=${k}=${v}`
       ),
       ...opt('--tier', a.tier),
+      ...optText('--domain', a.domain),
       ...(a.wait ? ['--wait', '--timeout', '600'] : []),
       ...scope(a)
     ],
@@ -1168,7 +1176,8 @@ export const TOOLS: ToolDef[] = [
     example: {
       blueprint: 'wordpress',
       name: 'blog',
-      inputs: { title: 'My blog', admin_email: 'me@example.com' },
+      inputs: { title: 'My blog' },
+      domain: 'www.example.com',
       wait: true
     }
   },
@@ -1286,11 +1295,15 @@ export const TOOLS: ToolDef[] = [
     input: {
       app: optional_app,
       project,
-      fqdn: z.string().describe('The domain that redirects, e.g. www.example.com'),
+      fqdn: z
+        .string()
+        .describe('The domain that redirects, e.g. www.example.com'),
       target: z
         .string()
         .nullable()
-        .describe('The domain it redirects to, e.g. example.com; null to stop redirecting')
+        .describe(
+          'The domain it redirects to, e.g. example.com; null to stop redirecting'
+        )
     },
     command: ['deploy', 'domains', 'redirect'],
     flags: a => [
@@ -1337,16 +1350,22 @@ export const TOOLS: ToolDef[] = [
       client_ip: z
         .string()
         .optional()
-        .describe('IPv4/IPv6 address or CIDR, e.g. 203.0.113.7 or 203.0.113.0/24'),
+        .describe(
+          'IPv4/IPv6 address or CIDR, e.g. 203.0.113.7 or 203.0.113.0/24'
+        ),
       rate: z
         .string()
         .regex(/^\d+\/[a-z]+$/i)
         .optional()
-        .describe('limit only (required there): requests per second or minute, e.g. 10/m or 5/s'),
+        .describe(
+          'limit only (required there): requests per second or minute, e.g. 10/m or 5/s'
+        ),
       per: z
         .enum(['ip', 'rule'])
         .optional()
-        .describe('limit only: one count per client IP (default) or one shared by all clients'),
+        .describe(
+          'limit only: one count per client IP (default) or one shared by all clients'
+        ),
       description: z
         .string()
         .max(500)
@@ -1884,12 +1903,7 @@ export const TOOLS: ToolDef[] = [
       project
     },
     command: ['auth', 'clients', 'update'],
-    flags: a => [
-      a.client,
-      '--signup-protection',
-      a.mode,
-      ...auth_scope(a)
-    ],
+    flags: a => [a.client, '--signup-protection', a.mode, ...auth_scope(a)],
     shape: (c: any) => ({
       id: c.id,
       client_id: c.client_id,
