@@ -9,6 +9,7 @@ import { roles } from './roles'
 import { sessions } from './sessions'
 import { users } from './users'
 import { webhooks } from './webhooks'
+import { email_subscriptions } from './email_subscriptions'
 
 // `faable auth` — management commands for a Faable Auth tenant. Auth: reuses
 // the `faable login` session (or FAABLE_TOKEN); tenant: --account /
@@ -17,7 +18,7 @@ import { webhooks } from './webhooks'
 export const auth: CommandModule = {
   command: 'auth',
   describe:
-    'Manage Faable Auth (users, roles, APIs, sessions, logins, actions, clients, webhooks, audit logs)',
+    'Manage Faable Auth (users, roles, APIs, sessions, logins, actions, clients, webhooks, email subscriptions, audit logs)',
   builder: yargs =>
     yargs
       .command(users)
@@ -29,6 +30,7 @@ export const auth: CommandModule = {
       .command(sessions)
       .command(connections)
       .command(webhooks)
+      .command(email_subscriptions)
       .command(accounts)
       .command(auth_use)
       .demandCommand(1)
