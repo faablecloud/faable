@@ -865,6 +865,75 @@ test('build logs skip a cancelled redeploy that never built (§374)', async t =>
   }
 })
 
+// A deployment id says whose it is: `inspect`, `logs --build -d`, `redeploy`
+// and `cancel` take the app from the deployment when there is no --app,
+// instead of app_required (§555 F0: agents paid a round trip for it). No
+// faable.json link here and no --app: the only way to the app is the
+// deployment itself.
+const OWN_DEPLOYMENT = (p: string): [number, unknown] => {
+  if (p === `/app/${APP.id}`) return [200, APP]
+  if (p === '/deployment/deployment_1') {
+    return [
+      200,
+      { id: 'deployment_1', app_id: APP.id, status: { phase: 'BUILD_ERROR' } }
+    ]
+  }
+  if (p === '/deployment/deployment_1/logs') {
+    return [200, { content: 'boom\n', truncated: false }]
+  }
+  if (p === '/deployment/deployment_1/redeploy') {
+    return [200, { id: 'deployment_2', redeploy_of: 'deployment_1' }]
+  }
+  if (p === '/deployment/deployment_1/cancel') {
+    return [200, { id: 'deployment_1', status: { phase: 'CANCELED' } }]
+  }
+  return [404, { message: 'not found' }]
+}
+
+for (const [args, check] of [
+  [['deploy', 'inspect', 'deployment_1'], (o: any) => o.id === 'deployment_1'],
+  [
+    ['deploy', 'logs', '--build', '-d', 'deployment_1'],
+    (o: any) => o.deployment_id === 'deployment_1' && o.content === 'boom\n'
+  ],
+  [['deploy', 'redeploy', 'deployment_1'], (o: any) => o.id === 'deployment_2'],
+  [['deploy', 'cancel', 'deployment_1'], (o: any) => o.id === 'deployment_1']
+] as const) {
+  test(`faable ${args.join(' ')} without --app: the app is the deployment's`, async t => {
+    const api = await tiny_api(OWN_DEPLOYMENT)
+    try {
+      const out = await run([...args, '--json'], {
+        ...NONINTERACTIVE,
+        FAABLE_TOKEN: 'stub',
+        FAABLE_API_URL: api.url
+      })
+      t.is(out.code, 0, out.stderr)
+      t.true(check(JSON.parse(out.stdout)), out.stdout)
+      t.true(api.seen.some(r => r.path === `/app/${APP.id}`))
+    } finally {
+      api.close()
+    }
+  })
+}
+
+test('inspect with an --app the deployment is not of: refused, not rendered against it', async t => {
+  const api = await tiny_api(p =>
+    p === '/app/app_other'
+      ? [200, { ...APP, id: 'app_other', name: 'other' }]
+      : OWN_DEPLOYMENT(p)
+  )
+  try {
+    const out = await run(
+      ['deploy', 'inspect', 'deployment_1', '--app', 'app_other', '--json'],
+      { ...NONINTERACTIVE, FAABLE_TOKEN: 'stub', FAABLE_API_URL: api.url }
+    )
+    t.is(out.code, 1)
+    t.regex(error_of(out.stderr).message, /belongs to another app/)
+  } finally {
+    api.close()
+  }
+})
+
 // Signup protection (auth SignupProtection): one field on the client.
 const last_body = (api: { bodies: string[] }) =>
   JSON.parse(api.bodies[api.bodies.length - 1])

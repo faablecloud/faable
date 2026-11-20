@@ -2,7 +2,7 @@ import { CommandModule } from 'yargs'
 import { requireApi } from '../../../api/context'
 import { json_option, print_json, print_noop } from '../../../lib/listing'
 import { log } from '../../../log'
-import { resolve_app_id } from '../resolve_app_id'
+import { resolve_app_for_deployment } from '../resolve_app_id'
 
 // Mirrors CANCELABLE_PHASES in the api (deployment/api/cancel.ts). Used only
 // to pick a default target; the api is the one that enforces it, so a phase
@@ -34,7 +34,12 @@ export const cancel: CommandModule<unknown, CancelArgs> = {
       .showHelpOnFail(false) as any,
   handler: async args => {
     const ctx = await requireApi()
-    const app_id = await resolve_app_id(args.app, ctx.appId, ctx.api)
+    const app_id = await resolve_app_for_deployment(
+      args.app,
+      args.deployment,
+      ctx.appId,
+      ctx.api
+    )
     const app = await ctx.api.getApp(app_id)
 
     let deployment_id = args.deployment
