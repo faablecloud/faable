@@ -30,6 +30,8 @@ export interface CatalogCommand {
   // Out of the help (`describe: false`): kept for programs that already call
   // it, or for the MCP alone (`deploy waf add`). Listed only on request.
   hidden: boolean
+  // The module yargs runs for it (not printed).
+  module: CommandModule<any, any>
 }
 
 interface Recorded {
@@ -167,7 +169,8 @@ export const walk = (
         .filter(([, o]) => visible(o))
         .map(([n, o]) => arg(n, o)),
       default_of_group: is_default,
-      hidden
+      hidden,
+      module: mod
     })
   }
   return out

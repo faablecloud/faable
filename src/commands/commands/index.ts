@@ -4,6 +4,7 @@ import { CatalogArg, CatalogCommand, matches, walk } from '../../lib/catalog'
 import { EFFECTS, Effect } from '../../lib/effects'
 import { CliError } from '../../lib/errors'
 import { json_option, print, print_json } from '../../lib/listing'
+import { is_read_only } from '../../lib/read_only'
 
 interface CommandsArgs {
   query?: string[]
@@ -70,6 +71,12 @@ const GLOBAL_OPTIONS = [
       'Never prompt nor infer the app from the working directory; errors as JSON (env FAABLE_NONINTERACTIVE=1)'
   },
   {
+    name: 'read-only',
+    type: 'boolean',
+    describe:
+      'Refuse every write or destructive command before it sends anything (env FAABLE_READONLY=1)'
+  },
+  {
     name: 'config',
     aliases: ['c'],
     type: 'string',
@@ -130,6 +137,8 @@ export const commands: CommandModule<unknown, CommandsArgs> = {
         has_more: false,
         next_cursor: null,
         cli_version: version,
+        // Whether `write` and `destructive` commands would be refused now.
+        read_only: is_read_only(args),
         global_options: GLOBAL_OPTIONS
       })
       return

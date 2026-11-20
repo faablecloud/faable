@@ -8,6 +8,7 @@ import { ContextStore } from './lib/ContextStore'
 import { notifyIfUpdateAvailable } from './lib/UpdateChecker'
 import { CliError, error_json } from './lib/errors'
 import { is_non_interactive } from './lib/interactive'
+import { guard_read_only } from './lib/read_only'
 import { log } from './log'
 
 // Where the command acts, on the banner — read locally, never a request.
@@ -71,6 +72,12 @@ yg.scriptName('faable')
     boolean: true,
     global: true
   })
+  .option('read-only', {
+    description:
+      'Refuse every command that would change Faable, before it sends anything (env FAABLE_READONLY=1)',
+    boolean: true,
+    global: true
+  })
   .option('p', {
     alias: 'project',
     description:
@@ -88,8 +95,9 @@ yg.scriptName('faable')
       Configuration.instance()
     }
   }, true)
-  // The same list `faable commands` describes (src/commands/root.ts).
-  .command(ROOT_COMMANDS)
+  // The same list `faable commands` describes (src/commands/root.ts), each
+  // handler behind the read-only check of its own effect.
+  .command(guard_read_only(ROOT_COMMANDS))
   .demandCommand(1)
   // Reject unknown (sub)commands loudly. Without this, a typo'd or
   // not-yet-existing command (`faable secrets list` on a version where it

@@ -31,6 +31,7 @@ const list = async (...args: string[]) =>
     data: any[]
     has_more: boolean
     global_options: { name: string }[]
+    read_only: boolean
   }
 
 test('--json: the listing envelope, one object per command', async t => {
@@ -41,7 +42,7 @@ test('--json: the listing envelope, one object per command', async t => {
   t.true(out.data.every(c => c.object === 'command' && c.effect))
   t.deepEqual(
     out.global_options.map(o => o.name),
-    ['project', 'non-interactive', 'config']
+    ['project', 'non-interactive', 'read-only', 'config']
   )
 })
 
@@ -107,4 +108,9 @@ test('text: one line per command, with its effect', async t => {
   const out = await run('secrets')
   t.regex(out, /^faable deploy secrets rm\s+destructive\s+Remove a secret/m)
   t.regex(out, /^faable deploy secrets list\s+read\s+/m)
+})
+
+test('the listing says whether read-only mode is on', async t => {
+  t.false((await list('quota')).read_only)
+  t.true((await list('quota', '--read-only')).read_only)
 })
