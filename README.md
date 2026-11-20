@@ -94,6 +94,23 @@ directory, and `faable deploy launch` needs `--app`, `--workdir` and `--yes`.
 Pass secret values on stdin (`faable deploy secrets set -f -`), never as
 arguments.
 
+To find a command, search the catalog instead of walking `--help`:
+
+```sh
+faable commands domain add --json      # usage, positionals, flags, effect
+faable commands --effect read          # everything that changes nothing
+```
+
+Each command carries its `effect`: `read`, `write`, `destructive` (deletes or
+overwrites what cannot be brought back) or `local` (only this machine's
+session). A few depend on their arguments and say when they are a read
+(`read_when`).
+
+`FAABLE_READONLY=1` (or `--read-only`) refuses every `write` and
+`destructive` command before it sends anything — `{"error":{"code":"read_only"}}`,
+exit 1 — and lets reads through. Turn it on for an agent you let run the CLI
+on its own; `faable commands --json` says whether it is on (`read_only`).
+
 ### Deploy
 
 ```bash

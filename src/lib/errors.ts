@@ -19,6 +19,7 @@ export type CliErrorCode =
   | 'name_taken' // creating an app with the name of one already in the project
   | 'operation_failed' // a queued operation (a volume backup, restore…) ended failed
   | 'usage' // bad invocation: unknown command, missing argument…
+  | 'read_only' // a write in read-only mode (FAABLE_READONLY / --read-only)
   | 'domain_taken' // 409, the api's code: the hostname is already registered
   | 'domain_unlinked' // 409, the api's code: already in this project, linked to no app
   | 'domain_redirect_invalid' // 422, the api's code: the redirect target is not a serving domain of the project
