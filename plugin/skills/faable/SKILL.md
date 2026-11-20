@@ -6,8 +6,9 @@ description: Operate Faable with the `faable` CLI — apps, deployments, build a
 # Faable CLI
 
 `faable` is logged in as the user (`faable login`, which only they can run). Drive it from the
-shell: every command takes `--json`, and a loop or a `jq` over its output is cheaper than one call
-per item.
+shell: every command takes `--json`. Permissions usually allow only `faable` and `jq`, so prefer
+one command piped to `jq` over a shell loop (`for`, `xargs`), and `-n` over `| tail`; most
+questions about many apps have one command that answers them (below).
 
 ## Rules
 
