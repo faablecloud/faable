@@ -23,7 +23,8 @@
   "homepage": "https://faable.com/docs/cli",
   "files": [
     "dist",
-    "bin"
+    "bin",
+    "plugin"
   ],
   "dependencies": {
     "@actions/core": "^3.0.0",

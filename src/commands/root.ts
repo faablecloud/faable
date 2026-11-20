@@ -1,4 +1,5 @@
 import { CommandModule } from 'yargs'
+import { agent } from './agent'
 import { auth } from './auth'
 import { challenge } from './challenge'
 import { commands } from './commands'
@@ -25,6 +26,7 @@ export const ROOT_COMMANDS: CommandModule<any, any>[] = [
   whoami,
   commands,
   mcp,
+  agent,
   upgrade,
   link_deprecated
 ]

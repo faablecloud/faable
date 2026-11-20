@@ -1,0 +1,8 @@
+{
+  "name": "faable",
+  "description": "Use the Faable CLI from Claude Code: a skill that knows its commands and JSON contract, and a session in read-only mode by default.",
+  "author": { "name": "Faable", "url": "https://faable.com" },
+  "homepage": "https://faable.com/docs/cli",
+  "repository": "https://github.com/faablecloud/faable",
+  "license": "MIT"
+}
