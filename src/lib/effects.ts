@@ -183,6 +183,9 @@ export const EFFECTS: Record<string, EffectRule> = {
   // Serves tools; each tool call is a CLI run of its own, governed by its
   // own command's effect.
   mcp: R,
+  // Writes the skill on this machine (~/.claude/skills or the project).
+  'agent install': L,
+  'agent skill': R,
   upgrade: L,
   link: W
 }

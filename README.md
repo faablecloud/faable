@@ -111,6 +111,31 @@ session). A few depend on their arguments and say when they are a read
 exit 1 — and lets reads through. Turn it on for an agent you let run the CLI
 on its own; `faable commands --json` says whether it is on (`read_only`).
 
+### Skill for coding agents
+
+An agent with a shell (Claude Code, Codex, Cursor…) can use the CLI directly
+instead of the MCP server. The Faable skill tells it the commands, the JSON
+contract and the rules (read-only by default, ask before any change):
+
+```bash
+# Claude Code: the plugin — the skill, plus read-only and non-interactive
+# mode for the whole session (FAABLE_READONLY=0 in your env keeps writes on)
+claude plugin marketplace add faablecloud/faable
+claude plugin install faable@faable
+
+# Or just the skill, from the CLI you have installed
+faable agent install                   # ~/.claude/skills/faable
+faable agent install --scope project   # ./.claude/skills/faable, to commit
+faable agent install --agents          # ~/.agents/skills/faable, other agents
+faable agent skill                     # print it (AGENTS.md, a prompt…)
+```
+
+To let the agent read without a prompt for every call, allow `Bash(faable:*)`
+in its permissions: in read-only mode a command that would change something
+fails before it sends anything. A change the user asked for runs as
+`FAABLE_READONLY=0 faable …`, which that rule does not match — Claude Code
+asks before running it.
+
 ### Deploy
 
 ```bash

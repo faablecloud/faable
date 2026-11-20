@@ -1,0 +1,11 @@
+{
+  "name": "faable",
+  "owner": { "name": "Faable", "url": "https://faable.com" },
+  "plugins": [
+    {
+      "name": "faable",
+      "source": "./plugin",
+      "description": "Operate Faable Deploy and Faable Auth with the faable CLI: a skill with its commands and JSON contract, read-only by default."
+    }
+  ]
+}
