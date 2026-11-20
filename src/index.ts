@@ -1,23 +1,13 @@
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
-import { auth } from './commands/auth'
-import { challenge } from './commands/challenge'
-import { deploy } from './commands/deploy'
-import { link_deprecated } from './commands/link'
-import { login } from './commands/login'
-import { logout } from './commands/logout'
-import { mcp } from './commands/mcp'
-import { organization } from './commands/organization'
-import { project } from './commands/project'
-import { upgrade } from './commands/upgrade'
-import { whoami } from './commands/whoami'
+import { configuredProject, setProjectFlag } from './api/project'
+import { ROOT_COMMANDS } from './commands/root'
 import { version } from './config'
 import { Configuration } from './lib/Configuration'
-import { configuredProject, setProjectFlag } from './api/project'
 import { ContextStore } from './lib/ContextStore'
+import { notifyIfUpdateAvailable } from './lib/UpdateChecker'
 import { CliError, error_json } from './lib/errors'
 import { is_non_interactive } from './lib/interactive'
-import { notifyIfUpdateAvailable } from './lib/UpdateChecker'
 import { log } from './log'
 
 // Where the command acts, on the banner — read locally, never a request.
@@ -32,8 +22,7 @@ const project_badge = async () => {
 }
 
 // A program is reading: errors go out as JSON on stderr.
-const wants_json = () =>
-  process.argv.includes('--json') || is_non_interactive()
+const wants_json = () => process.argv.includes('--json') || is_non_interactive()
 
 const fail_json = (err: unknown) => {
   process.stderr.write(JSON.stringify(error_json(err)) + '\n')
@@ -99,17 +88,8 @@ yg.scriptName('faable')
       Configuration.instance()
     }
   }, true)
-  .command(deploy)
-  .command(auth)
-  .command(challenge)
-  .command(project)
-  .command(organization)
-  .command(login)
-  .command(logout)
-  .command(whoami)
-  .command(mcp)
-  .command(upgrade)
-  .command(link_deprecated)
+  // The same list `faable commands` describes (src/commands/root.ts).
+  .command(ROOT_COMMANDS)
   .demandCommand(1)
   // Reject unknown (sub)commands loudly. Without this, a typo'd or
   // not-yet-existing command (`faable secrets list` on a version where it

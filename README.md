@@ -94,6 +94,18 @@ directory, and `faable deploy launch` needs `--app`, `--workdir` and `--yes`.
 Pass secret values on stdin (`faable deploy secrets set -f -`), never as
 arguments.
 
+To find a command, search the catalog instead of walking `--help`:
+
+```sh
+faable commands domain add --json      # usage, positionals, flags, effect
+faable commands --effect read          # everything that changes nothing
+```
+
+Each command carries its `effect`: `read`, `write`, `destructive` (deletes or
+overwrites what cannot be brought back) or `local` (only this machine's
+session). A few depend on their arguments and say when they are a read
+(`read_when`).
+
 ### Deploy
 
 ```bash
