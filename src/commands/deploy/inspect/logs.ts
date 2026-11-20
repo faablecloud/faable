@@ -4,7 +4,7 @@ import { CliError } from '../../../lib/errors'
 import { as_list, json_option, print_json } from '../../../lib/listing'
 import { log } from '../../../log'
 import { follow_remote_build } from '../remote/follow'
-import { resolve_app_id } from '../resolve_app_id'
+import { resolve_app_for_deployment } from '../resolve_app_id'
 import { format_log_lines, log_entries, tail_lines } from './format'
 
 interface LogsArgs {
@@ -83,7 +83,12 @@ export const logs: CommandModule<unknown, LogsArgs> = {
       throw new CliError('usage', '--tail must be a positive integer')
     }
     const ctx = await requireApi()
-    const app_id = await resolve_app_id(args.app, ctx.appId, ctx.api)
+    const app_id = await resolve_app_for_deployment(
+      args.app,
+      args.deployment,
+      ctx.appId,
+      ctx.api
+    )
     const app = await ctx.api.getApp(app_id)
 
     if (args.build) {

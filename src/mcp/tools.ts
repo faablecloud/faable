@@ -329,18 +329,43 @@ export const TOOLS: ToolDef[] = [
     name: 'list_apps',
     title: 'List apps',
     description:
-      'The apps of a project, with their live phase, URL and linked repository. Start here to find the app the user means.',
-    input: { project, cursor },
+      "The apps of a project, with their live phase, URL and linked repository. Start here to find the app the user means. With latest, also each app's newest deployment (serving or not): which apps' last deploy failed, in one call.",
+    input: {
+      project,
+      cursor,
+      latest: z
+        .boolean()
+        .optional()
+        .describe(
+          "Also each app's newest deployment — id, phase, when — even when an older one is what serves"
+        )
+    },
     command: ['deploy', 'apps', 'list'],
     flags: a => [
       '--limit',
       '100',
       ...scope(a),
-      ...opt('--starting-after', a.cursor)
+      ...opt('--starting-after', a.cursor),
+      ...(a.latest ? ['--latest'] : [])
     ],
-    shape: page(app_row),
+    // No failure message: that text is the deployer's (get_deployment).
+    shape: page((a: any) => ({
+      ...app_row(a),
+      ...(a.latest_deployment !== undefined
+        ? {
+            latest_deployment: a.latest_deployment
+              ? {
+                  id: a.latest_deployment.id,
+                  phase: a.latest_deployment.status?.phase,
+                  created_at: a.latest_deployment.createdAt,
+                  commit: a.latest_deployment.github_commit
+                }
+              : null
+          }
+        : {})
+    })),
     annotations: READ,
-    example: { project: 'p', cursor: 'abc' }
+    example: { project: 'p', cursor: 'abc', latest: true }
   },
   {
     name: 'list_blueprints',

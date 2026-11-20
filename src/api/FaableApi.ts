@@ -90,6 +90,9 @@ export interface FaableApp {
     phase: string
     deployment: string | null
   }
+  // Only when listed with `latest` (`?expand=latest_deployment`): the newest
+  // deployment, null when there is none.
+  latest_deployment?: FaableDeployment | null
 }
 
 export interface FaableDeployment {
@@ -695,13 +698,19 @@ export class FaableApi<T = any> {
   // One page of apps, scoped to `project` (default: the active project).
   // `null` = unscoped. The api filters by the header, so an admin session
   // doesn't page through the whole platform.
+  // `latest`: each app with its newest deployment, serving or not
+  // (`?expand=latest_deployment`, api ≥ the release that added it).
   async listApps(
     params: PageParams,
-    project: string | null = this.project ?? null
+    project: string | null = this.project ?? null,
+    { latest = false }: { latest?: boolean } = {}
   ) {
     return data(
       this.client.get<Page<FaableApp>>(`/app`, {
-        params: page_params(params),
+        params: {
+          ...page_params(params),
+          ...(latest ? { expand: 'latest_deployment' } : {})
+        },
         ...(project ? { headers: projectHeader(project) } : {})
       })
     )

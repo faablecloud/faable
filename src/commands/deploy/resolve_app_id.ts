@@ -2,9 +2,9 @@ import { FaableApi } from '../../api/FaableApi'
 import { requireProject } from '../../api/project'
 import { Configuration } from '../../lib/Configuration'
 import { CliError } from '../../lib/errors'
+import { getGitRemoteUrl } from '../../lib/git_remote'
 import { is_non_interactive } from '../../lib/interactive'
 import { fetch_page } from '../../lib/listing'
-import { getGitRemoteUrl } from '../../lib/git_remote'
 import { log } from '../../log'
 
 // --app takes an id, a name or a slug. An id (`app_…`) is used as-is — the
@@ -77,7 +77,9 @@ export const find_app_id = async (
     const matches = await api.appsByRepository(repository)
     if (matches.length === 1) {
       const app = matches[0]
-      log.info(`🔎 Detected app "${app.name}" (${app.id}) from repository ${repository}`)
+      log.info(
+        `🔎 Detected app "${app.name}" (${app.id}) from repository ${repository}`
+      )
       return app.id
     }
     if (matches.length > 1) {
@@ -107,4 +109,23 @@ export const resolve_app_id = async (
       ? 'Pass the app with --app <app_id> (non-interactive mode never infers it from the working directory).'
       : 'No app linked to this repository. Link it from the dashboard (or run "faable deploy link"), or pass one with --app <app_id>.'
   )
+}
+
+// The app of a command that names one deployment (`inspect`, `logs --build
+// -d`, `redeploy`, `cancel`): a deployment id is globally unique and says
+// whose it is, so without --app the app is the deployment's own — not the
+// linked one, and no app_required. With --app the usual resolution applies,
+// and the caller still checks the two agree. Measured in §555 F0: agents
+// passed a deployment id and paid an extra round trip to learn --app.
+export const resolve_app_for_deployment = async (
+  app_ref: string | undefined,
+  deployment_id: string | undefined,
+  linked: string | undefined,
+  api: FaableApi
+): Promise<string> => {
+  if (deployment_id && !app_ref) {
+    const deployment = await api.getDeployment(deployment_id)
+    if (deployment?.app_id) return deployment.app_id
+  }
+  return resolve_app_id(app_ref, linked, api)
 }
