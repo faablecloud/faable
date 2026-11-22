@@ -4,6 +4,7 @@ import { serve_stdio } from '../../mcp/server'
 
 interface McpArgs {
   writes?: boolean
+  code?: boolean
   http?: boolean
   port?: number
 }
@@ -30,6 +31,12 @@ export const mcp: CommandModule<unknown, McpArgs> = {
         description:
           'Also expose the reversible writes: create apps, set secrets, add domains, retry or cancel builds, change deploy settings (over HTTP: ?mode=write)'
       })
+      .option('code', {
+        type: 'boolean',
+        default: false,
+        description:
+          'Code Mode: two tools, `search` and `execute`, where the agent writes JavaScript that calls the CLI commands (over HTTP: ?mode=code)'
+      })
       .option('http', {
         type: 'boolean',
         default: false,
@@ -50,6 +57,10 @@ export const mcp: CommandModule<unknown, McpArgs> = {
         'With the reversible writes'
       )
       .example(
+        'claude mcp add faable -- npx -y @faable/faable mcp --code',
+        'Code Mode: search + execute'
+      )
+      .example(
         '$0 mcp --http --port 8080',
         'Host it (what runs at mcp.faable.com)'
       )
@@ -59,6 +70,6 @@ export const mcp: CommandModule<unknown, McpArgs> = {
       await serve_http({ port: args.port ?? 8080 })
       return
     }
-    await serve_stdio({ writes: args.writes })
+    await serve_stdio({ writes: args.writes, code: args.code })
   }
 }
