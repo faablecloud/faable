@@ -32,6 +32,9 @@ export interface RunOptions {
   // Tests point these elsewhere; by default, the running CLI itself.
   entry?: string
   env?: Record<string, string | undefined>
+  // What the api counts this traffic as (`x-faable-client`); Code Mode's
+  // calls are `faable-mcp-code`.
+  client?: 'faable-mcp' | 'faable-mcp-code'
 }
 
 const DEFAULT_TIMEOUT_MS = 120_000
@@ -125,7 +128,7 @@ export const run_cli = (
         env: {
           ...(opts.env ?? process.env),
           FAABLE_NONINTERACTIVE: '1',
-          FAABLE_CLIENT_NAME: 'faable-mcp',
+          FAABLE_CLIENT_NAME: opts.client ?? 'faable-mcp',
           NO_COLOR: '1'
         },
         stdio: ['pipe', 'pipe', 'pipe']

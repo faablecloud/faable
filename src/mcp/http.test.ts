@@ -6,7 +6,13 @@ import { AddressInfo } from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { APP, PROJECT, start_api } from '../test/stub_api'
-import { api_key_of, child_env, create_http_server, route_of } from './http'
+import {
+  api_key_of,
+  child_env,
+  create_http_server,
+  modes_of,
+  route_of
+} from './http'
 import { TOOLS } from './tools'
 
 const src = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -197,8 +203,14 @@ test.serial(
       // Everything but what works on the user's own disk.
       t.is(catalog.tools.length, TOOLS.filter(x => !x.local_only).length)
       t.false(catalog.tools.some((x: any) => x.name === 'deploy_directory'))
-      t.is(catalog.tools.find((x: any) => x.name === 'list_auth_logins').product, 'auth')
-      t.is(catalog.tools.find((x: any) => x.name === 'list_apps').product, 'deploy')
+      t.is(
+        catalog.tools.find((x: any) => x.name === 'list_auth_logins').product,
+        'auth'
+      )
+      t.is(
+        catalog.tools.find((x: any) => x.name === 'list_apps').product,
+        'deploy'
+      )
       t.is(
         catalog.tools.find((x: any) => x.name === 'set_secrets').requires,
         'mode=write'
@@ -226,6 +238,52 @@ test.serial(
         else process.env.OPENAI_APPS_CHALLENGE = before
       }
     } finally {
+      mcp.close()
+      api.close()
+    }
+  }
+)
+
+test('?mode= takes a list: code, write or both', t => {
+  const m = (q: string) => [...modes_of(new URL(`http://x/mcp${q}`))].sort()
+  t.deepEqual(m(''), [])
+  t.deepEqual(m('?mode=write'), ['write'])
+  t.deepEqual(m('?mode=code'), ['code'])
+  t.deepEqual(m('?mode=code,write'), ['code', 'write'])
+  t.deepEqual(m('?mode=code&mode=write'), ['code', 'write'])
+})
+
+test.serial(
+  "?mode=code: search + execute, and execute's calls run with the caller's key as faable-mcp-code",
+  async t => {
+    const api = await start_api()
+    const mcp = await start_mcp(api.url)
+    const c = await client_for(`${mcp.url}/mcp?mode=code`, 'fk_live_alice001')
+    try {
+      const { tools } = await c.listTools()
+      t.deepEqual(tools.map(x => x.name).sort(), ['execute', 'search'])
+      t.regex(
+        text_of(
+          await c.callTool({ name: 'search', arguments: { query: 'apps get' } })
+        ),
+        /faable\.deploy\.apps\.get\(/
+      )
+      const r = await c.callTool({
+        name: 'execute',
+        arguments: {
+          code: `const [l, g] = await Promise.all([faable.deploy.apps.list(), faable.deploy.apps.get({ app: '${APP.id}' })])
+                 return { n: l.data.length, writes: typeof faable.deploy.apps.create }`
+        }
+      })
+      t.falsy(r.isError, text_of(r))
+      t.regex(text_of(r), /"writes": "undefined"/)
+      t.regex(text_of(r), /2 faable calls: deploy apps list ok/)
+      const basic = `Basic ${Buffer.from('fk_live_alice001:').toString('base64')}`
+      t.true(api.requests.length >= 2)
+      t.true(api.requests.every(x => x.authorization === basic))
+      t.true(api.requests.every(x => x.client?.startsWith('faable-mcp-code/')))
+    } finally {
+      await c.close()
       mcp.close()
       api.close()
     }

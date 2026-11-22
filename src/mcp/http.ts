@@ -40,6 +40,8 @@ import { TOOLS, product_of } from './tools'
 //   POST /mcp              the key's project
 //   POST /mcp/<project>    pinned to one project (id, name or slug)
 //   ?mode=write            also the reversible writes
+//   ?mode=code             Code Mode: `search` + `execute` (code_mode.ts);
+//                          ?mode=code,write with the writes
 //   ?readonly=1            reads only — not even deploy_app
 
 export const PUBLIC_URL = 'https://mcp.faable.com'
@@ -81,6 +83,16 @@ export const calls_in = (body: unknown): string[] =>
         m?.method === 'tools/call' && typeof m?.params?.name === 'string'
     )
     .map((m: any) => m.params.name)
+
+// `?mode=write`, `?mode=code`, `?mode=code,write` (repeating `mode` works too).
+export const modes_of = (url: URL) =>
+  new Set(
+    url.searchParams
+      .getAll('mode')
+      .flatMap(m => m.split(','))
+      .map(m => m.trim())
+      .filter(Boolean)
+  )
 
 // /mcp → {}, /mcp/<project> → { project }; anything else → null.
 export const route_of = (pathname: string): { project?: string } | null => {
@@ -242,6 +254,7 @@ export const llms_txt = (base = PUBLIC_URL) =>
     `- \`${base}/mcp/<project>\` pins every call to one project.`,
     '- `?mode=write` adds the reversible writes (create apps, set secrets, add domains, retry or cancel builds, change deploy settings, rotate a Challenge secret). Nothing is ever deleted.',
     '- `?readonly=1` exposes reads only.',
+    '- `?mode=code` is Code Mode: two tools instead of the list below — `search` returns the TypeScript signatures of Faable CLI commands, and `execute` runs JavaScript that calls them as `faable.deploy.apps.list({ latest: true })` in a sandbox (QuickJS, no network or files), so one call can loop over every app. `?mode=code,write` adds the reversible writes.',
     '- Local alternative, no key: `npx -y @faable/faable mcp` (uses `faable login`).',
     '',
     '## Tools',
@@ -408,9 +421,12 @@ export const create_http_server = (opts: HttpOptions) => {
       // consent screen (DEFAULT_SCOPES) or, for an older connection, asked for
       // by step-up — and a tool the client never sees is a permission it never
       // asks for (§377). An API key still needs ?mode=write.
-      const writes = url.searchParams.get('mode') === 'write' || !!granted
+      const modes = modes_of(url)
+      const writes = modes.has('write') || !!granted
       const server = create_server({
         hosted: true,
+        code: modes.has('code'),
+        granted,
         writes,
         readonly: ['1', 'true'].includes(
           url.searchParams.get('readonly') ?? ''

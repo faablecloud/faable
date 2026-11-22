@@ -89,7 +89,8 @@ const parse_command = (mod: CommandModule) => {
   const [first, ...rest] = named.length ? named : forms
   const [name, ...params] = first.split(/\s+/)
   const positionals = params.map(p => ({
-    name: p.replace(/^[<[]|[>\]]$/g, '').replace(/\.\.$/, ''),
+    // `<ids..>` and `[pairs...]` are both variadic.
+    name: p.replace(/^[<[]|[>\]]$/g, '').replace(/\.{2,}$/, ''),
     required: p.startsWith('<'),
     array: p.includes('..')
   }))
