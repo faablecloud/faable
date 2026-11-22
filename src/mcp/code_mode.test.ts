@@ -279,6 +279,10 @@ test('search returns signatures, and only of what this connection has', async t 
     /faable\.deploy\.apps\.create/
   )
   t.regex(await search_text('zzzz', {}), /No command matches/)
+  // Not every word: the commands with the most of them.
+  const loose = await search_text('analytics paths traffic', {})
+  t.regex(loose, /faable\.deploy\.traffic\(/)
+  t.notRegex(loose, /faable\.deploy\.apps\.list\(/)
   t.regex(
     await search_text('setPassword', { writes: true }),
     /faable\.auth\.users\.setPassword/

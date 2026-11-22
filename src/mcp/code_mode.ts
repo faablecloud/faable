@@ -372,25 +372,29 @@ export const search_text = async (query: string, access: CodeAccess) => {
   const q = query.trim()
   // The catalog matcher works on the CLI's words; the code's names are the
   // same words in camelCase.
-  const found = q
-    ? all.filter(c => {
-        const cmd = {
-          path: c.path,
-          aliases: [],
-          describe: c.describe,
-          options: c.options
-        } as any
-        return matches(
-          cmd,
-          q
-            .replace(/([a-z])([A-Z])/g, '$1-$2')
-            .replace(/\./g, ' ')
-            .replace(/\bfaable\b/g, '')
-        )
-      })
+  const words = q
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .replace(/\./g, ' ')
+    .replace(/\bfaable\b/g, '')
+    .split(/\s+/)
+    .filter(Boolean)
+  // Every word, as `faable commands` does; failing that, the commands that
+  // have the most of them ("analytics paths traffic" still finds traffic).
+  const scored = all.map(c => {
+    const cmd = {
+      path: c.path,
+      aliases: [],
+      describe: c.describe,
+      options: c.options
+    } as any
+    return { c, n: words.filter(w => matches(cmd, w)).length }
+  })
+  const best = Math.max(0, ...scored.map(s => s.n))
+  const found = words.length
+    ? scored.filter(s => best > 0 && s.n === best).map(s => s.c)
     : all
   if (!found.length)
-    return `No command matches "${q}". Try fewer words, or search("") for every command.`
+    return `No command matches "${q}". Try other words, or search("") for every command.`
   const shown = q ? found.slice(0, MAX_SIGNATURES) : []
   const rest = q ? found.slice(MAX_SIGNATURES) : found
   return [
