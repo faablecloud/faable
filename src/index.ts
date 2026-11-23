@@ -37,6 +37,9 @@ const yg = yargs()
 yg.scriptName('faable')
   // Keep CLI output in English regardless of the system locale
   .locale('en')
+  // The package's own version. Left to yargs, it looks for a package.json
+  // from the cwd up and prints `unknown` anywhere outside a Node project.
+  .version(version)
   .middleware(async function (argv) {
     if (banner_shown) return
     banner_shown = true

@@ -23,8 +23,9 @@ jobs:
           node-version: "lts/*"
           cache: "npm"
       - run: npm ci
-      - run: npm test
+      # Before the tests: one of them runs the built binary (src/version.test.ts).
       - run: npm run build
+      - run: npm test
       - run: npm audit signatures
       - run: npm run release
         env:
