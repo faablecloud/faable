@@ -52,7 +52,7 @@ const npx_layout = () => {
   return { parent, bin: path.join(cli, 'bin', 'faable.js') }
 }
 
-// Runs the built binary (`npm run build` goes before `npm test` in CI).
+// Runs the built binary: `npm test` builds first (`pretest`).
 test('--version prints the package version when installed by npx', async t => {
   const { parent, bin } = npx_layout()
   const { stdout } = await exec_file(

@@ -69,6 +69,7 @@
     "cli": "tsx src/index.ts",
     "gh-action-cli": "GITHUB_ACTIONS=true FAABLE_ID_TOKEN=fake-token tsx src/index.ts",
     "build": "rimraf dist && rollup --config rollup.config.mjs",
+    "pretest": "npm run build",
     "test": "ava",
     "lint": "npx eslint .",
     "lint:fix": "npx eslint . --fix",
