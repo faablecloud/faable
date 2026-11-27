@@ -79,6 +79,10 @@ export const EFFECTS: Record<string, EffectRule> = {
   'deploy schedule enable': W,
   'deploy schedule disable': W,
   'deploy schedule rm': D,
+  'deploy databases list': R,
+  'deploy databases info': R,
+  // Creates a billed database (idempotent: a second call finds it).
+  'deploy databases create': W,
   'deploy volumes list': R,
   'deploy volumes ls': R,
   'deploy volumes get': R,

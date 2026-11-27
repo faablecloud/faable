@@ -1,6 +1,7 @@
 import { CommandModule } from 'yargs'
 import { link } from '../link'
 import { apps, apps_list_legacy } from './apps'
+import { databases } from './databases'
 import { domains } from './domains'
 import { github } from './github'
 import { capture_deploy_help } from './help'
@@ -57,6 +58,7 @@ export const deploy: CommandModule = {
         .command(run)
         .command(schedule)
         .command(volumes)
+        .command(databases)
         .command(traffic)
         .command(usage)
         .command(quota)

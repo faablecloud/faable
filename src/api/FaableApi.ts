@@ -415,12 +415,25 @@ export type FaableVolumeEntry = {
   mtime: string
 }
 
-// An app's database (api `/database`), as far as moving its data goes.
+// An app's database (api `/database`). Never a password: the api serves none.
 export type FaableDatabase = {
   id: string
   app_id: string
-  engine: 'mariadb'
+  engine: 'mariadb' | 'postgres'
   state: 'provisioning' | 'ready' | 'failed' | 'retained'
+  tier?: string
+  connections?: number | null
+  retain_until?: string | null
+  host?: string | null
+  port?: number | null
+  name?: string | null
+  user?: string | null
+}
+
+export type FaableDatabaseUsage = {
+  size_bytes: number
+  tables: number
+  measured_at: string
 }
 
 export type FaableDatabaseExport = {
@@ -1199,6 +1212,31 @@ export class FaableApi<T = any> {
     return data(
       this.client.get<{ results: FaableDatabase[] }>(`/database`, {
         params: { app_id },
+        headers: projectHeader(team)
+      })
+    )
+  }
+
+  /**
+   * Gives a code app its managed database (idempotent). Postgres waits until
+   * the server has created it (~30 s), hence the long timeout.
+   */
+  async attachDatabase(
+    team: string,
+    app_id: string,
+    body: { engine?: 'mariadb' | 'postgres'; tier?: string }
+  ) {
+    return data(
+      this.client.post<FaableDatabase>(`/app/${app_id}/database`, body, {
+        headers: projectHeader(team),
+        timeout: 120_000
+      })
+    )
+  }
+
+  async getDatabaseUsage(team: string, database_id: string) {
+    return data(
+      this.client.get<FaableDatabaseUsage>(`/database/${database_id}/usage`, {
         headers: projectHeader(team)
       })
     )
