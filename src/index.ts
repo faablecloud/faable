@@ -6,7 +6,7 @@ import { version } from './config'
 import { Configuration } from './lib/Configuration'
 import { ContextStore } from './lib/ContextStore'
 import { notifyIfUpdateAvailable } from './lib/UpdateChecker'
-import { CliError, error_json } from './lib/errors'
+import { CliError, error_json, tenant_disabled_error } from './lib/errors'
 import { is_non_interactive } from './lib/interactive'
 import { guard_read_only } from './lib/read_only'
 import { log } from './log'
@@ -108,7 +108,9 @@ yg.scriptName('faable')
   // lived elsewhere) exited silently with just the version banner.
   .strictCommands()
   .help()
-  .fail(function (msg, err) {
+  .fail(function (msg, raw) {
+    // A disabled Auth tenant says so, whichever command hit it.
+    const err = raw && (tenant_disabled_error(raw) ?? raw)
     if (err) {
       // With --json the caller is a program: the error as JSON too, on
       // stderr, so it can tell a 404 from a 403 without parsing prose

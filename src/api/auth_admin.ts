@@ -4,9 +4,13 @@ import os from 'os'
 import path from 'path'
 import { ContextStore } from '../lib/ContextStore'
 import { CredentialsStore } from '../lib/CredentialsStore'
-import { CliError, NOT_LOGGED_IN } from '../lib/errors'
+import { CliError, NOT_LOGGED_IN, tenant_disabled_error } from '../lib/errors'
 import { FaableApi, FaableAuthAccount } from './FaableApi'
-import { AUTH_DOMAIN, createAnonymousAuthApi, createBearerAuthApi } from './auth'
+import {
+  AUTH_DOMAIN,
+  createAnonymousAuthApi,
+  createBearerAuthApi
+} from './auth'
 import { requireProject } from './project'
 import { isTokenLive, loadLiveCredentials } from './session'
 import { apikey_strategy } from './strategies/apikey.strategy'
@@ -73,8 +77,9 @@ export const resolveTenant = async (
   }
 
   const project = await requireProject(api, store, env)
-  const accounts = (await api.listProjectAuthAccounts(project.id, { pageSize: 200 }))
-    .results
+  const accounts = (
+    await api.listProjectAuthAccounts(project.id, { pageSize: 200 })
+  ).results
   const chosen = await chooseAccount(project.id, accounts, store)
   return {
     account: chosen.id,
@@ -291,6 +296,8 @@ export const hintAuthError = (e: unknown): never => {
       { status, cause: e }
     )
   }
+  const disabled = tenant_disabled_error(e)
+  if (disabled) throw disabled
   if (status === 403) {
     throw new CliError(
       'forbidden',

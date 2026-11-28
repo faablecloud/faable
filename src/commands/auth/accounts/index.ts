@@ -1,6 +1,6 @@
 import { CommandModule } from 'yargs'
-import { requireSessionToken } from '../../../api/auth_admin'
 import { FaableApi } from '../../../api/FaableApi'
+import { requireSessionToken } from '../../../api/auth_admin'
 import { requireProject } from '../../../api/project'
 import { apikey_strategy } from '../../../api/strategies/apikey.strategy'
 import { bearer_strategy } from '../../../api/strategies/bearer.strategy'
@@ -28,6 +28,19 @@ const deploy_api = async () =>
         auth: { token: await requireSessionToken() }
       })
 
+// Switched off without deleting it (arch/auth/tenant-disable.md): by its
+// owner, who enables it again in the dashboard, or by Faable staff, who only
+// support undoes.
+export const tenant_status = (a: {
+  disabled_at?: string | null
+  disabled_by?: string | null
+}) =>
+  !a.disabled_at
+    ? 'active'
+    : a.disabled_by === 'staff'
+      ? 'disabled by Faable staff'
+      : 'disabled'
+
 // `faable auth accounts list` — the Auth tenants of the active project, the
 // ones `faable auth` can manage without --account.
 const accounts_list: CommandModule<unknown, ListArgs> = {
@@ -51,8 +64,14 @@ const accounts_list: CommandModule<unknown, ListArgs> = {
     const active = page.data.length === 1 ? page.data[0].id : stored
     log.info(`🔐 ${page.data.length} Auth tenant(s) in ${project.id}:`)
     for (const line of table_lines(
-      ['', 'ID', 'NAME', 'DOMAIN'],
-      page.data.map(a => [a.id === active ? '*' : '', a.id, a.name, a.domain])
+      ['', 'ID', 'NAME', 'DOMAIN', 'STATUS'],
+      page.data.map(a => [
+        a.id === active ? '*' : '',
+        a.id,
+        a.name,
+        a.domain,
+        tenant_status(a)
+      ])
     )) {
       print(line)
     }
@@ -101,6 +120,8 @@ export const auth_use: CommandModule<unknown, { account: string }> = {
       ...ctx,
       auth_accounts: { ...ctx.auth_accounts, [project.id]: account.id }
     }))
-    log.info(`✅ faable auth now manages ${account.name} (${account.domain}) in ${project.id}.`)
+    log.info(
+      `✅ faable auth now manages ${account.name} (${account.domain}) in ${project.id}.`
+    )
   }
 }

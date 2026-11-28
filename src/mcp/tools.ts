@@ -702,11 +702,19 @@ export const TOOLS: ToolDef[] = [
     name: 'list_auth_tenants',
     title: 'List Auth tenants',
     description:
-      'The Faable Auth tenants (user directories) of a project. Most projects have one and every Auth tool uses it; with several, pass the right one as `tenant`.',
+      'The Faable Auth tenants (user directories) of a project. Most projects have one and every Auth tool uses it; with several, pass the right one as `tenant`. A `disabled` tenant refuses every sign-in and change (reads still work); disabled_by `staff` means only support@faable.com can restore it, `owner` that it is enabled again from the dashboard.',
     input: { project },
     command: ['auth', 'accounts', 'list'],
     flags: scope,
-    shape: page((a: any) => ({ id: a.id, name: a.name, domain: a.domain })),
+    shape: page((a: any) => ({
+      id: a.id,
+      name: a.name,
+      domain: a.domain,
+      // Disabled: nobody signs in and writes get 403 account_disabled; reads
+      // work. `staff`: only support@faable.com restores it.
+      disabled: !!a.disabled_at,
+      disabled_by: a.disabled_at ? (a.disabled_by ?? 'owner') : undefined
+    })),
     annotations: AUTH_READ,
     example: { project: 'p' }
   },

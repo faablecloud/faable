@@ -55,6 +55,9 @@ export interface FaableAuthAccount {
   domain: string
   slug?: string
   team?: string
+  /** Switched off without deleting it, and by whom (arch/auth/tenant-disable.md). */
+  disabled_at?: string | null
+  disabled_by?: 'owner' | 'staff' | null
 }
 
 export interface PageParams {
