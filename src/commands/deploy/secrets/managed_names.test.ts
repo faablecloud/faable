@@ -16,7 +16,8 @@ test('every FAABLE_* injected name is reserved', t => {
     'FAABLE_DEPLOY_ID',
     'FAABLE_RELEASE',
     'FAABLE_GIT_COMMIT',
-    'FAABLE_GIT_REF'
+    'FAABLE_GIT_REF',
+    'FAABLE_PROXY_SECRET'
   ]) {
     t.is(managed_name(name)?.kind, 'reserved', name)
   }

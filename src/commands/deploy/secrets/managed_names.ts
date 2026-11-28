@@ -49,6 +49,10 @@ export const MANAGED_ENV_NAMES: Record<string, ManagedName> = {
     detail: 'to the commit the deployment was built from'
   },
   FAABLE_GIT_REF: { kind: 'reserved', detail: 'to the deployed git ref' },
+  FAABLE_PROXY_SECRET: {
+    kind: 'reserved',
+    detail: "to this app's edge secret, when enabled (never displayed)"
+  },
   START_COMMAND: {
     kind: 'reserved',
     detail: "to the artifact's start command"
