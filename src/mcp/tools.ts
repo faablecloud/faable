@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CONNECTION_TYPES } from '../commands/auth/connections/body'
 import { version } from '../config'
 
 // The tool catalog of `faable mcp` — catalog v1 of
@@ -172,6 +173,14 @@ const log_user = (l: any) =>
       : {}
 
 const AUTH_READ = { ...READ } as const
+
+// A connection as the agent needs it: never its client secret.
+const connection_row = (c: any) => ({
+  id: c.id,
+  connection_name: c.connection_name,
+  connection_type: c.connection_type,
+  enabled: !!c.enabled
+})
 
 // ── Auth APIs: the settings create_auth_api and update_auth_api take ────────
 // Same names as the API fields; the CLI flag is the field in kebab case
@@ -2108,6 +2117,92 @@ export const TOOLS: ToolDef[] = [
       only: ['OTP'],
       passkey: 'on'
     }
+  },
+  {
+    name: 'create_auth_connection',
+    title: 'Add a login method',
+    description:
+      'Create a login method (connection) in the Auth tenant: `passwordless_email` (a code by email), `database` (username and password), a social provider (google_oauth2, github, microsoft, apple…) or `oidc` (any OpenID Connect identity provider, with `issuer`, `client_id` and `client_secret`). A new tenant has none, and its apps fail at login with "has no login method available" until one exists. Google, GitHub and Microsoft work without a client_id (Faable\'s shared app). Every app of the tenant offers it unless it removed it (update_auth_client_login). Check list_auth_connections first so you do not create a duplicate.',
+    input: {
+      name: z
+        .string()
+        .min(1)
+        .max(120)
+        .describe('Connection name, e.g. email or google'),
+      type: z.enum(CONNECTION_TYPES),
+      enabled: z.boolean().optional().describe('Create it on (default) or off'),
+      client_id: z
+        .string()
+        .optional()
+        .describe("Social/oidc: the client id of the user's own OAuth app"),
+      client_secret: z
+        .string()
+        .optional()
+        .describe(
+          "Social/oidc: the client secret of the user's own OAuth app (Apple: the .p8 key). Sent on stdin; never returned"
+        ),
+      issuer: z.string().optional().describe('oidc: the issuer URL'),
+      scope: z
+        .array(z.string())
+        .max(30)
+        .optional()
+        .describe("OAuth scopes (default: the provider's)"),
+      disable_signup: z
+        .boolean()
+        .optional()
+        .describe('Only existing users may log in with it'),
+      tenant,
+      project
+    },
+    command: ['auth', 'connections', 'create'],
+    flags: a => [
+      // A name may start with "-": glued with "=" it can only be the value.
+      `--name=${a.name}`,
+      '--type',
+      a.type,
+      ...(a.enabled === false ? ['--no-enabled'] : []),
+      ...optText('--client-id', a.client_id),
+      // The secret goes on stdin, never in argv.
+      ...(a.client_secret ? ['--client-secret-file', '-'] : []),
+      ...optText('--issuer', a.issuer),
+      ...(a.scope ?? []).flatMap((s: string) => [`--scope=${s}`]),
+      ...(a.disable_signup === undefined
+        ? []
+        : [a.disable_signup ? '--disable-signup' : '--no-disable-signup']),
+      ...auth_scope(a)
+    ],
+    stdin: a => a.client_secret ?? '',
+    shape: connection_row,
+    write: true,
+    // The hosted token only reads connections (api tenant_access.ts): a
+    // login method decides who gets into every app of the tenant.
+    local_only: true,
+    annotations: { ...AUTH_WRITE, idempotentHint: false },
+    example: { name: 'email', type: 'passwordless_email' }
+  },
+  {
+    name: 'update_auth_connection',
+    title: 'Turn a login method on or off',
+    description:
+      'Enable or disable one login method (connection) of the Auth tenant, by id or name as list_auth_connections shows them. Off is reversible: the connection and the identities linked to it stay, but nobody can log in with it until it is on again — confirm with the user before turning off the only one an app offers. To hide it on a single app instead, use update_auth_client_login.',
+    input: {
+      connection: z.string().describe('Connection id (connection_…) or name'),
+      enabled: z.boolean(),
+      tenant,
+      project
+    },
+    command: ['auth', 'connections', 'update'],
+    flags: a => [
+      a.connection,
+      a.enabled ? '--enabled' : '--no-enabled',
+      ...auth_scope(a)
+    ],
+    shape: connection_row,
+    write: true,
+    // See create_auth_connection.
+    local_only: true,
+    annotations: AUTH_WRITE,
+    example: { connection: 'email', enabled: false }
   },
   {
     name: 'update_auth_client_signup_protection',
